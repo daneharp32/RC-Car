@@ -65,26 +65,42 @@ grid.material.opacity = 0.09;
 scene.add(grid);
 
 const jumpLocations = [
-  { x: 0, z: -12, angle: 0.19 },
-  { x: -15, z: 7, angle: 0.16 },
-  { x: 16, z: 18, angle: 0.18 },
-  { x: 4, z: 34, angle: 0.15 }
+  { x: 0, z: -12, yaw: 0 },
+  { x: -15, z: 7, yaw: 0 },
+  { x: 16, z: 18, yaw: 0 },
+  { x: 4, z: 34, yaw: 0 }
 ];
 const jumpMaterial = new THREE.MeshStandardMaterial({ color: 0x806b50, roughness: 0.96 });
+
+function makeRampGeometry(width, length, height) {
+  const w = width / 2;
+  const l = length / 2;
+  const vertices = [
+    [-w, 0, l], [w, 0, l], [-w, 0, -l],
+    [w, 0, -l], [-w, height, -l], [w, height, -l]
+  ];
+  const faces = [
+    [0, 2, 3, 1], [0, 1, 5, 4], [0, 4, 2],
+    [1, 3, 5], [2, 4, 5, 3]
+  ];
+  const indices = [];
+  for (const face of faces) {
+    for (let i = 1; i < face.length - 1; i++) indices.push(face[0], face[i], face[i + 1]);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices.flat(), 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 for (const jump of jumpLocations) {
-  const ramp = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.44, 3.2), jumpMaterial);
-  ramp.position.set(jump.x, 0.22, jump.z);
-  ramp.rotation.x = jump.angle;
+  const ramp = new THREE.Mesh(makeRampGeometry(4.4, 4.2, 0.62), jumpMaterial);
+  ramp.position.set(jump.x, 0, jump.z);
+  ramp.rotation.y = jump.yaw;
   ramp.castShadow = true;
   ramp.receiveShadow = true;
   scene.add(ramp);
-  const marker = new THREE.Mesh(
-    new THREE.BoxGeometry(4.35, 0.045, 3.3),
-    new THREE.MeshStandardMaterial({ color: 0xc6a477, roughness: 1 })
-  );
-  marker.position.set(jump.x, 0.445, jump.z);
-  marker.rotation.x = jump.angle;
-  scene.add(marker);
 }
 
 // Physics: Cannon's RaycastVehicle applies suspension and tire impulses only
@@ -103,12 +119,22 @@ groundBody.addShape(new CANNON.Plane());
 groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
 world.addBody(groundBody);
 
-// Match the visible practice jumps with static collision ramps.
+// Matching convex wedge colliders keep the approach edge flush with the ground.
 for (const jump of jumpLocations) {
+  const w = 2.2, l = 2.1, h = 0.62;
+  const vertices = [
+    new CANNON.Vec3(-w, 0, l), new CANNON.Vec3(w, 0, l),
+    new CANNON.Vec3(-w, 0, -l), new CANNON.Vec3(w, 0, -l),
+    new CANNON.Vec3(-w, h, -l), new CANNON.Vec3(w, h, -l)
+  ];
+  const faces = [
+    [0, 2, 3, 1], [0, 1, 5, 4], [0, 4, 2],
+    [1, 3, 5], [2, 4, 5, 3]
+  ];
   const rampBody = new CANNON.Body({ mass: 0, material: groundBody.material });
-  rampBody.addShape(new CANNON.Box(new CANNON.Vec3(2.1, 0.22, 1.6)));
-  rampBody.position.set(jump.x, 0.22, jump.z);
-  rampBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), jump.angle);
+  rampBody.addShape(new CANNON.ConvexPolyhedron({ vertices, faces }));
+  rampBody.position.set(jump.x, 0, jump.z);
+  rampBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), jump.yaw);
   world.addBody(rampBody);
 }
 
@@ -639,10 +665,19 @@ function animate(now) {
   const touching = vehicle.wheelInfos.filter((wheel) => wheel.isInContact).length;
   $("wheelStatus").textContent = touching + " / 4 TIRES IN CONTACT";
 
-  const cameraOffset = new THREE.Vector3(0, 2.45, 5.3).applyQuaternion(localCar.root.quaternion);
-  const desiredCamera = localCar.root.position.clone().add(cameraOffset);
-  camera.position.lerp(desiredCamera, 1 - Math.exp(-4.5 * delta));
-  const lookTarget = localCar.root.position.clone().add(new THREE.Vector3(0, 0.36, -0.7).applyQuaternion(localCar.root.quaternion));
+  // Follow horizontal heading only; ignore chassis pitch and roll.
+  const carForward = new THREE.Vector3(0, 0, -1).applyQuaternion(localCar.root.quaternion);
+  carForward.y = 0;
+  if (carForward.lengthSq() < 0.0001) carForward.set(0, 0, -1);
+  carForward.normalize();
+  const desiredCamera = localCar.root.position.clone()
+    .addScaledVector(carForward, -5.8)
+    .add(new THREE.Vector3(0, 2.8, 0));
+  camera.position.lerp(desiredCamera, 1 - Math.exp(-2.8 * delta));
+  const lookTarget = localCar.root.position.clone()
+    .add(new THREE.Vector3(0, 0.28, 0))
+    .addScaledVector(carForward, 0.85);
+  camera.up.set(0, 1, 0);
   camera.lookAt(lookTarget);
 
   networkTimer += delta;
