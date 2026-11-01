@@ -460,6 +460,40 @@ function updateRemoteVisuals(delta) {
   updatePlayerCount();
 }
 
+// Drag the view around the car. Pointer events support both mouse and touch.
+let cameraOrbitYaw = 0;
+let cameraDragging = false;
+let cameraPointerId = null;
+let cameraLastX = 0;
+canvas.style.touchAction = "none";
+canvas.style.cursor = "grab";
+
+canvas.addEventListener("pointerdown", (event) => {
+  if (event.button !== 0 && event.pointerType === "mouse") return;
+  cameraDragging = true;
+  cameraPointerId = event.pointerId;
+  cameraLastX = event.clientX;
+  canvas.style.cursor = "grabbing";
+  canvas.setPointerCapture(event.pointerId);
+});
+
+canvas.addEventListener("pointermove", (event) => {
+  if (!cameraDragging || event.pointerId !== cameraPointerId) return;
+  const deltaX = event.clientX - cameraLastX;
+  cameraLastX = event.clientX;
+  cameraOrbitYaw += deltaX * 0.006;
+});
+
+function stopCameraDrag(event) {
+  if (!cameraDragging || (event && event.pointerId !== cameraPointerId)) return;
+  cameraDragging = false;
+  cameraPointerId = null;
+  canvas.style.cursor = "grab";
+}
+canvas.addEventListener("pointerup", stopCameraDrag);
+canvas.addEventListener("pointercancel", stopCameraDrag);
+canvas.addEventListener("lostpointercapture", stopCameraDrag);
+
 // Keyboard controls
 const keys = Object.create(null);
 const controlKeys = new Set(["w", "a", "s", "d", " ", "r", "arrowup", "arrowdown", "arrowleft", "arrowright"]);
@@ -486,7 +520,6 @@ function resetCar() {
   chassisBody.velocity.set(0, 0, 0);
   chassisBody.angularVelocity.set(0, 0, 0);
   throttleState = 0;
-  brakeState = 0;
   steerState = 0;
   chassisBody.force.set(0, 0, 0);
   chassisBody.torque.set(0, 0, 0);
@@ -501,12 +534,11 @@ function resetCar() {
 
 let steerState = 0;
 let throttleState = 0;
-let brakeState = 0;
-function updateDrivingControls() {
+function updateDrivingControls(delta) {
   if (!joined) {
     for (let i = 0; i < 4; i++) {
       vehicle.applyEngineForce(0, i);
-      vehicle.setBrake(5, i);
+      vehicle.setBrake(0, i);
     }
     return;
   }
@@ -528,12 +560,16 @@ function updateDrivingControls() {
   throttleState += (throttle - throttleState) * 0.12;
   const speedLimitScale = THREE.MathUtils.clamp(1 - speed / 24, 0.28, 1);
   const engineForce = throttleState * 25 * speedLimitScale;
-  // Ramp brake pressure in gently to avoid pitching the truck forward.
-  const brakeTarget = keys[" "] ? 3.2 : 0;
-  brakeState += (brakeTarget - brakeState) * 0.16;
+  // Slow the chassis horizontally instead of applying wheel-brake torque.
+  // This avoids the abrupt nose-down pitching that was causing front flips.
   for (let i = 0; i < 4; i++) {
     vehicle.applyEngineForce(engineForce, i);
-    vehicle.setBrake(brakeState, i);
+    vehicle.setBrake(0, i);
+  }
+  if (keys[" "] && delta > 0) {
+    const brakeFactor = Math.exp(-2.7 * delta);
+    chassisBody.velocity.x *= brakeFactor;
+    chassisBody.velocity.z *= brakeFactor;
   }
 
   // Reduce excessive pitch and roll spin while grounded, but keep jumps lively.
@@ -659,7 +695,7 @@ function animate(now) {
   const delta = Math.min((now - lastTime) / 1000, 0.05);
   lastTime = now;
 
-  updateDrivingControls();
+  updateDrivingControls(delta);
   world.step(FIXED_STEP, delta, 3);
   updateLocalVisual();
   updateRemoteVisuals(delta);
@@ -674,8 +710,9 @@ function animate(now) {
   carForward.y = 0;
   if (carForward.lengthSq() < 0.0001) carForward.set(0, 0, -1);
   carForward.normalize();
+  const cameraDirection = carForward.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraOrbitYaw);
   const desiredCamera = localCar.root.position.clone()
-    .addScaledVector(carForward, -5.8)
+    .addScaledVector(cameraDirection, -5.8)
     .add(new THREE.Vector3(0, 2.8, 0));
   camera.position.lerp(desiredCamera, 1 - Math.exp(-2.8 * delta));
   const lookTarget = localCar.root.position.clone()
