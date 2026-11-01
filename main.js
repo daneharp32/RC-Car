@@ -209,126 +209,109 @@ const hubMaterial = new THREE.MeshStandardMaterial({ color: 0x333b40, metalness:
 
 function makeCarVisual(color, playerName = "") {
   const root = new THREE.Group();
-  const shellMaterial = new THREE.MeshStandardMaterial({
-    color,
-    roughness: 0.52,
-    metalness: 0.12
-  });
-  const darkMaterial = new THREE.MeshStandardMaterial({ color: 0x242a2e, roughness: 0.7 });
-  const glassMaterial = new THREE.MeshStandardMaterial({
-    color: 0x253a46,
-    roughness: 0.22,
-    metalness: 0.14
-  });
-  const lightMaterial = new THREE.MeshStandardMaterial({
-    color: 0xffe4a4,
-    emissive: 0xffb84d,
-    emissiveIntensity: 0.7
-  });
-
-  function box(size, material, position, parent = root) {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
-    mesh.position.set(...position);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    parent.add(mesh);
-    return mesh;
+  const chassisGroup = new THREE.Group();
+  const shellGroup = new THREE.Group();
+  root.add(chassisGroup, shellGroup);
+  const paint = new THREE.MeshStandardMaterial({ color, roughness: 0.48, metalness: 0.08 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x202a32, roughness: 0.72 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x172d3b, roughness: 0.2, metalness: 0.15 });
+  const metal = new THREE.MeshStandardMaterial({ color: 0x89959b, metalness: 0.72, roughness: 0.34 });
+  const black = new THREE.MeshStandardMaterial({ color: 0x11171c, roughness: 0.8 });
+  const red = new THREE.MeshStandardMaterial({ color: 0xd84b35, roughness: 0.55 });
+  const lamp = new THREE.MeshStandardMaterial({ color: 0xffe7b5, emissive: 0xffb84d, emissiveIntensity: 0.8 });
+  function box(parent, size, mat, pos, rot) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(...size), mat);
+    m.position.set(...pos); if (rot) m.rotation.set(...rot);
+    m.castShadow = true; m.receiveShadow = true; parent.add(m); return m;
   }
-
-  box([0.56, 0.105, 0.77], darkMaterial, [0, -0.015, 0]);
-  box([0.57, 0.135, 0.69], shellMaterial, [0, 0.075, 0.015]);
-  box([0.54, 0.075, 0.28], shellMaterial, [0, 0.143, -0.235]);
-  box([0.405, 0.12, 0.30], glassMaterial, [0, 0.195, 0.015]);
-  box([0.43, 0.035, 0.33], shellMaterial, [0, 0.27, 0.015]);
-  box([0.63, 0.075, 0.10], darkMaterial, [0, -0.005, -0.435]);
-  box([0.63, 0.075, 0.10], darkMaterial, [0, -0.005, 0.435]);
-  box([0.48, 0.055, 0.055], shellMaterial, [0, 0.12, 0.39]);
-  box([0.51, 0.035, 0.12], darkMaterial, [0, 0.24, 0.43]);
-  box([0.07, 0.045, 0.025], lightMaterial, [-0.19, 0.13, -0.382]);
-  box([0.07, 0.045, 0.025], lightMaterial, [0.19, 0.13, -0.382]);
-
-  // Simple roll-cage rails make the small truck read clearly from the chase camera.
-  const cagePoints = [
-    [[-0.22, 0.13, -0.10], [-0.22, 0.31, -0.10]],
-    [[ 0.22, 0.13, -0.10], [ 0.22, 0.31, -0.10]],
-    [[-0.22, 0.31, -0.10], [-0.22, 0.31, 0.16]],
-    [[ 0.22, 0.31, -0.10], [ 0.22, 0.31, 0.16]],
-    [[-0.22, 0.31, 0.16], [-0.22, 0.13, 0.16]],
-    [[ 0.22, 0.31, 0.16], [ 0.22, 0.13, 0.16]]
-  ];
-  for (const [a, b] of cagePoints) {
-    const start = new THREE.Vector3(...a);
-    const end = new THREE.Vector3(...b);
-    const length = start.distanceTo(end);
-    const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, length, 7), darkMaterial);
-    rail.position.copy(start).add(end).multiplyScalar(0.5);
-    rail.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), end.sub(start).normalize());
-    rail.castShadow = true;
-    root.add(rail);
+  function beam(parent, a, b, r, mat) {
+    const p = new THREE.Vector3(...a), q = new THREE.Vector3(...b), d = q.clone().sub(p);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r,r,d.length(),8),mat);
+    m.position.copy(p).add(q).multiplyScalar(.5);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize());
+    m.castShadow=true; parent.add(m);
   }
-
-  const wheelPivots = [];
-  for (let i = 0; i < 4; i++) {
-    const pivot = new THREE.Group();
-    pivot.position.set(...wheelPositions[i]);
-    root.add(pivot);
-
-    const tire = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.13, 0.13, 0.105, 20),
-      rubberMaterial
-    );
-    tire.rotation.z = Math.PI / 2;
-    tire.castShadow = true;
-    tire.receiveShadow = true;
-    pivot.add(tire);
-
-    const rim = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.077, 0.077, 0.109, 16),
-      rimMaterial
-    );
-    rim.rotation.z = Math.PI / 2;
-    rim.castShadow = true;
-    pivot.add(rim);
-
-    const hub = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.028, 0.028, 0.112, 12),
-      hubMaterial
-    );
-    hub.rotation.z = Math.PI / 2;
-    pivot.add(hub);
-    wheelPivots.push(pivot);
+  // Exposed tub chassis, bumpers, electronics, suspension arms and dampers.
+  box(chassisGroup,[.43,.075,.78],metal,[0,-.035,0]);
+  box(chassisGroup,[.34,.045,.43],black,[0,.018,.02]);
+  box(chassisGroup,[.23,.075,.22],red,[0,.075,-.02]);
+  box(chassisGroup,[.19,.045,.16],dark,[0,.125,.17]);
+  box(chassisGroup,[.25,.06,.15],dark,[0,.075,-.27]);
+  for (const z of [-.29,.29]) {
+    box(chassisGroup,[.08,.2,.035],metal,[0,.12,z]);
+    for (const side of [-1,1]) {
+      beam(chassisGroup,[side*.12,-.055,z],[side*.34,-.065,z+(z<0?-.035:.035)],.025,black);
+      beam(chassisGroup,[side*.19,.02,z],[side*.29,.25,z],.018,metal);
+      beam(chassisGroup,[side*.29,.25,z],[side*.34,-.06,z],.014,metal);
+      beam(chassisGroup,[side*.29,.25,z],[side*.29,.17,z],.027,red);
+    }
   }
-
-  if (playerName) {
-    const tagCanvas = document.createElement("canvas");
-    tagCanvas.width = 512;
-    tagCanvas.height = 128;
-    const ctx = tagCanvas.getContext("2d");
-    ctx.fillStyle = "rgba(13,20,29,0.80)";
-    ctx.beginPath();
-    ctx.roundRect(8, 14, 496, 100, 28);
-    ctx.fill();
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 46px system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(playerName.slice(0, 18), 256, 64);
-    const texture = new THREE.CanvasTexture(tagCanvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    const tag = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: texture,
-      transparent: true,
-      depthWrite: false
-    }));
-    tag.position.set(0, 0.76, 0);
-    tag.scale.set(1.2, 0.3, 1);
-    root.add(tag);
+  box(chassisGroup,[.59,.085,.105],black,[0,-.005,-.49]);
+  box(chassisGroup,[.59,.085,.105],black,[0,-.005,.49]);
+  beam(chassisGroup,[0,.02,-.25],[0,.02,.25],.025,metal);
+  for (const side of [-1,1]) {
+    beam(chassisGroup,[side*.19,.07,-.08],[side*.19,.28,.18],.012,metal);
+    beam(chassisGroup,[side*.19,.28,.18],[side*.19,.07,.34],.012,metal);
+    beam(chassisGroup,[side*.19,.28,.18],[-side*.19,.28,.18],.012,metal);
   }
-
+  // Moulded pickup shell: low front nose, cab glazing, broad sides and rear bed.
+  box(shellGroup,[.64,.105,.76],paint,[0,.105,.015]);
+  box(shellGroup,[.61,.09,.26],paint,[0,.155,-.34]);
+  box(shellGroup,[.59,.075,.22],paint,[0,.145,.31]);
+  box(shellGroup,[.43,.035,.28],paint,[0,.245,.015]);
+  box(shellGroup,[.42,.16,.025],glass,[0,.205,-.13],[-.48,0,0]);
+  box(shellGroup,[.39,.105,.025],glass,[0,.21,.16],[.55,0,0]);
+  for (const side of [-1,1]) {
+    box(shellGroup,[.018,.12,.31],glass,[side*.218,.205,.015]);
+    box(shellGroup,[.025,.055,.43],black,[side*.307,.075,.015]);
+    for (const z of [-.29,.29]) {
+      const arch=new THREE.Mesh(new THREE.TorusGeometry(.158,.018,7,24,Math.PI),black);
+      arch.rotation.z=Math.PI; arch.rotation.y=Math.PI/2;
+      arch.position.set(side*.315,-.005,z); arch.castShadow=true; shellGroup.add(arch);
+    }
+  }
+  box(shellGroup,[.44,.035,.31],paint,[0,.29,.015]);
+  box(shellGroup,[.62,.075,.095],black,[0,.045,-.47]);
+  box(shellGroup,[.62,.075,.095],black,[0,.045,.47]);
+  box(shellGroup,[.58,.035,.13],black,[0,.32,.53],[-.08,0,0]);
+  for (const side of [-1,1]) {
+    beam(shellGroup,[side*.18,.18,.40],[side*.18,.31,.52],.012,black);
+    box(shellGroup,[.105,.045,.025],lamp,[side*.205,.155,-.473]);
+    box(shellGroup,[.105,.04,.025],red,[side*.205,.16,.473]);
+  }
+  // Chunky all-terrain tyres, rims and hubs.
+  const rubber=new THREE.MeshStandardMaterial({color:0x17191b,roughness:.98});
+  const rim=new THREE.MeshStandardMaterial({color:0xaeb8bd,metalness:.7,roughness:.32});
+  const hub=new THREE.MeshStandardMaterial({color:0x303a40,metalness:.38,roughness:.52});
+  const wheelPivots=[];
+  for(let i=0;i<4;i++){
+    const pivot=new THREE.Group(); pivot.position.set(...wheelPositions[i]); root.add(pivot);
+    const tire=new THREE.Mesh(new THREE.CylinderGeometry(.145,.145,.115,24),rubber);
+    tire.rotation.z=Math.PI/2; tire.castShadow=true; tire.receiveShadow=true; pivot.add(tire);
+    for(let n=0;n<18;n++){
+      const angle=n/18*Math.PI*2;
+      const lug=new THREE.Mesh(new THREE.BoxGeometry(.12,.035,.026),rubber);
+      lug.position.set(0,Math.cos(angle)*.14,Math.sin(angle)*.14);
+      lug.rotation.x=-angle; lug.castShadow=true; pivot.add(lug);
+    }
+    const r=new THREE.Mesh(new THREE.CylinderGeometry(.083,.083,.12,16),rim);
+    r.rotation.z=Math.PI/2; r.castShadow=true; pivot.add(r);
+    const h=new THREE.Mesh(new THREE.CylinderGeometry(.03,.03,.124,12),hub);
+    h.rotation.z=Math.PI/2; pivot.add(h); wheelPivots.push(pivot);
+  }
+  if(playerName){
+    const c=document.createElement("canvas"); c.width=512;c.height=128;
+    const ctx=c.getContext("2d");ctx.fillStyle="rgba(13,20,29,.8)";
+    ctx.beginPath();ctx.roundRect(8,14,496,100,28);ctx.fill();
+    ctx.fillStyle="#fff";ctx.font="bold 46px system-ui";ctx.textAlign="center";ctx.textBaseline="middle";
+    ctx.fillText(playerName.slice(0,18),256,64);
+    const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;
+    const tag=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));
+    tag.position.set(0,.88,0);tag.scale.set(1.2,.3,1);root.add(tag);
+  }
   scene.add(root);
-  return { root, wheelPivots };
+  return {root,wheelPivots,shellGroup,chassisGroup,setShellVisible(v){shellGroup.visible=v;}};
 }
-
 const localCar = makeCarVisual(0xffa33d);
 
 // Illuminated showroom used by the main menu and garage.
@@ -393,6 +376,7 @@ function parkCarForShowroom() {
   updateLocalVisual();
 }
 function showMainMenu() {
+  setGarageShellVisible(true);
   viewMode = "menu";
   mainMenuPanel.style.display = "block";
   garagePanel.style.display = "none";
@@ -403,6 +387,7 @@ function showMainMenu() {
   parkCarForShowroom();
 }
 function showGarage() {
+  setGarageShellVisible(true);
   viewMode = "garage";
   mainMenuPanel.style.display = "none";
   garagePanel.style.display = "block";
@@ -412,6 +397,13 @@ function showGarage() {
   setArenaVisible(false);
   parkCarForShowroom();
 }
+function setGarageShellVisible(visible) {
+  localCar.setShellVisible(visible);
+  $("shellToggleButton").textContent = visible ? "REMOVE BODY SHELL" : "REINSTALL BODY SHELL";
+}
+$("shellToggleButton").addEventListener("click", () => {
+  setGarageShellVisible(!localCar.shellGroup.visible);
+});
 function showDriveScreen() {
   viewMode = "drive";
   mainMenuPanel.style.display = "none";
