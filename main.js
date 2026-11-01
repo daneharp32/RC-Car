@@ -27,7 +27,7 @@ renderer.toneMappingExposure = 1.08;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xb6c8cc);
-scene.fog = new THREE.Fog(0xb6c8cc, 30, 82);
+scene.fog = new THREE.Fog(0xb6c8cc, 65, 155);
 
 const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 180);
 camera.position.set(0, 3.1, 5.8);
@@ -57,85 +57,42 @@ groundMesh.position.y = -0.025;
 groundMesh.receiveShadow = true;
 scene.add(groundMesh);
 
-function addTrackLine(radiusX, radiusZ, color, opacity = 0.8) {
-  const points = [];
-  for (let i = 0; i <= 180; i++) {
-    const a = (i / 180) * Math.PI * 2;
-    points.push(new THREE.Vector3(Math.cos(a) * radiusX, 0.006, Math.sin(a) * radiusZ));
-  }
-  const geometry = new THREE.BufferGeometry().setFromPoints(points);
-  const line = new THREE.Line(
-    geometry,
-    new THREE.LineBasicMaterial({ color, transparent: true, opacity })
-  );
-  scene.add(line);
-}
+// Wide-open practice field with a few separated, low-profile jumps.
+const groundMaterial = new THREE.MeshStandardMaterial({ color: 0xa18d70, roughness: 1 });
+const groundMesh = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), groundMaterial);
+groundMesh.rotation.x = -Math.PI / 2;
+groundMesh.position.y = -0.025;
+groundMesh.receiveShadow = true;
+scene.add(groundMesh);
 
-addTrackLine(10.5, 14, 0xe0c69d, 0.72);
-addTrackLine(8.9, 12.4, 0x76644e, 0.4);
-
-const grid = new THREE.GridHelper(48, 48, 0x786d5d, 0xa99a81);
+const grid = new THREE.GridHelper(100, 50, 0x786d5d, 0xa99a81);
 grid.position.y = 0.002;
 grid.material.transparent = true;
-grid.material.opacity = 0.13;
+grid.material.opacity = 0.09;
 scene.add(grid);
 
-function addCone(x, z, color = 0xff8538) {
-  const cone = new THREE.Mesh(
-    new THREE.ConeGeometry(0.19, 0.48, 12),
-    new THREE.MeshStandardMaterial({ color, roughness: 0.78 })
+const jumpLocations = [
+  { x: 0, z: -12, angle: 0.19 },
+  { x: -15, z: 7, angle: 0.16 },
+  { x: 16, z: 18, angle: 0.18 },
+  { x: 4, z: 34, angle: 0.15 }
+];
+const jumpMaterial = new THREE.MeshStandardMaterial({ color: 0x806b50, roughness: 0.96 });
+for (const jump of jumpLocations) {
+  const ramp = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.44, 3.2), jumpMaterial);
+  ramp.position.set(jump.x, 0.22, jump.z);
+  ramp.rotation.x = jump.angle;
+  ramp.castShadow = true;
+  ramp.receiveShadow = true;
+  scene.add(ramp);
+  const marker = new THREE.Mesh(
+    new THREE.BoxGeometry(4.35, 0.045, 3.3),
+    new THREE.MeshStandardMaterial({ color: 0xc6a477, roughness: 1 })
   );
-  cone.position.set(x, 0.24, z);
-  cone.castShadow = true;
-  cone.receiveShadow = true;
-  scene.add(cone);
-
-  const base = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.23, 0.23, 0.055, 12),
-    new THREE.MeshStandardMaterial({ color: 0x282c30, roughness: 1 })
-  );
-  base.position.set(x, 0.03, z);
-  base.castShadow = true;
-  scene.add(base);
+  marker.position.set(jump.x, 0.445, jump.z);
+  marker.rotation.x = jump.angle;
+  scene.add(marker);
 }
-
-[
-  [-5.5, -8], [5.5, -8], [-7.2, -2], [7.2, -2],
-  [-7.2, 7], [7.2, 7], [-3.4, 11], [3.4, 11],
-  [-10.5, 0], [10.5, 0]
-].forEach(([x, z], i) => addCone(x, z, i % 3 === 0 ? 0xffb14d : 0xff8538));
-
-function addBarrier(x, z, length, alongX = true) {
-  const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(alongX ? length : 0.22, 0.34, alongX ? 0.22 : length),
-    new THREE.MeshStandardMaterial({ color: 0x4d5559, roughness: 0.9 })
-  );
-  mesh.position.set(x, 0.17, z);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  scene.add(mesh);
-}
-addBarrier(0, -17, 34, true);
-addBarrier(0, 17, 34, true);
-addBarrier(-17, 0, 34, false);
-addBarrier(17, 0, 34, false);
-
-// A few visual paddock details give the flat practice area a sense of scale.
-for (let i = -2; i <= 2; i++) {
-  const post = new THREE.Mesh(
-    new THREE.BoxGeometry(0.12, 1.05, 0.12),
-    new THREE.MeshStandardMaterial({ color: 0x555b5c, roughness: 0.95 })
-  );
-  post.position.set(i * 4, 0.52, -17.15);
-  post.castShadow = true;
-  scene.add(post);
-}
-const sign = new THREE.Mesh(
-  new THREE.BoxGeometry(3.8, 0.76, 0.12),
-  new THREE.MeshStandardMaterial({ color: 0x25323a, roughness: 0.72 })
-);
-sign.position.set(0, 1.35, -17.1);
-scene.add(sign);
 
 // Physics: Cannon's RaycastVehicle applies suspension and tire impulses only
 // when each wheel ray has actually found a surface to touch.
@@ -153,6 +110,15 @@ groundBody.addShape(new CANNON.Plane());
 groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
 world.addBody(groundBody);
 
+// Match the visible practice jumps with static collision ramps.
+for (const jump of jumpLocations) {
+  const rampBody = new CANNON.Body({ mass: 0, material: groundBody.material });
+  rampBody.addShape(new CANNON.Box(new CANNON.Vec3(2.1, 0.22, 1.6)));
+  rampBody.position.set(jump.x, 0.22, jump.z);
+  rampBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), jump.angle);
+  world.addBody(rampBody);
+}
+
 const chassisMaterial = new CANNON.Material("chassis");
 world.addContactMaterial(new CANNON.ContactMaterial(chassisMaterial, groundBody.material, {
   friction: 0.25,
@@ -167,11 +133,11 @@ const spawnX = Math.cos(spawnAngle) * 3;
 const spawnZ = Math.sin(spawnAngle) * 3;
 
 const chassisBody = new CANNON.Body({
-  mass: 6.2,
+  mass: 8.0,
   material: chassisMaterial,
   position: new CANNON.Vec3(spawnX, 0.24, spawnZ),
   linearDamping: 0.10,
-  angularDamping: 0.42
+  angularDamping: 0.72
 });
 chassisBody.addShape(new CANNON.Box(new CANNON.Vec3(0.28, 0.075, 0.41)));
 chassisBody.allowSleep = false;
@@ -197,14 +163,14 @@ for (let i = 0; i < 4; i++) {
     directionLocal: new CANNON.Vec3(0, -1, 0),
     axleLocal: new CANNON.Vec3(-1, 0, 0),
     suspensionRestLength: 0.12,
-    suspensionStiffness: 55,
-    dampingCompression: 4.4,
-    dampingRelaxation: 3.6,
+    suspensionStiffness: 43,
+    dampingCompression: 5.2,
+    dampingRelaxation: 4.5,
     maxSuspensionTravel: 0.14,
     maxSuspensionForce: 260,
     radius: 0.13,
     frictionSlip: 4.4,
-    rollInfluence: 0.055,
+    rollInfluence: 0.085,
     isFrontWheel: i < 2,
     useCustomSlidingRotationalSpeed: true,
     customSlidingRotationalSpeed: 18
@@ -500,6 +466,8 @@ function resetCar() {
   chassisBody.quaternion.set(0, 0, 0, 1);
   chassisBody.velocity.set(0, 0, 0);
   chassisBody.angularVelocity.set(0, 0, 0);
+  throttleState = 0;
+  steerState = 0;
   chassisBody.force.set(0, 0, 0);
   chassisBody.torque.set(0, 0, 0);
   chassisBody.wakeUp();
@@ -512,6 +480,7 @@ function resetCar() {
 }
 
 let steerState = 0;
+let throttleState = 0;
 function updateDrivingControls() {
   if (!joined) {
     for (let i = 0; i < 4; i++) {
@@ -528,16 +497,27 @@ function updateDrivingControls() {
   steerState += (steerTarget - steerState) * 0.22;
 
   const speed = chassisBody.velocity.length();
-  const speedSteerScale = THREE.MathUtils.clamp(1 - speed / 26, 0.48, 1);
-  const steeringAngle = steerState * 0.49 * speedSteerScale;
+  const speedSteerScale = THREE.MathUtils.clamp(1 - speed / 30, 0.52, 1);
+  const steeringAngle = steerState * 0.40 * speedSteerScale;
 
   vehicle.setSteeringValue(steeringAngle, 0);
   vehicle.setSteeringValue(steeringAngle, 1);
-  const engineForce = -throttle * 72;
-  const brakeForce = keys[" "] ? 19 : 0;
+  // Positive force is forward for this chassis orientation. Progressive,
+  // moderate power helps prevent abrupt pitching and uncontrolled wheelies.
+  throttleState += (throttle - throttleState) * 0.12;
+  const speedLimitScale = THREE.MathUtils.clamp(1 - speed / 24, 0.28, 1);
+  const engineForce = throttleState * 25 * speedLimitScale;
+  const brakeForce = keys[" "] ? 15 : 0;
   for (let i = 0; i < 4; i++) {
     vehicle.applyEngineForce(engineForce, i);
     vehicle.setBrake(brakeForce, i);
+  }
+
+  // Reduce excessive pitch and roll spin while grounded, but keep jumps lively.
+  const groundedWheels = vehicle.wheelInfos.filter((wheel) => wheel.isInContact).length;
+  if (groundedWheels >= 2) {
+    chassisBody.angularVelocity.x *= 0.94;
+    chassisBody.angularVelocity.z *= 0.94;
   }
 }
 
