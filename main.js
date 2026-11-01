@@ -1,4 +1,5 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js";
+import { RoundedBoxGeometry } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/geometries/RoundedBoxGeometry.js";
 import * as CANNON from "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js";
 import { joinRoom, selfId } from "https://esm.sh/trystero@0.26.0";
 
@@ -212,21 +213,28 @@ function makeCarVisual(color, playerName = "") {
   const chassisGroup = new THREE.Group();
   const shellGroup = new THREE.Group();
   root.add(chassisGroup, shellGroup);
-  const paint = new THREE.MeshStandardMaterial({ color, roughness: 0.48, metalness: 0.08 });
+  // Slightly larger 1/10-scale-inspired proportions while keeping wheel pivots
+  // tied to the physics suspension locations.
+  chassisGroup.scale.set(1.09, 1.07, 1.10);
+  shellGroup.scale.set(1.09, 1.07, 1.10);
+  const paint = new THREE.MeshStandardMaterial({ color, roughness: 0.34, metalness: 0.06 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x202a32, roughness: 0.72 });
-  const glass = new THREE.MeshStandardMaterial({ color: 0x172d3b, roughness: 0.2, metalness: 0.15 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x172d3b, roughness: 0.16, metalness: 0.18, transparent: true, opacity: 0.92 });
   const metal = new THREE.MeshStandardMaterial({ color: 0x89959b, metalness: 0.72, roughness: 0.34 });
   const black = new THREE.MeshStandardMaterial({ color: 0x11171c, roughness: 0.8 });
   const red = new THREE.MeshStandardMaterial({ color: 0xd84b35, roughness: 0.55 });
   const lamp = new THREE.MeshStandardMaterial({ color: 0xffe7b5, emissive: 0xffb84d, emissiveIntensity: 0.8 });
   function box(parent, size, mat, pos, rot) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(...size), mat);
+    const minSide = Math.min(...size);
+    const radius = Math.min(0.025, minSide * 0.16);
+    const geometry = new RoundedBoxGeometry(...size, 3, radius);
+    const m = new THREE.Mesh(geometry, mat);
     m.position.set(...pos); if (rot) m.rotation.set(...rot);
     m.castShadow = true; m.receiveShadow = true; parent.add(m); return m;
   }
   function beam(parent, a, b, r, mat) {
     const p = new THREE.Vector3(...a), q = new THREE.Vector3(...b), d = q.clone().sub(p);
-    const m = new THREE.Mesh(new THREE.CylinderGeometry(r,r,d.length(),8),mat);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r,r,d.length(),12),mat);
     m.position.copy(p).add(q).multiplyScalar(.5);
     m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize());
     m.castShadow=true; parent.add(m);
