@@ -50,21 +50,6 @@ const fill = new THREE.DirectionalLight(0xb8d8e9, 0.65);
 fill.position.set(8, 6, -10);
 scene.add(fill);
 
-const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x9b8668, roughness: 1 });
-const groundMesh = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), groundMaterial);
-groundMesh.rotation.x = -Math.PI / 2;
-groundMesh.position.y = -0.025;
-groundMesh.receiveShadow = true;
-scene.add(groundMesh);
-
-// Wide-open practice field with a few separated, low-profile jumps.
-const groundMaterial = new THREE.MeshStandardMaterial({ color: 0xa18d70, roughness: 1 });
-const groundMesh = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), groundMaterial);
-groundMesh.rotation.x = -Math.PI / 2;
-groundMesh.position.y = -0.025;
-groundMesh.receiveShadow = true;
-scene.add(groundMesh);
-
 const grid = new THREE.GridHelper(100, 50, 0x786d5d, 0xa99a81);
 grid.position.y = 0.002;
 grid.material.transparent = true;
