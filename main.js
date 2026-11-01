@@ -357,14 +357,14 @@ showroomStripe.position.set(0, 2.65, -4.98);
 garageGroup.add(showroomStripe);
 const displayPad = new THREE.Mesh(new THREE.CylinderGeometry(1.75, 1.9, 0.12, 64),
   new THREE.MeshStandardMaterial({ color: 0x34495d, metalness: 0.42, roughness: 0.42 }));
-displayPad.position.set(0, 0.025, 0);
+displayPad.position.set(0, -0.06, 0);
 displayPad.receiveShadow = true;
 displayPad.castShadow = true;
 garageGroup.add(displayPad);
 const displayRing = new THREE.Mesh(new THREE.TorusGeometry(1.76, 0.025, 8, 80),
   new THREE.MeshBasicMaterial({ color: 0x3ba9ff }));
 displayRing.rotation.x = Math.PI / 2;
-displayRing.position.y = 0.09;
+displayRing.position.y = 0.01;
 garageGroup.add(displayRing);
 const showroomLight = new THREE.PointLight(0x7dbfff, 24, 15, 2);
 showroomLight.position.set(0, 4.8, 1.5);
