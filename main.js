@@ -5,6 +5,8 @@ import { joinRoom, selfId } from "https://esm.sh/trystero@0.26.0";
 const $ = (id) => document.getElementById(id);
 const canvas = $("gameCanvas");
 const joinPanel = $("joinPanel");
+const mainMenuPanel = $("mainMenuPanel");
+const garagePanel = $("garagePanel");
 const joinButton = $("joinButton");
 const joinError = $("joinError");
 const hud = $("hud");
@@ -71,6 +73,8 @@ const jumpLocations = [
   { x: 4, z: 34, yaw: 0 }
 ];
 const jumpMaterial = new THREE.MeshStandardMaterial({ color: 0x806b50, roughness: 0.96 });
+const arenaVisuals = [groundMesh, grid];
+const rampVisuals = [];
 
 function makeRampGeometry(width, length, height) {
   const w = width / 2;
@@ -101,7 +105,9 @@ for (const jump of jumpLocations) {
   ramp.castShadow = true;
   ramp.receiveShadow = true;
   scene.add(ramp);
+  rampVisuals.push(ramp);
 }
+arenaVisuals.push(...rampVisuals);
 
 // Physics: Cannon's RaycastVehicle applies suspension and tire impulses only
 // when each wheel ray has actually found a surface to touch.
@@ -324,6 +330,99 @@ function makeCarVisual(color, playerName = "") {
 }
 
 const localCar = makeCarVisual(0xffa33d);
+
+// Illuminated showroom used by the main menu and garage.
+const garageGroup = new THREE.Group();
+scene.add(garageGroup);
+const showroomFloor = new THREE.Mesh(new THREE.PlaneGeometry(24, 24),
+  new THREE.MeshStandardMaterial({ color: 0x202d3a, roughness: 0.72, metalness: 0.18 }));
+showroomFloor.rotation.x = -Math.PI / 2;
+showroomFloor.position.y = -0.035;
+showroomFloor.receiveShadow = true;
+garageGroup.add(showroomFloor);
+const showroomBackWall = new THREE.Mesh(new THREE.BoxGeometry(24, 8, 0.35),
+  new THREE.MeshStandardMaterial({ color: 0x172433, roughness: 0.85 }));
+showroomBackWall.position.set(0, 3.9, -5.2);
+showroomBackWall.receiveShadow = true;
+garageGroup.add(showroomBackWall);
+const showroomSideMaterial = new THREE.MeshStandardMaterial({ color: 0x25384b, roughness: 0.82 });
+for (const x of [-8.5, 8.5]) {
+  const column = new THREE.Mesh(new THREE.BoxGeometry(0.22, 5.8, 0.28), showroomSideMaterial);
+  column.position.set(x, 2.85, -2.7);
+  garageGroup.add(column);
+}
+const showroomStripe = new THREE.Mesh(new THREE.BoxGeometry(9, 0.025, 0.045),
+  new THREE.MeshBasicMaterial({ color: 0x2798ff }));
+showroomStripe.position.set(0, 2.65, -4.98);
+garageGroup.add(showroomStripe);
+const displayPad = new THREE.Mesh(new THREE.CylinderGeometry(1.75, 1.9, 0.12, 64),
+  new THREE.MeshStandardMaterial({ color: 0x34495d, metalness: 0.42, roughness: 0.42 }));
+displayPad.position.set(0, 0.025, 0);
+displayPad.receiveShadow = true;
+displayPad.castShadow = true;
+garageGroup.add(displayPad);
+const displayRing = new THREE.Mesh(new THREE.TorusGeometry(1.76, 0.025, 8, 80),
+  new THREE.MeshBasicMaterial({ color: 0x3ba9ff }));
+displayRing.rotation.x = Math.PI / 2;
+displayRing.position.y = 0.09;
+garageGroup.add(displayRing);
+const showroomLight = new THREE.PointLight(0x7dbfff, 24, 15, 2);
+showroomLight.position.set(0, 4.8, 1.5);
+garageGroup.add(showroomLight);
+garageGroup.visible = true;
+for (const item of arenaVisuals) item.visible = false;
+
+let viewMode = "menu";
+function setArenaVisible(visible) {
+  for (const item of arenaVisuals) item.visible = visible;
+  garageGroup.visible = !visible;
+}
+function parkCarForShowroom() {
+  chassisBody.position.set(0, 0.24, 0);
+  chassisBody.quaternion.set(0, 0, 0, 1);
+  chassisBody.velocity.set(0, 0, 0);
+  chassisBody.angularVelocity.set(0, 0, 0);
+  chassisBody.force.set(0, 0, 0);
+  chassisBody.torque.set(0, 0, 0);
+  chassisBody.wakeUp();
+  for (let i = 0; i < 4; i++) {
+    vehicle.wheelInfos[i].engineForce = 0;
+    vehicle.wheelInfos[i].rotation = 0;
+    vehicle.wheelInfos[i].deltaRotation = 0;
+  }
+  updateLocalVisual();
+}
+function showMainMenu() {
+  viewMode = "menu";
+  mainMenuPanel.style.display = "block";
+  garagePanel.style.display = "none";
+  joinPanel.style.display = "none";
+  hud.style.display = "none";
+  $("topStatus").style.display = "none";
+  setArenaVisible(false);
+  parkCarForShowroom();
+}
+function showGarage() {
+  viewMode = "garage";
+  mainMenuPanel.style.display = "none";
+  garagePanel.style.display = "block";
+  joinPanel.style.display = "none";
+  hud.style.display = "none";
+  $("topStatus").style.display = "none";
+  setArenaVisible(false);
+  parkCarForShowroom();
+}
+function showDriveScreen() {
+  viewMode = "drive";
+  mainMenuPanel.style.display = "none";
+  garagePanel.style.display = "none";
+  joinPanel.style.display = "block";
+  hud.style.display = "none";
+  $("topStatus").style.display = "flex";
+  setArenaVisible(true);
+  cameraOrbitYaw = 0;
+  resetCar();
+}
 const remotePlayers = new Map();
 const remotePalette = [0x42c7c2, 0x76a8ff, 0xe879b2, 0xa2d66d, 0xb18aff, 0xff795e];
 function colorForPeer(peerId) {
@@ -630,6 +729,7 @@ async function joinArena() {
     $("roomValue").textContent = joinedRoomCode.toUpperCase();
     joinPanel.style.display = "none";
     hud.style.display = "block";
+    viewMode = "drive";
     $("statusDot").classList.remove("live");
     $("topStatus").textContent = "WAITING FOR DRIVERS";
     updatePlayerCount();
@@ -664,6 +764,9 @@ async function leaveArena() {
   updatePlayerCount();
   hud.style.display = "none";
   joinPanel.style.display = "block";
+  viewMode = "drive";
+  setArenaVisible(true);
+  $("topStatus").style.display = "flex";
   $("topStatus").textContent = "READY TO DRIVE";
   $("statusDot").classList.remove("live");
   resetCar();
@@ -671,6 +774,10 @@ async function leaveArena() {
 
 joinButton.addEventListener("click", joinArena);
 $("leaveButton").addEventListener("click", leaveArena);
+$("menuDriveButton").addEventListener("click", showDriveScreen);
+$("menuGarageButton").addEventListener("click", showGarage);
+$("garageBackButton").addEventListener("click", showMainMenu);
+$("driveBackButton").addEventListener("click", showMainMenu);
 $("roomCode").addEventListener("keydown", (event) => {
   if (event.key === "Enter") joinArena();
 });
@@ -705,6 +812,18 @@ function animate(now) {
   const touching = vehicle.wheelInfos.filter((wheel) => wheel.isInContact).length;
   $("wheelStatus").textContent = touching + " / 4 TIRES IN CONTACT";
 
+  // The showroom camera presents the parked truck in menu and garage views.
+  if (viewMode === "menu" || viewMode === "garage") {
+    const distance = viewMode === "garage" ? 4.4 : 5.1;
+    const height = viewMode === "garage" ? 1.75 : 2.15;
+    const orbitDirection = new THREE.Vector3(0, 0, 1)
+      .applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraOrbitYaw + (viewMode === "menu" ? -0.18 : 0));
+    const showroomCamera = localCar.root.position.clone()
+      .addScaledVector(orbitDirection, distance)
+      .add(new THREE.Vector3(0, height, 0));
+    camera.position.lerp(showroomCamera, 1 - Math.exp(-2.4 * delta));
+    camera.lookAt(localCar.root.position.clone().add(new THREE.Vector3(0, 0.12, 0)));
+  } else {
   // Follow horizontal heading only; ignore chassis pitch and roll.
   const carForward = new THREE.Vector3(0, 0, -1).applyQuaternion(localCar.root.quaternion);
   carForward.y = 0;
@@ -720,6 +839,7 @@ function animate(now) {
     .addScaledVector(carForward, 0.85);
   camera.up.set(0, 1, 0);
   camera.lookAt(lookTarget);
+  }
 
   networkTimer += delta;
   if (joined && stateAction && networkTimer >= 1 / 15) {
@@ -731,6 +851,7 @@ function animate(now) {
 }
 updateLocalVisual();
 $("loading").style.display = "none";
+showMainMenu();
 requestAnimationFrame(animate);
 
 // Generate a local default nickname so each tab is easy to distinguish.
