@@ -486,6 +486,7 @@ function resetCar() {
   chassisBody.velocity.set(0, 0, 0);
   chassisBody.angularVelocity.set(0, 0, 0);
   throttleState = 0;
+  brakeState = 0;
   steerState = 0;
   chassisBody.force.set(0, 0, 0);
   chassisBody.torque.set(0, 0, 0);
@@ -500,6 +501,7 @@ function resetCar() {
 
 let steerState = 0;
 let throttleState = 0;
+let brakeState = 0;
 function updateDrivingControls() {
   if (!joined) {
     for (let i = 0; i < 4; i++) {
@@ -526,10 +528,12 @@ function updateDrivingControls() {
   throttleState += (throttle - throttleState) * 0.12;
   const speedLimitScale = THREE.MathUtils.clamp(1 - speed / 24, 0.28, 1);
   const engineForce = throttleState * 25 * speedLimitScale;
-  const brakeForce = keys[" "] ? 15 : 0;
+  // Ramp brake pressure in gently to avoid pitching the truck forward.
+  const brakeTarget = keys[" "] ? 3.2 : 0;
+  brakeState += (brakeTarget - brakeState) * 0.16;
   for (let i = 0; i < 4; i++) {
     vehicle.applyEngineForce(engineForce, i);
-    vehicle.setBrake(brakeForce, i);
+    vehicle.setBrake(brakeState, i);
   }
 
   // Reduce excessive pitch and roll spin while grounded, but keep jumps lively.
