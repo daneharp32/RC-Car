@@ -56,6 +56,55 @@
       background: var(--panel); box-shadow: 0 24px 80px rgba(5,10,16,.34);
       backdrop-filter: blur(18px);
     }
+    .menu-screen {
+      position: fixed; z-index: 4; inset: 0; display: none;
+      background: linear-gradient(180deg, rgba(5,13,23,.32), rgba(5,13,23,.04) 55%, rgba(5,13,23,.42));
+      pointer-events: none;
+    }
+    .menu-content {
+      position: absolute; top: 15%; left: 50%; transform: translateX(-50%);
+      width: min(520px, calc(100vw - 34px)); padding: 25px 28px 27px;
+      text-align: center; pointer-events: auto;
+      border: 1px solid rgba(155,205,255,.2); border-radius: 22px;
+      background: rgba(9,20,34,.78); backdrop-filter: blur(15px);
+      box-shadow: 0 22px 75px rgba(0,0,0,.3);
+    }
+    .menu-kicker { color: #65baff; font-size: 10px; font-weight: 900; letter-spacing: .28em; }
+    .menu-title {
+      margin: 12px 0 8px; color: #f4f9ff;
+      font: 900 clamp(32px, 7vw, 55px)/1.04 "Orbitron", ui-sans-serif, sans-serif;
+      letter-spacing: -.055em; text-shadow: 0 4px 25px rgba(39,152,255,.25);
+    }
+    .menu-description { margin: 0 0 22px; color: #aebfce; font-size: 12px; letter-spacing: .035em; }
+    .menu-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+    .menu-button {
+      min-height: 48px; padding: 0 15px; color: #f5faff;
+      border: 1px solid rgba(115,190,255,.34);
+      background: linear-gradient(145deg, #258fe9, #1456bd);
+      box-shadow: 0 8px 22px rgba(16,102,202,.24);
+      font-family: "Orbitron", ui-sans-serif, sans-serif; font-size: 11px;
+    }
+    .menu-button.secondary {
+      background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.18);
+      box-shadow: none; color: #dcecff;
+    }
+    #garagePanel {
+      position: fixed; z-index: 4; left: 22px; top: 50%; transform: translateY(-50%);
+      width: min(300px, calc(100vw - 36px)); padding: 23px;
+      border: 1px solid rgba(155,205,255,.2); border-radius: 18px;
+      background: rgba(9,20,34,.84); backdrop-filter: blur(15px);
+      box-shadow: 0 22px 75px rgba(0,0,0,.3);
+    }
+    .garage-title { margin: 8px 0; font: 800 25px/1.1 "Orbitron", ui-sans-serif, sans-serif; }
+    .garage-copy { color: #aebfce; font-size: 12px; line-height: 1.55; margin: 0 0 18px; }
+    .garage-hint { color: #76bfff; font-size: 10px; letter-spacing: .06em; margin: 0 0 16px; }
+    #garageBackButton, #driveBackButton {
+      min-height: 42px; padding: 0 14px; color: #e5f3ff;
+      border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.08);
+      font-size: 10px;
+    }
+    #garageBackButton { width: 100%; }
+    #driveBackButton { width: 100%; margin-top: 11px; }
     .eyebrow { color: var(--accent); font-size: 10px; font-weight: 900; letter-spacing: .2em; }
     h1 { margin: 9px 0 7px; font-size: clamp(27px, 6vw, 36px); line-height: 1.02; letter-spacing: -.04em; }
     .intro { margin: 0 0 22px; color: #b5c2cb; font-size: 13px; line-height: 1.55; }
@@ -124,6 +173,12 @@
       #roomCard { right: 12px; top: 66px; }
       #leaveButton { left: 12px; top: 66px; }
       #controlsCard { display: none; }
+      .menu-content { top: 13%; padding: 21px 18px; }
+      .menu-description { font-size: 11px; }
+      #garagePanel { left: 12px; top: auto; bottom: 16px; transform: none; width: min(270px, calc(100vw - 24px)); padding: 17px; }
+      .garage-title { font-size: 21px; }
+      .garage-copy { margin-bottom: 12px; }
+      .garage-hint { margin-bottom: 10px; }
     }
   </style>
 </head>
@@ -141,7 +196,27 @@
     <div class="top-status"><span id="statusDot" class="status-dot"></span><span id="topStatus">READY TO DRIVE</span></div>
   </header>
 
-  <section id="joinPanel" class="panel">
+  <section id="mainMenuPanel" class="menu-screen" style="display:block">
+    <div class="menu-content">
+      <div class="menu-kicker">RADIO CONTROL • MULTIPLAYER</div>
+      <h1 class="menu-title">RC CAR<br>SIMULATOR</h1>
+      <p class="menu-description">Build your line. Hit the jumps. Drive together.</p>
+      <div class="menu-actions">
+        <button id="menuDriveButton" class="menu-button" type="button">DRIVE</button>
+        <button id="menuGarageButton" class="menu-button secondary" type="button">GARAGE</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="garagePanel" style="display:none">
+    <div class="eyebrow">YOUR VEHICLE</div>
+    <h2 class="garage-title">GARAGE</h2>
+    <p class="garage-copy">Your RC truck is displayed on the showroom platform. Drag across the car to look around it.</p>
+    <p class="garage-hint">PERSONAL SHOWROOM</p>
+    <button id="garageBackButton" type="button">BACK TO MAIN MENU</button>
+  </section>
+
+  <section id="joinPanel" class="panel" style="display:none">
     <div class="eyebrow">ONLINE PRACTICE ARENA</div>
     <h1>Start your<br>engines.</h1>
     <p class="intro">Join a room and drive with other players. Share the same room code to meet up in the arena.</p>
@@ -154,6 +229,7 @@
       <input id="roomCode" maxlength="24" autocomplete="off" spellcheck="false" value="pit-lane">
     </label>
     <button id="joinButton" type="button">JOIN THE ARENA</button>
+    <button id="driveBackButton" type="button">BACK TO MAIN MENU</button>
     <div id="joinError"></div>
     <div class="fine-print">Peer-to-peer multiplayer · No account required<br>WASD to drive · Space to brake · R to reset</div>
   </section>
