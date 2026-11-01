@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#111923">
+  <title>RC Car Multiplayer</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --panel: rgba(13, 20, 29, .88);
+      --panel-border: rgba(255,255,255,.12);
+      --muted: #9aabba;
+      --text: #f5f7fa;
+      --accent: #ffad45;
+      --green: #7be0a5;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #9cb4bf; color: var(--text); }
+    body { user-select: none; }
+    #gameCanvas { position: fixed; inset: 0; display: block; width: 100%; height: 100%; outline: none; }
+    .topbar {
+      position: fixed; z-index: 3; left: 18px; right: 18px; top: 16px;
+      display: flex; align-items: center; justify-content: space-between; pointer-events: none;
+    }
+    .brand, .top-status { display: flex; align-items: center; gap: 10px; }
+    .brand-mark {
+      width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px;
+      background: var(--accent); color: #1d2025; font-weight: 950; font-size: 15px;
+      box-shadow: 0 5px 18px rgba(0,0,0,.18);
+    }
+    .brand-name { font-size: 13px; font-weight: 850; letter-spacing: .14em; }
+    .brand-sub { margin-top: 2px; color: #d7e0e5; font-size: 10px; letter-spacing: .18em; }
+    .top-status {
+      padding: 9px 12px; border: 1px solid rgba(255,255,255,.23); border-radius: 999px;
+      background: rgba(13,20,29,.58); backdrop-filter: blur(12px); color: #e8eff3;
+      font-size: 11px; font-weight: 700; letter-spacing: .04em;
+    }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #9ba9b4; box-shadow: 0 0 0 3px rgba(155,169,180,.15); }
+    .status-dot.live { background: var(--green); box-shadow: 0 0 0 3px rgba(123,224,165,.15); }
+    .panel {
+      position: fixed; z-index: 4; left: 50%; top: 50%; transform: translate(-50%,-50%);
+      width: min(440px, calc(100vw - 32px)); padding: 27px;
+      border: 1px solid var(--panel-border); border-radius: 21px;
+      background: var(--panel); box-shadow: 0 24px 80px rgba(5,10,16,.34);
+      backdrop-filter: blur(18px);
+    }
+    .eyebrow { color: var(--accent); font-size: 10px; font-weight: 900; letter-spacing: .2em; }
+    h1 { margin: 9px 0 7px; font-size: clamp(27px, 6vw, 36px); line-height: 1.02; letter-spacing: -.04em; }
+    .intro { margin: 0 0 22px; color: #b5c2cb; font-size: 13px; line-height: 1.55; }
+    .field { display: block; margin: 0 0 13px; }
+    .field span { display: block; margin: 0 0 7px; color: #c8d2d9; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    input {
+      display: block; width: 100%; height: 45px; padding: 0 13px; border: 1px solid rgba(255,255,255,.15);
+      border-radius: 10px; outline: none; background: rgba(255,255,255,.07); color: white;
+      font: inherit; font-size: 14px; user-select: text;
+    }
+    input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255,173,69,.12); }
+    button {
+      appearance: none; border: 0; border-radius: 11px; cursor: pointer; font: inherit;
+      font-weight: 900; letter-spacing: .04em; transition: transform .14s ease, filter .14s ease, opacity .14s ease;
+    }
+    button:hover { filter: brightness(1.07); transform: translateY(-1px); }
+    button:active { transform: translateY(0); }
+    button:disabled { cursor: wait; opacity: .6; transform: none; }
+    #joinButton { width: 100%; height: 48px; margin-top: 6px; color: #1d2025; background: var(--accent); }
+    .fine-print { margin-top: 13px; color: #8495a2; font-size: 10px; line-height: 1.5; text-align: center; }
+    #joinError { display: none; margin-top: 12px; color: #ff9c91; font-size: 12px; line-height: 1.4; }
+    #hud { display: none; position: fixed; z-index: 3; inset: 0; pointer-events: none; }
+    .hud-card {
+      position: absolute; padding: 12px 15px; border: 1px solid rgba(255,255,255,.14);
+      border-radius: 13px; background: rgba(13,20,29,.72); box-shadow: 0 8px 28px rgba(0,0,0,.13);
+      backdrop-filter: blur(12px);
+    }
+    #speedCard { left: 18px; bottom: 18px; min-width: 136px; }
+    .hud-label { color: #aab8c2; font-size: 9px; font-weight: 900; letter-spacing: .17em; }
+    #speedValue { margin-top: 1px; font-size: 42px; line-height: 1; font-weight: 900; letter-spacing: -.06em; font-variant-numeric: tabular-nums; }
+    .speed-unit { margin-left: 4px; color: #b2c0c8; font-size: 11px; font-weight: 800; letter-spacing: .08em; }
+    #wheelStatus { margin-top: 8px; color: #aab8c2; font-size: 10px; }
+    #roomCard { right: 18px; top: 72px; text-align: right; }
+    #roomValue { margin-top: 4px; font-size: 13px; font-weight: 900; letter-spacing: .12em; }
+    #playersValue { margin-top: 4px; color: #b8c5cd; font-size: 11px; }
+    #controlsCard { left: 18px; bottom: 18px; transform: translateY(-132px); color: #bdc9d0; font-size: 10px; line-height: 1.8; }
+    kbd {
+      display: inline-grid; min-width: 19px; height: 19px; margin: 0 2px; padding: 0 4px;
+      place-items: center; border: 1px solid rgba(255,255,255,.2); border-radius: 5px;
+      background: rgba(255,255,255,.1); color: white; font: 800 10px ui-monospace, monospace;
+    }
+    #leaveButton {
+      position: absolute; top: 72px; left: 18px; pointer-events: auto; padding: 9px 12px;
+      border: 1px solid rgba(255,255,255,.16); background: rgba(13,20,29,.68); color: #e6edf1;
+      font-size: 10px;
+    }
+    #toast {
+      position: fixed; z-index: 5; left: 50%; bottom: 26px; transform: translate(-50%, 14px);
+      max-width: calc(100vw - 28px); padding: 10px 14px; border: 1px solid rgba(255,255,255,.16);
+      border-radius: 999px; background: rgba(13,20,29,.9); color: #eff4f7;
+      font-size: 11px; opacity: 0; pointer-events: none; transition: .2s ease;
+    }
+    #toast.show { opacity: 1; transform: translate(-50%, 0); }
+    #loading {
+      position: fixed; z-index: 2; left: 50%; bottom: 22px; transform: translateX(-50%);
+      color: rgba(25,35,43,.62); font-size: 10px; font-weight: 800; letter-spacing: .12em;
+      text-shadow: 0 1px 3px rgba(255,255,255,.35); pointer-events: none;
+    }
+    @media (max-width: 600px) {
+      .topbar { left: 12px; right: 12px; top: 12px; }
+      .top-status { padding: 8px 9px; font-size: 9px; }
+      .brand-name { font-size: 11px; }
+      .panel { padding: 22px; }
+      #speedCard { left: 12px; bottom: 12px; min-width: 116px; }
+      #speedValue { font-size: 36px; }
+      #roomCard { right: 12px; top: 66px; }
+      #leaveButton { left: 12px; top: 66px; }
+      #controlsCard { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" aria-label="3D RC car practice arena"></canvas>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">RC</div>
+      <div>
+        <div class="brand-name">RC CAR</div>
+        <div class="brand-sub">MULTIPLAYER SIMULATOR</div>
+      </div>
+    </div>
+    <div class="top-status"><span id="statusDot" class="status-dot"></span><span id="topStatus">READY TO DRIVE</span></div>
+  </header>
+
+  <section id="joinPanel" class="panel">
+    <div class="eyebrow">ONLINE PRACTICE ARENA</div>
+    <h1>Start your<br>engines.</h1>
+    <p class="intro">Join a room and drive with other players. Share the same room code to meet up in the arena.</p>
+    <label class="field">
+      <span>Driver name</span>
+      <input id="driverName" maxlength="18" autocomplete="nickname" value="">
+    </label>
+    <label class="field">
+      <span>Room code</span>
+      <input id="roomCode" maxlength="24" autocomplete="off" spellcheck="false" value="pit-lane">
+    </label>
+    <button id="joinButton" type="button">JOIN THE ARENA</button>
+    <div id="joinError"></div>
+    <div class="fine-print">Peer-to-peer multiplayer · No account required<br>WASD to drive · Space to brake · R to reset</div>
+  </section>
+
+  <section id="hud" aria-live="polite">
+    <button id="leaveButton" type="button">LEAVE ROOM</button>
+    <div id="roomCard" class="hud-card">
+      <div class="hud-label">ROOM</div>
+      <div id="roomValue">PIT-LANE</div>
+      <div id="playersValue">1 DRIVER</div>
+    </div>
+    <div id="controlsCard" class="hud-card">
+      <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Drive / steer</div>
+      <div><kbd>SPACE</kbd> Brake</div>
+      <div><kbd>R</kbd> Reset car</div>
+    </div>
+    <div id="speedCard" class="hud-card">
+      <div class="hud-label">GROUND SPEED</div>
+      <div><span id="speedValue">0</span><span class="speed-unit">MPH</span></div>
+      <div id="wheelStatus">0 / 4 TIRES IN CONTACT</div>
+    </div>
+  </section>
+
+  <div id="loading">BUILDING THE PRACTICE TRACK</div>
+  <div id="toast"></div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
