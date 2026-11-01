@@ -104,6 +104,7 @@
       font-size: 10px;
     }
     #garageBackButton { width: 100%; }
+    #shellToggleButton { min-height:42px; font-size:10px; }
     #driveBackButton { width: 100%; margin-top: 11px; }
     .eyebrow { color: var(--accent); font-size: 10px; font-weight: 900; letter-spacing: .2em; }
     h1 { margin: 9px 0 7px; font-size: clamp(27px, 6vw, 36px); line-height: 1.02; letter-spacing: -.04em; }
@@ -212,7 +213,8 @@
     <div class="eyebrow">YOUR VEHICLE</div>
     <h2 class="garage-title">GARAGE</h2>
     <p class="garage-copy">Your RC truck is displayed on the showroom platform. Drag across the car to look around it.</p>
-    <p class="garage-hint">PERSONAL SHOWROOM</p>
+    <p class="garage-hint">PERSONAL SHOWROOM · DRAG TO ROTATE</p>
+    <button id="shellToggleButton" class="menu-button secondary" type="button" style="width:100%;margin-bottom:10px">REMOVE BODY SHELL</button>
     <button id="garageBackButton" type="button">BACK TO MAIN MENU</button>
   </section>
 
