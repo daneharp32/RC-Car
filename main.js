@@ -3,6 +3,8 @@ import { RoundedBoxGeometry } from "https://cdn.jsdelivr.net/npm/three@0.187.0/e
 import * as CANNON from "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js";
 import { joinRoom, selfId } from "https://esm.sh/trystero@0.26.0";
 
+window.__rcCarBootStage = "module-started";
+
 const $ = (id) => document.getElementById(id);
 const canvas = $("gameCanvas");
 const joinPanel = $("joinPanel");
@@ -27,6 +29,7 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.08;
+window.__rcCarBootStage = "renderer-created";
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xb6c8cc);
@@ -1619,6 +1622,7 @@ displayRing.rotation.x = Math.PI / 2;
 displayRing.position.y = 0.01;
 garageGroup.add(displayRing);
 
+window.__rcCarBootStage = "workshop-build-started";
 // Detailed RC workshop environment used behind the main menu and vehicle garage.
 const showroomLight = new THREE.PointLight(0x7dbfff, 24, 15, 2);
 showroomLight.position.set(0, 4.8, 1.5);
@@ -1920,6 +1924,7 @@ displayPad.material.metalness = 0.28;
 displayRing.material.color.setHex(0xb56a37);
 showroomStripe.material.color.setHex(0x9e7045);
 workshopGroup.visible = true;
+window.__rcCarBootStage = "workshop-built";
 
 garageGroup.visible = true;
 for (const item of arenaVisuals) item.visible = false;
@@ -2537,7 +2542,12 @@ function animate(now) {
   }
 
   renderer.render(scene, camera);
+  if (!window.__rcCarFirstFrameRendered) {
+    window.__rcCarFirstFrameRendered = true;
+    window.__rcCarBootStage = "first-frame-rendered";
+  }
 }
+window.__rcCarBootStage = "scene-and-ui-ready";
 updateLocalVisual();
 $("loading").style.display = "none";
 showMainMenu();
