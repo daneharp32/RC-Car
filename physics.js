@@ -56,14 +56,16 @@ const spawnZ = spawn.z + spawn.normalZ * acrossOffset + spawn.tangentZ * backOff
 const spawnYaw = spawn.yaw;
 
 const chassisBody = new CANNON.Body({
-  mass: 8.0,
+  // Higher mass and a slightly broader collision tub give the truck a more
+  // substantial feel without changing the visual shell or wheelbase.
+  mass: 10.5,
   material: chassisMaterial,
   position: new CANNON.Vec3(spawnX, 0.24, spawnZ),
-  linearDamping: 0.10,
-  angularDamping: 0.72
+  linearDamping: 0.12,
+  angularDamping: 0.90
 });
 chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), spawnYaw);
-chassisBody.addShape(new CANNON.Box(new CANNON.Vec3(0.28, 0.075, 0.41)));
+chassisBody.addShape(new CANNON.Box(new CANNON.Vec3(0.30, 0.08, 0.43)));
 chassisBody.allowSleep = false;
 
 const vehicle = new CANNON.RaycastVehicle({
@@ -90,11 +92,11 @@ for (let i = 0; i < 4; i++) {
     directionLocal: new CANNON.Vec3(0, -1, 0),
     axleLocal: new CANNON.Vec3(-1, 0, 0),
     suspensionRestLength: 0.12,
-    suspensionStiffness: 46,
-    dampingCompression: 5.0,
-    dampingRelaxation: 4.2,
-    maxSuspensionTravel: 0.16,
-    maxSuspensionForce: 285,
+    suspensionStiffness: 52,
+    dampingCompression: 5.6,
+    dampingRelaxation: 4.8,
+    maxSuspensionTravel: 0.17,
+    maxSuspensionForce: 350,
     radius: 0.13,
     frictionSlip: 4.8,
     rollInfluence: 0.08,
