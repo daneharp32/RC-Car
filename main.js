@@ -453,8 +453,8 @@ function makeCarVisual(color, playerName = "") {
     );
     cylinderBetween(upper, [s * 0.10, 0.17, z + (isFront ? 0.025 : -0.025)],
       [s * 0.29, 0.13, z], 0.011, alloy, 10, 0.009);
-    cylinderBetween(upper, [s * 0.12, 0.17, z + (isFront ? 0.025 : -0.025)],
-      [s * 0.12, 0.17, z + (isFront ? 0.025 : -0.025)], 0.014, red, 10);
+    addMesh(upper, new THREE.SphereGeometry(0.015, 12, 10), red,
+      [s * 0.12, 0.17, z + (isFront ? 0.025 : -0.025)]);
 
     const carrier = makePart(
       chassisGroup,
@@ -914,9 +914,16 @@ let viewMode = "menu";
 const garageRaycaster = new THREE.Raycaster();
 const garagePointer = new THREE.Vector2();
 let activeGaragePart = null;
+let activeGaragePartObject = null;
+const garagePartBounds = new THREE.Box3();
+const garagePartOutline = new THREE.Box3Helper(garagePartBounds, 0x62c6ff);
+garagePartOutline.visible = false;
+scene.add(garagePartOutline);
 
 function clearGaragePartHover() {
   activeGaragePart = null;
+  activeGaragePartObject = null;
+  garagePartOutline.visible = false;
   const title = $("partHoverTitle");
   const description = $("partHoverDescription");
   if (title) title.textContent = "HOVER OVER A COMPONENT";
@@ -935,11 +942,13 @@ function updateGaragePartHover(event) {
   garageRaycaster.setFromCamera(garagePointer, camera);
   const intersections = garageRaycaster.intersectObject(localCar.root, true);
   let found = null;
+  let foundObject = null;
   for (const hit of intersections) {
     let node = hit.object;
     while (node && node !== localCar.root) {
       if (node.userData && node.userData.partInfo) {
         found = node.userData.partInfo;
+        foundObject = node;
         break;
       }
       node = node.parent;
@@ -950,8 +959,16 @@ function updateGaragePartHover(event) {
     if (activeGaragePart) clearGaragePartHover();
     return;
   }
-  if (activeGaragePart && activeGaragePart.id === found.id) return;
+  if (activeGaragePart && activeGaragePart.id === found.id) {
+    garagePartBounds.setFromObject(foundObject);
+    garagePartOutline.updateMatrixWorld(true);
+    return;
+  }
   activeGaragePart = found;
+  activeGaragePartObject = foundObject;
+  garagePartBounds.setFromObject(foundObject);
+  garagePartOutline.visible = true;
+  garagePartOutline.updateMatrixWorld(true);
   $("partHoverTitle").textContent = found.label;
   $("partHoverDescription").textContent = found.description;
 }
@@ -1467,6 +1484,10 @@ function animate(now) {
       .add(new THREE.Vector3(0, height, 0));
     camera.position.lerp(showroomCamera, 1 - Math.exp(-2.4 * delta));
     camera.lookAt(localCar.root.position.clone().add(new THREE.Vector3(0, 0.12, 0)));
+    if (activeGaragePartObject) {
+      garagePartBounds.setFromObject(activeGaragePartObject);
+      garagePartOutline.updateMatrixWorld(true);
+    }
   } else {
   // Follow horizontal heading only; ignore chassis pitch and roll.
   const carForward = new THREE.Vector3(0, 0, -1).applyQuaternion(localCar.root.quaternion);
