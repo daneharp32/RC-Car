@@ -188,6 +188,9 @@ const wheelPositions = [
   [ 0.305, -0.018,  0.29]
 ];
 
+// Visual-only length increase. Physics wheel attachment points stay unchanged.
+const VISUAL_CHASSIS_LENGTH_SCALE = 1.26;
+
 for (let i = 0; i < 4; i++) {
   const [x, y, z] = wheelPositions[i];
   vehicle.addWheel({
@@ -221,8 +224,9 @@ function makeCarVisual(color, playerName = "") {
   root.add(chassisGroup, shellGroup);
 
   // Chassis-only pass: the shell group remains empty and hidden until a later
-  // body-shell pass. The physics wheel locations are deliberately unchanged.
+  // body-shell pass. Lengthen the exposed chassis without changing physics.
   shellGroup.visible = false;
+  chassisGroup.scale.set(1, 1, VISUAL_CHASSIS_LENGTH_SCALE);
 
   const carbon = new THREE.MeshStandardMaterial({ color: 0x171e24, roughness: 0.78, metalness: 0.18 });
   const carbonEdge = new THREE.MeshStandardMaterial({ color: 0x303b43, roughness: 0.62, metalness: 0.24 });
@@ -1058,6 +1062,7 @@ function updateLocalVisual() {
       transform.position.z - chassisBody.position.z
     );
     localPosition.applyQuaternion(inverseRoot);
+    localPosition.z *= VISUAL_CHASSIS_LENGTH_SCALE;
     worldWheelQuaternion.set(
       transform.quaternion.x,
       transform.quaternion.y,
@@ -1156,7 +1161,7 @@ function updateRemoteVisuals(delta) {
     for (let i = 0; i < 4; i++) {
       const [x, , z] = wheelPositions[i];
       const pivot = remote.visual.wheelPivots[i];
-      pivot.position.set(x, -0.095, z);
+      pivot.position.set(x, -0.095, z * VISUAL_CHASSIS_LENGTH_SCALE);
       const steerQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), i < 2 ? remote.steering : 0);
       const spinQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), remote.wheelRotations[i]);
       pivot.quaternion.copy(steerQ).multiply(spinQ);
@@ -1475,14 +1480,14 @@ function animate(now) {
 
   // The showroom camera presents the parked truck in menu and garage views.
   if (viewMode === "menu" || viewMode === "garage") {
-    const distance = viewMode === "garage" ? 2.9 : 5.1;
-    const height = viewMode === "garage" ? 1.45 : 2.15;
+    const distance = viewMode === "garage" ? 2.35 : 5.1;
+    const height = viewMode === "garage" ? 1.18 : 2.15;
     const orbitDirection = new THREE.Vector3(0, 0, 1)
       .applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraOrbitYaw + (viewMode === "menu" ? -0.18 : 0));
     const showroomCamera = localCar.root.position.clone()
       .addScaledVector(orbitDirection, distance)
       .add(new THREE.Vector3(0, height, 0));
-    camera.position.lerp(showroomCamera, 1 - Math.exp(-2.4 * delta));
+    camera.position.lerp(showroomCamera, 1 - Math.exp(-3.2 * delta));
     camera.lookAt(localCar.root.position.clone().add(new THREE.Vector3(0, 0.12, 0)));
     if (activeGaragePartObject) {
       garagePartBounds.setFromObject(activeGaragePartObject);
