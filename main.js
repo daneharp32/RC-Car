@@ -33,8 +33,9 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.08;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x493629);
-scene.fog = new THREE.Fog(0x493629, 95, 215);
+// Open blue sky with a matching distant haze above the dirt field.
+scene.background = new THREE.Color(0x83c5ef);
+scene.fog = new THREE.Fog(0x83c5ef, 135, 265);
 
 const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 180);
 camera.position.set(0, 3.1, 5.8);
