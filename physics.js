@@ -2,7 +2,7 @@ import { selfId } from "https://esm.sh/trystero@0.26.0";
 
 // Builds the Cannon-es world, terrain colliders, chassis, and four-wheel
 // raycast vehicle. The returned objects are shared by the driving systems.
-export function createPhysicsSystem({ CANNON, jumpLocations }) {
+export function createPhysicsSystem({ CANNON, trackLayout }) {
 const world = new CANNON.World({
   gravity: new CANNON.Vec3(0, -9.82, 0)
 });
@@ -18,7 +18,7 @@ groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
 world.addBody(groundBody);
 
 // Matching convex wedge colliders keep the approach edge flush with the ground.
-for (const jump of jumpLocations) {
+for (const jump of trackLayout.jumps) {
   const w = jump.width / 2;
   const l = jump.length / 2;
   const h = jump.height;
@@ -47,9 +47,13 @@ world.addContactMaterial(new CANNON.ContactMaterial(chassisMaterial, groundBody.
 
 let spawnHash = 0;
 for (let i = 0; i < selfId.length; i++) spawnHash = (spawnHash * 31 + selfId.charCodeAt(i)) | 0;
-const spawnAngle = (Math.abs(spawnHash) % 8) * (Math.PI / 4);
-const spawnX = Math.cos(spawnAngle) * 3;
-const spawnZ = Math.sin(spawnAngle) * 3;
+const spawnSlot = Math.abs(spawnHash) % 8;
+const acrossOffset = ((spawnSlot % 4) - 1.5) * 1.15;
+const backOffset = -Math.floor(spawnSlot / 4) * 1.8;
+const spawn = trackLayout.spawn;
+const spawnX = spawn.x + spawn.normalX * acrossOffset + spawn.tangentX * backOffset;
+const spawnZ = spawn.z + spawn.normalZ * acrossOffset + spawn.tangentZ * backOffset;
+const spawnYaw = spawn.yaw;
 
 const chassisBody = new CANNON.Body({
   mass: 8.0,
@@ -58,6 +62,7 @@ const chassisBody = new CANNON.Body({
   linearDamping: 0.10,
   angularDamping: 0.72
 });
+chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), spawnYaw);
 chassisBody.addShape(new CANNON.Box(new CANNON.Vec3(0.28, 0.075, 0.41)));
 chassisBody.allowSleep = false;
 
@@ -100,6 +105,25 @@ for (let i = 0; i < 4; i++) {
 }
 vehicle.addToWorld(world);
 
+// Matching static boxes make the alternating red/white perimeter curbs solid.
+for (const barrier of trackLayout.barriers) {
+  const barrierBody = new CANNON.Body({
+    mass: 0,
+    material: groundBody.material
+  });
+  barrierBody.addShape(new CANNON.Box(new CANNON.Vec3(
+    barrier.width / 2,
+    barrier.height / 2,
+    barrier.length / 2
+  )));
+  barrierBody.position.set(barrier.x, barrier.y, barrier.z);
+  barrierBody.quaternion.setFromAxisAngle(
+    new CANNON.Vec3(0, 1, 0),
+    barrier.yaw
+  );
+  world.addBody(barrierBody);
+}
+
   return {
     world,
     groundBody,
@@ -109,6 +133,7 @@ vehicle.addToWorld(world);
     wheelPositions,
     VISUAL_CHASSIS_LENGTH_SCALE,
     spawnX,
-    spawnZ
+    spawnZ,
+    spawnYaw
   };
 }
