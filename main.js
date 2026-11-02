@@ -787,6 +787,7 @@ let viewMode = "menu";
 function setArenaVisible(visible) {
   for (const item of arenaVisuals) item.visible = visible;
   garageGroup.visible = !visible;
+  if (visible) localCar.root.visible = true;
 }
 function parkCarForShowroom() {
   chassisBody.position.set(0, 0.24, 0);
@@ -840,8 +841,20 @@ function showDriveScreen() {
   hud.style.display = "none";
   $("topStatus").style.display = "flex";
   setArenaVisible(true);
+
+  // Reset both orbit axes so a previous showroom view cannot leave the
+  // track camera pointed away from the car.
   cameraOrbitYaw = 0;
+  cameraOrbitPitch = 0;
   resetCar();
+  updateLocalVisual();
+
+  // Start with a known-good chase view before the first drive frame.
+  const p = localCar.root.position;
+  camera.position.set(p.x, p.y + 2.7, p.z + 6.0);
+  camera.up.set(0, 1, 0);
+  camera.lookAt(p.x, p.y + 0.22, p.z - 0.65);
+  camera.updateMatrixWorld(true);
 }
 const remotePlayers = new Map();
 const remotePalette = [0x42c7c2, 0x76a8ff, 0xe879b2, 0xa2d66d, 0xb18aff, 0xff795e];
@@ -1227,6 +1240,9 @@ async function joinArena() {
     joinPanel.style.display = "none";
     hud.style.display = "block";
     viewMode = "drive";
+    setArenaVisible(true);
+    localCar.root.visible = true;
+    updateLocalVisual();
     $("statusDot").classList.remove("live");
     $("topStatus").textContent = "WAITING FOR DRIVERS";
     updatePlayerCount();
@@ -1284,14 +1300,22 @@ $("driverName").addEventListener("keydown", (event) => {
 });
 
 function resize() {
-  const width = window.innerWidth;
-  const height = window.innerHeight;
+  const width = Math.max(1, window.innerWidth);
+  const height = Math.max(1, window.innerHeight);
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
-  renderer.setSize(width, height, false);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.7));
+  renderer.setSize(width, height, false);
+  renderer.domElement.style.width = "100%";
+  renderer.domElement.style.height = "100%";
+  renderer.setViewport(0, 0, width, height);
+  renderer.setScissorTest(false);
 }
 window.addEventListener("resize", resize);
+window.addEventListener("orientationchange", resize);
+document.addEventListener("fullscreenchange", () => {
+  requestAnimationFrame(resize);
+});
 
 let lastTime = performance.now();
 let networkTimer = 0;
@@ -1324,21 +1348,40 @@ function animate(now) {
     camera.position.lerp(showroomCamera, 1 - Math.exp(-2.4 * delta));
     camera.lookAt(localCar.root.position.clone().add(new THREE.Vector3(0, 0.12, 0)));
   } else {
-  // Follow horizontal heading only; ignore chassis pitch and roll.
-  const carForward = new THREE.Vector3(0, 0, -1).applyQuaternion(localCar.root.quaternion);
+  // Drive view: always orbit around the actual local truck position.
+  // Reassert arena visibility here as a recovery guard for fullscreen changes.
+  for (const item of arenaVisuals) item.visible = true;
+  garageGroup.visible = false;
+  localCar.root.visible = true;
+
+  const carPosition = localCar.root.position;
+  const carForward = new THREE.Vector3(0, 0, -1)
+    .applyQuaternion(localCar.root.quaternion);
   carForward.y = 0;
-  if (carForward.lengthSq() < 0.0001) carForward.set(0, 0, -1);
+  if (!Number.isFinite(carForward.x) || !Number.isFinite(carForward.z) ||
+      carForward.lengthSq() < 0.0001) {
+    carForward.set(0, 0, -1);
+  }
   carForward.normalize();
-  const cameraDirection = carForward.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraOrbitYaw);
-  const cameraHorizontalDistance = 5.8 * Math.cos(cameraOrbitPitch);
-  const cameraHeight = 2.8 + 5.8 * Math.sin(cameraOrbitPitch);
-  const desiredCamera = localCar.root.position.clone()
-    .addScaledVector(cameraDirection, -cameraHorizontalDistance)
+
+  const orbitForward = carForward.clone()
+    .applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraOrbitYaw);
+  const cameraHorizontalDistance = 6.0 * Math.cos(cameraOrbitPitch);
+  const cameraHeight = 2.6 + 6.0 * Math.sin(cameraOrbitPitch);
+  const desiredCamera = carPosition.clone()
+    .addScaledVector(orbitForward, -cameraHorizontalDistance)
     .add(new THREE.Vector3(0, cameraHeight, 0));
-  camera.position.lerp(desiredCamera, 1 - Math.exp(-2.8 * delta));
-  const lookTarget = localCar.root.position.clone()
+
+  if (![desiredCamera.x, desiredCamera.y, desiredCamera.z].every(Number.isFinite)) {
+    cameraOrbitYaw = 0;
+    cameraOrbitPitch = 0;
+    desiredCamera.set(carPosition.x, carPosition.y + 2.7, carPosition.z + 6.0);
+  }
+
+  camera.position.lerp(desiredCamera, 1 - Math.exp(-4.0 * delta));
+  const lookTarget = carPosition.clone()
     .add(new THREE.Vector3(0, 0.28, 0))
-    .addScaledVector(carForward, 0.85);
+    .addScaledVector(carForward, 0.35);
   camera.up.set(0, 1, 0);
   camera.lookAt(lookTarget);
   }
