@@ -239,6 +239,7 @@ export function createTrackSystem({ THREE, scene }) {
   const treeSpacing = 6.0;
   const edgeRows = [86.5, 92.0];
   const halfEdgeSpan = 82.0;
+  const treeSafetySamples = centerline.getPoints(160);
 
   for (let row = 0; row < edgeRows.length; row++) {
     const edge = edgeRows[row];
@@ -254,9 +255,8 @@ export function createTrackSystem({ THREE, scene }) {
         if (sideIndex === 2) { x = -edge + (treeRandom() - 0.5) * 0.7; z = along; }
         if (sideIndex === 3) { x = edge + (treeRandom() - 0.5) * 0.7; z = along; }
 
-        const nearby = centerline.getPoints(160);
         let closest = Infinity;
-        for (const point of nearby) {
+        for (const point of treeSafetySamples) {
           const dx = x - point.x;
           const dz = z - point.z;
           closest = Math.min(closest, dx * dx + dz * dz);
@@ -271,6 +271,19 @@ export function createTrackSystem({ THREE, scene }) {
           scale: 0.82 + treeRandom() * 0.48
         });
       }
+    }
+  }
+
+  // A few larger corner trees join the four perimeter rows into one continuous
+  // natural border around the rectangular field.
+  for (const xSide of [-1, 1]) {
+    for (const zSide of [-1, 1]) {
+      treeSpots.push({
+        x: xSide * 89.0 + (treeRandom() - 0.5) * 1.2,
+        z: zSide * 89.0 + (treeRandom() - 0.5) * 1.2,
+        yaw: treeRandom() * Math.PI * 2,
+        scale: 1.0 + treeRandom() * 0.28
+      });
     }
   }
 
