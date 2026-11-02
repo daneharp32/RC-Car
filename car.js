@@ -654,6 +654,12 @@ function makeCarVisual(color, playerName = "") {
       metalness: 0.1,
       side: THREE.DoubleSide
     });
+    const black = new THREE.MeshStandardMaterial({
+      color: 0x101519,
+      roughness: 0.58,
+      metalness: 0.06,
+      side: THREE.DoubleSide
+    });
     const graphite = new THREE.MeshStandardMaterial({
       color: 0x59636a,
       roughness: 0.55,
