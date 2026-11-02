@@ -1045,6 +1045,69 @@ function makeCarVisual(color, playerName = "") {
       return part;
     }
 
+    // Surface-following graphic helpers: all stripes and decals sit on the
+    // curved polycarbonate rather than floating as rectangular plates.
+    function makeTopGraphic(points, material, lift = 0.008) {
+      const contour = points.map(([z, across]) => new THREE.Vector2(z, across));
+      const triangles = THREE.ShapeUtils.triangulateShape(contour, []);
+      const minZ = Math.min(...points.map((p) => p[0]));
+      const maxZ = Math.max(...points.map((p) => p[0]));
+      const minAcross = Math.min(...points.map((p) => p[1]));
+      const maxAcross = Math.max(...points.map((p) => p[1]));
+      const positions = [];
+      const uvs = [];
+      for (const [z, across] of points) {
+        const point = surfacePoint(z, across, true);
+        positions.push(point.x, point.y + lift, point.z);
+        uvs.push(
+          (z - minZ) / Math.max(0.0001, maxZ - minZ),
+          (across - minAcross) / Math.max(0.0001, maxAcross - minAcross)
+        );
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+      geometry.setIndex(triangles.flat());
+      geometry.computeVertexNormals();
+      material.side = THREE.DoubleSide;
+      const mesh = addMesh(shellGeometryGroup, geometry, material);
+      mesh.castShadow = false;
+      return mesh;
+    }
+
+    function makeSideGraphic(side, points, material, offset = 0.009) {
+      const contour = points.map(([z, vertical]) => new THREE.Vector2(z, vertical));
+      const triangles = THREE.ShapeUtils.triangulateShape(contour, []);
+      const minZ = Math.min(...points.map((p) => p[0]));
+      const maxZ = Math.max(...points.map((p) => p[0]));
+      const minV = Math.min(...points.map((p) => p[1]));
+      const maxV = Math.max(...points.map((p) => p[1]));
+      const positions = [];
+      const uvs = [];
+      for (const [z, vertical] of points) {
+        const p = getProfile(z);
+        const v = THREE.MathUtils.clamp(vertical, 0, 1);
+        const sine = Math.pow(v, 1 / crossExponent);
+        const cosine = Math.sqrt(Math.max(0, 1 - sine * sine));
+        const across = side * Math.pow(cosine, crossExponent);
+        const point = surfacePoint(z, across, true);
+        positions.push(point.x + side * offset, point.y + 0.002, point.z);
+        uvs.push(
+          (z - minZ) / Math.max(0.0001, maxZ - minZ),
+          (vertical - minV) / Math.max(0.0001, maxV - minV)
+        );
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+      geometry.setIndex(triangles.flat());
+      geometry.computeVertexNormals();
+      material.side = THREE.DoubleSide;
+      const mesh = addMesh(shellGeometryGroup, geometry, material);
+      mesh.castShadow = false;
+      return mesh;
+    }
+
     // One continuous, closed, smooth body surface. This replaces the former
     // disconnected orange side plates and floating hood/cab pieces.
     const mainBody = makePart(
@@ -1103,25 +1166,40 @@ function makeCarVisual(color, playerName = "") {
     bodyGeometry.computeVertexNormals();
     addMesh(mainBody, bodyGeometry, orange).material.side = THREE.DoubleSide;
 
-    // Hood: a low, flush black center panel with fine orange pinstripes.
-    makeSurfacePatch(
-      shellGeometryGroup,
-      "shell-hood-graphics",
-      "Black hood center and orange pinstripes",
-      "The hood remains orange around a narrow satin-black center stripe with two fine orange accent lines. The graphics follow the molded hood surface."
-      , black, -0.645, -0.225, -0.43, 0.43, 0.004
-    );
+    // Tapered satin-black hood graphic with narrow silver/orange pinstripes.
+    // All pieces conform to the curved hood instead of forming raised plates.
+    const hoodGraphic = new THREE.MeshStandardMaterial({
+      color: 0x171d22, roughness: 0.48, metalness: 0.12
+    });
+    makeTopGraphic([
+      [-0.648, -0.19], [-0.628, -0.32], [-0.585, -0.37],
+      [-0.285, -0.285], [-0.238, -0.22], [-0.238, 0.22],
+      [-0.285, 0.285], [-0.585, 0.37], [-0.628, 0.32],
+      [-0.648, 0.19]
+    ], hoodGraphic, 0.006);
     for (const side of [-1, 1]) {
-      makeSurfacePatch(
-        shellGeometryGroup,
-        `shell-hood-pinstripe-${side}`,
-        "Hood orange pinstripe",
-        "Thin orange accent stripe laid directly on top of the hood graphic.",
-        orangeLight,
-        -0.62, -0.25,
-        side * 0.445, side * 0.475,
-        0.006
-      );
+      makeTopGraphic([
+        [-0.626, side * 0.385], [-0.594, side * 0.405],
+        [-0.285, side * 0.315], [-0.257, side * 0.285],
+        [-0.269, side * 0.267], [-0.302, side * 0.293],
+        [-0.592, side * 0.377]
+      ], grayLight, 0.009);
+      makeTopGraphic([
+        [-0.615, side * 0.421], [-0.584, side * 0.438],
+        [-0.292, side * 0.35], [-0.278, side * 0.331],
+        [-0.30, side * 0.326], [-0.59, side * 0.411]
+      ], orangeLight, 0.01);
+    }
+    // Two short hood extraction vents with fine silver louver lines.
+    for (const side of [-1, 1]) {
+      makeTopGraphic([
+        [-0.34, side * 0.22], [-0.31, side * 0.245],
+        [-0.265, side * 0.228], [-0.292, side * 0.204]
+      ], black, 0.01);
+      makeTopGraphic([
+        [-0.326, side * 0.225], [-0.32, side * 0.228],
+        [-0.283, side * 0.216], [-0.289, side * 0.213]
+      ], grayLight, 0.013);
     }
 
     // Black cab roof is a flush upper panel rather than a raised box.
@@ -1133,6 +1211,19 @@ function makeCarVisual(color, playerName = "") {
       black,
       -0.055, 0.235, -0.77, 0.77, 0.004
     );
+
+    // Two slim orange/gray roof stripes bring the hood graphics over the cab.
+    for (const side of [-1, 1]) {
+      makeTopGraphic([
+        [-0.035, side * 0.56], [-0.018, side * 0.58],
+        [0.215, side * 0.58], [0.232, side * 0.55],
+        [0.215, side * 0.535], [-0.018, side * 0.535]
+      ], orangeLight, 0.009);
+      makeTopGraphic([
+        [-0.018, side * 0.50], [0.0, side * 0.515],
+        [0.218, side * 0.515], [0.228, side * 0.50]
+      ], grayLight, 0.01);
+    }
 
     // The windshield and rear glass are conforming surfaces on the same body.
     makeSurfacePatch(
@@ -1150,6 +1241,24 @@ function makeCarVisual(color, playerName = "") {
       "Smoked rear cab glass follows the sloping transition between the roof and rear bed.",
       glass,
       0.235, 0.305, -0.70, 0.70, 0.007
+    );
+
+    // Narrow windshield header band and understated wiper at the cowl.
+    makeSurfacePatch(
+      shellGeometryGroup,
+      "shell-windshield-banner",
+      "Windshield racing banner",
+      "A narrow charcoal header with a fine orange pinstripe, designed to sit neatly within the smoked windshield.",
+      black,
+      -0.178, -0.166, -0.62, 0.62, 0.009
+    );
+    makeSurfacePatch(
+      shellGeometryGroup,
+      "shell-windshield-banner-accent",
+      "Windshield banner accent",
+      "Fine orange line along the windshield header.",
+      orangeLight,
+      -0.179, -0.175, -0.56, 0.56, 0.011
     );
 
     // Both side windows conform to the curved cab flank.
@@ -1177,6 +1286,24 @@ function makeCarVisual(color, playerName = "") {
       charcoal,
       0.36, 0.665, -0.82, 0.82, 0.005
     );
+    // Fine bed rails and shallow grooves make the rear deck read as a molded
+    // short-course bed rather than a large blank gray rectangle.
+    for (const side of [-1, 1]) {
+      makeTopGraphic([
+        [0.405, side * 0.73], [0.425, side * 0.76],
+        [0.635, side * 0.74], [0.655, side * 0.69],
+        [0.64, side * 0.675], [0.43, side * 0.70]
+      ], grayLight, 0.012);
+      makeTopGraphic([
+        [0.425, side * 0.48], [0.625, side * 0.48],
+        [0.625, side * 0.50], [0.425, side * 0.50]
+      ], gray, 0.012);
+    }
+    makeTopGraphic([
+      [0.43, -0.28], [0.62, -0.28],
+      [0.62, 0.28], [0.43, 0.28]
+    ], charcoal, 0.012);
+
     for (const side of [-1, 1]) {
       makeSidePatch(
         shellGeometryGroup,
@@ -1213,37 +1340,94 @@ function makeCarVisual(color, playerName = "") {
       );
     }
 
-    // Simple door graphic decals lie close to the door surface and do not
-    // imitate protected sponsor marks from the reference image.
+    // Layered short-course side livery: broad charcoal sweep, silver blade,
+    // fine orange keyline and a compact number panel. Shapes follow the side skin.
+    const badgeCanvas = document.createElement("canvas");
+    badgeCanvas.width = 768;
+    badgeCanvas.height = 384;
+    const badgeContext = badgeCanvas.getContext("2d");
+    badgeContext.clearRect(0, 0, 768, 384);
+    badgeContext.fillStyle = "rgba(12,17,22,0.96)";
+    badgeContext.beginPath();
+    badgeContext.moveTo(35, 54);
+    badgeContext.lineTo(725, 25);
+    badgeContext.lineTo(676, 328);
+    badgeContext.lineTo(95, 348);
+    badgeContext.closePath();
+    badgeContext.fill();
+    badgeContext.strokeStyle = "#8f999f";
+    badgeContext.lineWidth = 15;
+    badgeContext.beginPath();
+    badgeContext.moveTo(62, 312);
+    badgeContext.lineTo(695, 72);
+    badgeContext.stroke();
+    badgeContext.fillStyle = "#ff6420";
+    badgeContext.font = "900 34px Arial";
+    badgeContext.textAlign = "center";
+    badgeContext.fillText("SHORT COURSE", 380, 326);
+    badgeContext.fillStyle = "#f6f7f7";
+    badgeContext.strokeStyle = "#080c10";
+    badgeContext.lineWidth = 16;
+    badgeContext.font = "italic 900 220px Arial";
+    badgeContext.textBaseline = "middle";
+    badgeContext.strokeText("27", 390, 177);
+    badgeContext.fillText("27", 390, 177);
+    const badgeTexture = new THREE.CanvasTexture(badgeCanvas);
+    badgeTexture.colorSpace = THREE.SRGBColorSpace;
+    badgeTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    const badgeMaterial = new THREE.MeshBasicMaterial({
+      map: badgeTexture,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      polygonOffset: true,
+      polygonOffsetFactor: -2
+    });
+
     for (const side of [-1, 1]) {
-      const stripe = makePart(
-        shellGeometryGroup,
-        `shell-door-stripe-${side}`,
-        side < 0 ? "Left door racing stripe" : "Right door racing stripe",
-        "Angular black and silver short-course racing stripe applied to the orange door."
-      );
-      makeSidePatch(
-        stripe,
-        `door-stripe-dark-${side}`,
-        "Black door graphic",
-        "Black lower-door graphic.",
-        black,
-        side,
-        -0.115, 0.22,
-        0.54, 0.62,
-        0.012
-      );
-      makeSidePatch(
-        stripe,
-        `door-stripe-silver-${side}`,
-        "Silver door accent",
-        "A narrow silver accent separates the orange and black paint sections.",
-        grayLight,
-        side,
-        -0.10, 0.20,
-        0.625, 0.645,
-        0.014
-      );
+      // Main black/charcoal graphic sweeps rearward below the window line.
+      makeSideGraphic(side, [
+        [-0.235, 0.37], [-0.13, 0.50], [0.045, 0.535],
+        [0.255, 0.485], [0.62, 0.405], [0.575, 0.325],
+        [0.315, 0.37], [0.095, 0.405], [-0.105, 0.325]
+      ], black, 0.010);
+
+      // Satin-silver slash follows the upper edge and breaks up the dark panel.
+      makeSideGraphic(side, [
+        [-0.185, 0.475], [-0.115, 0.535], [0.055, 0.565],
+        [0.27, 0.515], [0.59, 0.445], [0.565, 0.468],
+        [0.27, 0.545], [0.055, 0.59], [-0.12, 0.56]
+      ], grayLight, 0.013);
+
+      // A narrow orange line separates the gray blade from the body paint.
+      makeSideGraphic(side, [
+        [-0.16, 0.575], [0.05, 0.605], [0.27, 0.56],
+        [0.55, 0.49], [0.535, 0.505], [0.27, 0.58],
+        [0.05, 0.625], [-0.14, 0.595]
+      ], orangeLight, 0.015);
+
+      // Number panel follows the door surface, with a small gray keyline.
+      makeSideGraphic(side, [
+        [-0.015, 0.405], [0.205, 0.405],
+        [0.265, 0.505], [0.035, 0.52]
+      ], badgeMaterial, 0.017);
+
+      // Small door handle and fuel/access-panel detail.
+      const handle = makeSideGraphic(side, [
+        [0.105, 0.645], [0.185, 0.645],
+        [0.185, 0.665], [0.105, 0.665]
+      ], charcoal, 0.012);
+      handle.castShadow = false;
+
+      // Compact graphite quarter-panel hash marks behind the cab.
+      makeSideGraphic(side, [
+        [0.39, 0.55], [0.57, 0.505],
+        [0.59, 0.525], [0.405, 0.575]
+      ], charcoal, 0.012);
+      makeSideGraphic(side, [
+        [0.425, 0.585], [0.59, 0.545],
+        [0.60, 0.56], [0.44, 0.603]
+      ], grayLight, 0.014);
     }
 
     // Rounded wheel-arch flares sit directly outside the existing wheel
@@ -1318,6 +1502,14 @@ function makeCarVisual(color, playerName = "") {
     }
     roundedBox(rear, [0.63, 0.068, 0.072], gray,
       [0, 0.135, 0.735], null, 0.02);
+
+    // Tailgate inset, small centered model badge and lower reflectors.
+    roundedBox(rear, [0.30, 0.008, 0.012], black, [0, 0.267, 0.713], null, 0.004);
+    roundedBox(rear, [0.115, 0.012, 0.016], grayLight, [0, 0.27, 0.718], null, 0.004);
+    for (const side of [-1, 1]) {
+      roundedBox(rear, [0.055, 0.022, 0.012], grayLight,
+        [side * 0.19, 0.16, 0.712], null, 0.004);
+    }
 
     // Small mirrors, wipers, molded door handles and bed-rail trim.
     const trim = makePart(
