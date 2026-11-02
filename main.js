@@ -1254,12 +1254,29 @@ window.addEventListener("resize", resize);
 
 let lastTime = performance.now();
 let networkTimer = 0;
+let drivingControlErrorReported = false;
 function animate(now) {
   requestAnimationFrame(animate);
   const delta = Math.min((now - lastTime) / 1000, 0.05);
   lastTime = now;
 
-  updateDrivingControls(delta);
+  try {
+    updateDrivingControls(delta);
+  } catch (error) {
+    // A control bug must not stop the render loop or turn the track screen
+    // into a blank background. Remove drive force and report the error once.
+    for (let i = 0; i < 4; i++) {
+      vehicle.applyEngineForce(0, i);
+      vehicle.setBrake(0, i);
+    }
+    vehicle.setSteeringValue(0, 0);
+    vehicle.setSteeringValue(0, 1);
+    if (!drivingControlErrorReported) {
+      console.error("Driving controls failed; keeping the game running:", error);
+      showToast("Driving input error — please reload the game");
+      drivingControlErrorReported = true;
+    }
+  }
   world.step(FIXED_STEP, delta, 3);
   updateLocalVisual();
   updateRemoteVisuals(delta);
