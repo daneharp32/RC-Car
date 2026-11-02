@@ -184,7 +184,7 @@ async function leaveArena() {
   peersConnected = false;
   for (const remote of remotePlayers.values()) scene.remove(remote.visual.root);
   remotePlayers.clear();
-  for (const key of Object.game.controls.keys(game.controls.keys)) game.controls.keys[key] = false;
+  for (const key of Object.keys(game.controls.keys)) game.controls.keys[key] = false;
   updatePlayerCount();
   hud.style.display = "none";
   joinPanel.style.display = "block";
