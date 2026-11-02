@@ -283,6 +283,62 @@
   <div id="loading">BUILDING THE PRACTICE TRACK</div>
   <div id="toast"></div>
 
-  <script type="module" src="./main.js"></script>
+  <script>
+  // Temporary startup diagnostics: reveal otherwise-hidden module/runtime errors.
+  (() => {
+    function showStartupError(kind, message, source = "", line = "", column = "", stack = "") {
+      let panel = document.getElementById("startupErrorPanel");
+      if (!panel) {
+        panel = document.createElement("pre");
+        panel.id = "startupErrorPanel";
+        panel.setAttribute("role", "alert");
+        panel.style.cssText = [
+          "position:fixed", "z-index:99999", "left:12px", "right:12px",
+          "bottom:12px", "max-height:45vh", "overflow:auto",
+          "margin:0", "padding:14px", "border:2px solid #ff765e",
+          "border-radius:10px", "background:rgba(18,12,15,.96)",
+          "color:#fff", "font:12px/1.45 ui-monospace,monospace",
+          "white-space:pre-wrap", "overflow-wrap:anywhere",
+          "box-shadow:0 8px 32px rgba(0,0,0,.55)", "pointer-events:none"
+        ].join(";");
+        (document.body || document.documentElement).appendChild(panel);
+      }
+      const stage = window.__rcCarBootStage || "HTML loaded; game module did not report a startup stage";
+      panel.textContent =
+        "RC CAR SIMULATOR — STARTUP ERROR\n" +
+        "Type: " + kind + "\n" +
+        "Stage: " + stage + "\n" +
+        "Message: " + String(message || "No message supplied") + "\n" +
+        (source ? "File: " + source + "\n" : "") +
+        (line ? "Line: " + line + (column ? ", column: " + column : "") + "\n" : "") +
+        (stack ? "\n" + String(stack).slice(0, 2600) : "") +
+        "\n\nPlease send a screenshot of this message.";
+    }
+    window.addEventListener("error", (event) => {
+      showStartupError(
+        "JavaScript error",
+        event.message,
+        event.filename,
+        event.lineno,
+        event.colno,
+        event.error && event.error.stack
+      );
+    });
+    window.addEventListener("unhandledrejection", (event) => {
+      const reason = event.reason;
+      showStartupError(
+        "Unhandled promise rejection",
+        reason && reason.message ? reason.message : reason,
+        "",
+        "",
+        "",
+        reason && reason.stack
+      );
+    });
+    window.__rcCarReportStartupError = showStartupError;
+    window.__rcCarBootStage = "HTML loaded; waiting for game module";
+  })();
+</script>
+<script type="module" src="./main.js"></script>
 </body>
 </html>
