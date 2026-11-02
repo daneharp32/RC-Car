@@ -1,6 +1,6 @@
 // Camera orbit, keyboard input, vehicle reset, and driving forces.
 export function createControlsSystem(game) {
-  const { THREE, CANNON, chassisBody, vehicle, spawnX, spawnZ } = game;
+  const { THREE, CANNON, chassisBody, vehicle, spawnX, spawnZ, spawnYaw } = game;
   const canvas = game.canvas;
   const showToast = game.showToast;
 // Drag the view around the car. Pointer events support both mouse and touch.
@@ -59,7 +59,7 @@ window.addEventListener("blur", () => {
 
 function resetCar() {
   chassisBody.position.set(spawnX, 0.24, spawnZ);
-  chassisBody.quaternion.set(0, 0, 0, 1);
+  chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), spawnYaw);
   chassisBody.velocity.set(0, 0, 0);
   chassisBody.angularVelocity.set(0, 0, 0);
   throttleState = 0;
