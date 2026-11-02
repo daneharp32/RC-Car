@@ -131,7 +131,7 @@ const {
   spawnZ
 } = physicsSystem;
 
-const makeCarVisual = createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle });
+const makeCarVisual = createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer });
 const localCar = makeCarVisual(0xffa33d);
 
 function updateLocalVisual() {
