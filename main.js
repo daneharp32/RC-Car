@@ -889,14 +889,14 @@ function makeCarVisual(color, playerName = "") {
     const profilePoints = [
       [-0.72, 0.250, 0.215],
       [-0.64, 0.330, 0.264],
-      [-0.49, 0.372, 0.294],
+      [-0.49, 0.374, 0.294],
       [-0.30, 0.374, 0.304],
-      [-0.19, 0.350, 0.344],
-      [-0.075, 0.342, 0.474],
-      [0.205, 0.342, 0.490],
-      [0.305, 0.350, 0.370],
+      [-0.19, 0.374, 0.344],
+      [-0.075, 0.374, 0.474],
+      [0.205, 0.374, 0.490],
+      [0.305, 0.374, 0.370],
       [0.425, 0.374, 0.310],
-      [0.605, 0.354, 0.286],
+      [0.605, 0.374, 0.286],
       [0.720, 0.286, 0.230]
     ];
     const profileCurve = new THREE.CatmullRomCurve3(
@@ -904,11 +904,32 @@ function makeCarVisual(color, playerName = "") {
       false,
       "centripetal"
     );
+    const shellSideSkirtY = -0.055;
+    const shellWheelCenterY =
+      vehicle.wheelInfos[0].chassisConnectionPointLocal.y -
+      vehicle.wheelInfos[0].suspensionRestLength + 0.028;
+    const shellWheelArchHalfLength = 0.19;
+    const shellWheelArchCenters = [-0.29 / 0.75, 0.29 / 0.75];
+
+    function shellLowerEdgeAt(z) {
+      let edgeY = shellSideSkirtY;
+      for (const centerZ of shellWheelArchCenters) {
+        const t = Math.abs(z - centerZ) / shellWheelArchHalfLength;
+        if (t < 1) {
+          const archY = shellSideSkirtY +
+            (shellWheelCenterY + 0.19 - shellSideSkirtY) *
+            Math.cos(t * Math.PI * 0.5);
+          edgeY = Math.max(edgeY, archY);
+        }
+      }
+      return edgeY;
+    }
+
     const sampledProfiles = profileCurve.getPoints(160).map((p) => ({
       z: p.x,
       width: p.y,
       top: p.z,
-      bottom: 0.145
+      bottom: shellLowerEdgeAt(p.x)
     }));
 
     function getProfile(z) {
@@ -939,12 +960,12 @@ function makeCarVisual(color, playerName = "") {
       const absAcross = THREE.MathUtils.clamp(Math.abs(across), 0, 1);
       const cosValue = Math.pow(absAcross, 1 / crossExponent);
       const sinMagnitude = Math.sqrt(Math.max(0, 1 - cosValue * cosValue));
-      const sinValue = upper ? sinMagnitude : -sinMagnitude;
-      const heightFactor = 0.5 + 0.5 * Math.sign(sinValue) *
-        Math.pow(Math.abs(sinValue), crossExponent);
+      const y = upper
+        ? p.bottom + (p.top - p.bottom) * Math.pow(sinMagnitude, crossExponent)
+        : p.bottom - 0.045 * Math.pow(sinMagnitude, 0.65);
       return {
         x: p.width * across,
-        y: p.bottom + (p.top - p.bottom) * heightFactor,
+        y,
         z
       };
     }
@@ -991,14 +1012,17 @@ function makeCarVisual(color, playerName = "") {
         const z = THREE.MathUtils.lerp(z0, z1, row / rows);
         const p = getProfile(z);
         for (let column = 0; column <= columns; column++) {
-          const v = THREE.MathUtils.lerp(vertical0, vertical1, column / columns);
-          const signedSin = Math.sign(2 * v - 1) * Math.pow(Math.abs(2 * v - 1), 1 / crossExponent);
-          const cosValue = Math.sqrt(Math.max(0, 1 - signedSin * signedSin));
+          const v = THREE.MathUtils.clamp(
+            THREE.MathUtils.lerp(vertical0, vertical1, column / columns),
+            0, 1
+          );
+          const sinMagnitude = Math.pow(v, 1 / crossExponent);
+          const cosValue = Math.sqrt(Math.max(0, 1 - sinMagnitude * sinMagnitude));
           const across = side * Math.pow(cosValue, crossExponent);
-          const point = surfacePoint(z, across, v >= 0.5);
+          const point = surfacePoint(z, across, true);
           positions.push(
             point.x + side * offset,
-            p.bottom + (p.top - p.bottom) * v,
+            point.y,
             z
           );
         }
@@ -1061,9 +1085,11 @@ function makeCarVisual(color, playerName = "") {
       }
     }
     const frontCenter = positions.length / 3;
-    positions.push(0, 0.18, -0.72);
+    const frontProfile = getProfile(-0.72);
+    positions.push(0, (frontProfile.bottom + frontProfile.top) * 0.5, -0.72);
     const rearCenter = positions.length / 3;
-    positions.push(0, 0.18, 0.72);
+    const rearProfile = getProfile(0.72);
+    positions.push(0, (rearProfile.bottom + rearProfile.top) * 0.5, 0.72);
     for (let column = 0; column < ringSegments; column++) {
       const next = (column + 1) % ringSegments;
       indices.push(frontCenter, next, column);
@@ -1228,26 +1254,24 @@ function makeCarVisual(color, playerName = "") {
       "Four rounded fender lips follow the tire openings and sit just outside the tread without forming separate oversized rings."
     );
     for (const side of [-1, 1]) {
-      for (const z of [-0.29 / 0.75, 0.29 / 0.75]) {
-        const flare = new THREE.Mesh(
-          new THREE.TorusGeometry(0.166, 0.014, 10, 56, Math.PI),
-          black
-        );
-        flare.rotation.y = Math.PI / 2;
-        flare.position.set(side * 0.378, 0.145, z);
-        flare.scale.y = 0.75;
-        flare.castShadow = true;
-        flare.receiveShadow = true;
-        arches.add(flare);
+      for (const centerZ of shellWheelArchCenters) {
+        const archPoints = [];
+        const accentPoints = [];
+        const archSegments = 40;
+        for (let i = 0; i <= archSegments; i++) {
+          const t = -1 + 2 * i / archSegments;
+          const z = centerZ + t * shellWheelArchHalfLength;
+          const y = shellLowerEdgeAt(z) + 0.006;
+          archPoints.push(new THREE.Vector3(side * 0.379, y, z));
+          accentPoints.push(new THREE.Vector3(side * 0.381, y + 0.009, z));
+        }
+        const archCurve = new THREE.CatmullRomCurve3(archPoints);
+        const flare = new THREE.TubeGeometry(archCurve, 80, 0.012, 8, false);
+        addMesh(arches, flare, black);
 
-        const lip = new THREE.Mesh(
-          new THREE.TorusGeometry(0.153, 0.0055, 8, 52, Math.PI),
-          orangeLight
-        );
-        lip.rotation.y = Math.PI / 2;
-        lip.position.set(side * 0.380, 0.145, z);
-        lip.scale.y = 0.75;
-        arches.add(lip);
+        const accentCurve = new THREE.CatmullRomCurve3(accentPoints);
+        const lip = new THREE.TubeGeometry(accentCurve, 80, 0.0045, 7, false);
+        addMesh(arches, lip, orangeLight);
       }
     }
 
@@ -1317,6 +1341,20 @@ function makeCarVisual(color, playerName = "") {
     }
   }
   makeBodyShell();
+
+  // All painted shell surfaces share one garage hover identity. The chassis
+  // retains its own individual component labels when the shell is removed.
+  shellGroup.userData.partInfo = {
+    id: "short-course-body-shell",
+    label: "Short-course truck body shell",
+    description: "Complete orange, black and graphite-gray short-course body shell, including the hood, cab, windows, rear bed, fenders and exterior trim."
+  };
+  shellGroup.traverse((object) => {
+    if (object !== shellGroup && object.userData) {
+      delete object.userData.partInfo;
+    }
+  });
+
   if (playerName) {
     const labelCanvas = document.createElement("canvas");
     labelCanvas.width = 512;
@@ -1410,7 +1448,7 @@ function clearGaragePartHover() {
   const title = $("partHoverTitle");
   const description = $("partHoverDescription");
   if (title) title.textContent = "HOVER OVER A COMPONENT";
-  if (description) description.textContent = "Move your pointer over the exposed chassis to identify each part.";
+  if (description) description.textContent = "Move your pointer over the body shell to identify the complete shell as one part.";
 }
 
 function updateGaragePartHover(event) {
