@@ -689,11 +689,12 @@ function makeCarVisual(color, playerName = "") {
     const wheelCenterY =
       vehicle.wheelInfos[0].chassisConnectionPointLocal.y -
       vehicle.wheelInfos[0].suspensionRestLength + 0.028;
-    const wheelRadius = vehicle.wheelInfos[0].radius || 0.13;
+    // The visible tire geometry is slightly larger than the physics ray radius.
+    const visualTireRadius = 0.158;
     const archCenterZ = [-0.29 / 0.75, 0.29 / 0.75];
     const archHalfLength = 0.164;
     const skirtY = -0.052;
-    const archCrownY = wheelCenterY + wheelRadius + 0.026;
+    const archCrownY = wheelCenterY + visualTireRadius + 0.026;
 
     // Body stations are short and close to the wheelbase. Each station is
     // [longitudinal position, half-width, deck height].
@@ -741,17 +742,31 @@ function makeCarVisual(color, playerName = "") {
       for (const center of archCenterZ) {
         const normalized = Math.abs(z - center) / archHalfLength;
         if (normalized < 1) {
-          const t = THREE.MathUtils.clamp((1 - normalized) / 0.48, 0, 1);
-          // A broad, slightly squared crown keeps the arch close to the tire
-          // while avoiding the thin, overly round fender cut-out.
-          const rise = t < 0.55 ? 1 : 1 - (t - 0.55) * 0.42;
+          const t = THREE.MathUtils.clamp((1 - normalized) / 0.40, 0, 1);
+          // A broad, flatter crown transitions into angled shoulders near
+          // the wheel opening ends, matching a molded short-course fender.
+          const rise = Math.pow(t, 0.68);
           y = Math.max(y, skirtY + (archCrownY - skirtY) * rise);
         }
       }
       return y;
     }
 
-    function box(parent, size, position, material, rotation = [0, 0, 0]) {
+    function box(parent, size, positionOrMaterial, materialOrPosition, rotation = [0, 0, 0]) {
+      // Accept either (position, material) or (material, position), keeping
+      // bumper/detail calls safe if they follow the older helper convention.
+      const position = Array.isArray(positionOrMaterial)
+        ? positionOrMaterial
+        : materialOrPosition;
+      const material = Array.isArray(positionOrMaterial)
+        ? materialOrPosition
+        : positionOrMaterial;
+      if (!Array.isArray(position) || position.length !== 3) {
+        throw new TypeError("Body box requires a three-number position.");
+      }
+      if (!material || typeof material !== "object") {
+        throw new TypeError("Body box requires a Three.js material.");
+      }
       return addMesh(
         parent,
         new THREE.BoxGeometry(size[0], size[1], size[2]),
@@ -1046,35 +1061,35 @@ function makeCarVisual(color, playerName = "") {
     }
 
     // Wide squared front bumper, slim grille and low rectangular headlights.
-    box(shellBody, [0.470, 0.042, 0.024], [0, 0.176, -0.650], black);
+    box(shellBody, [0.470, 0.042, 0.024], [0, 0.176, -0.612], black);
     for (let i = 0; i < 7; i++) {
       box(shellBody, [0.012, 0.028, 0.008],
-        [-0.18 + i * 0.06, 0.176, -0.666], silver);
+        [-0.18 + i * 0.06, 0.176, -0.628], silver);
     }
     for (const side of [-1, 1]) {
       box(shellBody, [0.085, 0.040, 0.018],
-        [side * 0.242, 0.190, -0.635], charcoal);
+        [side * 0.242, 0.190, -0.600], charcoal);
       box(shellBody, [0.060, 0.022, 0.009],
-        [side * 0.242, 0.191, -0.648], headlamp);
+        [side * 0.242, 0.191, -0.613], headlamp);
     }
     box(shellBody, [0.780, 0.065, 0.088],
-      [0, 0.118, -0.682], graphite);
+      [0, 0.118, -0.616], graphite);
     box(shellBody, [0.610, 0.018, 0.028],
-      [0, 0.153, -0.724], black);
+      [0, 0.153, -0.653], black);
 
     // Short tailgate, horizontal tail lamps and wide rear bumper.
-    box(shellBody, [0.550, 0.050, 0.020], charcoal, [0, 0.190, 0.640]);
-    box(shellBody, [0.300, 0.010, 0.008], black, [0, 0.218, 0.653]);
+    box(shellBody, [0.550, 0.050, 0.020], charcoal, [0, 0.190, 0.610]);
+    box(shellBody, [0.300, 0.010, 0.008], black, [0, 0.218, 0.625]);
     for (const side of [-1, 1]) {
       box(shellBody, [0.075, 0.038, 0.018],
-        [side * 0.244, 0.194, 0.656], tailLamp);
+        [side * 0.244, 0.194, 0.628], tailLamp);
       box(shellBody, [0.110, 0.014, 0.014],
-        [side * 0.242, 0.155, 0.661], silver);
+        [side * 0.242, 0.155, 0.632], silver);
     }
     box(shellBody, [0.780, 0.066, 0.090],
-      [0, 0.112, 0.680], graphite);
+      [0, 0.112, 0.615], graphite);
     box(shellBody, [0.600, 0.018, 0.028],
-      [0, 0.146, 0.722], black);
+      [0, 0.146, 0.653], black);
 
     // The entire low/wide shell remains one removable assembly and one hover
     // target; none of its individual mesh details receives partInfo.
