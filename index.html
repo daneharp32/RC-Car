@@ -90,14 +90,22 @@
     }
     #garagePanel {
       position: fixed; z-index: 4; left: 22px; top: 50%; transform: translateY(-50%);
-      width: min(300px, calc(100vw - 36px)); padding: 23px;
+      width: min(340px, calc(100vw - 36px)); padding: 22px;
       border: 1px solid rgba(155,205,255,.2); border-radius: 18px;
-      background: rgba(9,20,34,.84); backdrop-filter: blur(15px);
+      background: rgba(9,20,34,.88); backdrop-filter: blur(15px);
       box-shadow: 0 22px 75px rgba(0,0,0,.3);
     }
     .garage-title { margin: 8px 0; font: 800 25px/1.1 "Orbitron", ui-sans-serif, sans-serif; }
-    .garage-copy { color: #aebfce; font-size: 12px; line-height: 1.55; margin: 0 0 18px; }
-    .garage-hint { color: #76bfff; font-size: 10px; letter-spacing: .06em; margin: 0 0 16px; }
+    .garage-copy { color: #aebfce; font-size: 12px; line-height: 1.55; margin: 0 0 14px; }
+    .garage-hint { color: #76bfff; font-size: 10px; line-height: 1.5; letter-spacing: .06em; margin: 0 0 13px; }
+    .part-inspector {
+      min-height: 112px; margin: 0 0 16px; padding: 13px 14px;
+      border: 1px solid rgba(105,180,255,.24); border-radius: 12px;
+      background: linear-gradient(145deg, rgba(35,75,112,.36), rgba(9,17,28,.64));
+    }
+    .part-inspector-kicker { margin-bottom: 7px; color: #72bdff; font-size: 9px; font-weight: 900; letter-spacing: .18em; }
+    #partHoverTitle { color: #f4f8fc; font: 800 13px/1.35 "Orbitron", ui-sans-serif, sans-serif; }
+    #partHoverDescription { color: #b8c7d2; font-size: 11px; line-height: 1.5; margin: 7px 0 0; }
     #garageBackButton, #driveBackButton {
       min-height: 42px; padding: 0 14px; color: #e5f3ff;
       border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.08);
@@ -217,11 +225,15 @@
   </section>
 
   <section id="garagePanel" style="display:none">
-    <div class="eyebrow">YOUR VEHICLE</div>
-    <h2 class="garage-title">GARAGE</h2>
-    <p class="garage-copy">Your RC truck is displayed on the showroom platform. Drag across the car to look around it.</p>
-    <p class="garage-hint">PERSONAL SHOWROOM · DRAG TO ROTATE</p>
-    <button id="shellToggleButton" class="menu-button secondary" type="button" style="width:100%;margin-bottom:10px">REMOVE BODY SHELL</button>
+    <div class="eyebrow">EXPOSED VEHICLE</div>
+    <h2 class="garage-title">CHASSIS GARAGE</h2>
+    <p class="garage-copy">The body shell is removed so you can inspect the complete RC chassis. Drag to rotate the truck and hover over individual components to identify them.</p>
+    <p class="garage-hint">BARE CHASSIS · DRAG TO ROTATE · HOVER TO IDENTIFY</p>
+    <div class="part-inspector" aria-live="polite">
+      <div class="part-inspector-kicker">PART IDENTIFICATION</div>
+      <div id="partHoverTitle">HOVER OVER A COMPONENT</div>
+      <p id="partHoverDescription">Move your pointer over the exposed chassis to learn what each part does.</p>
+    </div>
     <button id="garageBackButton" type="button">BACK TO MAIN MENU</button>
   </section>
 
