@@ -68,10 +68,11 @@ grid.material.opacity = 0.09;
 scene.add(grid);
 
 const jumpLocations = [
-  { x: 0, z: -12, yaw: 0 },
-  { x: -15, z: 7, yaw: 0 },
-  { x: 16, z: 18, yaw: 0 },
-  { x: 4, z: 34, yaw: 0 }
+  // Main, taller short-course kicker. The gradual approach keeps it drivable.
+  { x: 0, z: -13, yaw: 0, width: 6.8, length: 6.2, height: 2.25 },
+  { x: -15, z: 7, yaw: 0, width: 4.8, length: 4.8, height: 0.95 },
+  { x: 16, z: 18, yaw: 0, width: 5.0, length: 5.0, height: 1.05 },
+  { x: 4, z: 34, yaw: 0, width: 4.6, length: 4.8, height: 0.9 }
 ];
 const jumpMaterial = new THREE.MeshStandardMaterial({ color: 0x806b50, roughness: 0.96 });
 const arenaVisuals = [groundMesh, grid];
@@ -100,7 +101,10 @@ function makeRampGeometry(width, length, height) {
 }
 
 for (const jump of jumpLocations) {
-  const ramp = new THREE.Mesh(makeRampGeometry(4.4, 4.2, 0.62), jumpMaterial);
+  const ramp = new THREE.Mesh(
+    makeRampGeometry(jump.width, jump.length, jump.height),
+    jumpMaterial
+  );
   ramp.position.set(jump.x, 0, jump.z);
   ramp.rotation.y = jump.yaw;
   ramp.castShadow = true;
@@ -116,7 +120,7 @@ const world = new CANNON.World({
   gravity: new CANNON.Vec3(0, -9.82, 0)
 });
 world.broadphase = new CANNON.SAPBroadphase(world);
-world.solver.iterations = 12;
+world.solver.iterations = 14;
 world.allowSleep = false;
 world.defaultContactMaterial.friction = 0.35;
 world.defaultContactMaterial.restitution = 0.02;
@@ -128,7 +132,9 @@ world.addBody(groundBody);
 
 // Matching convex wedge colliders keep the approach edge flush with the ground.
 for (const jump of jumpLocations) {
-  const w = 2.2, l = 2.1, h = 0.62;
+  const w = jump.width / 2;
+  const l = jump.length / 2;
+  const h = jump.height;
   const vertices = [
     new CANNON.Vec3(-w, 0, l), new CANNON.Vec3(w, 0, l),
     new CANNON.Vec3(-w, 0, -l), new CANNON.Vec3(w, 0, -l),
@@ -189,14 +195,14 @@ for (let i = 0; i < 4; i++) {
     directionLocal: new CANNON.Vec3(0, -1, 0),
     axleLocal: new CANNON.Vec3(-1, 0, 0),
     suspensionRestLength: 0.12,
-    suspensionStiffness: 43,
-    dampingCompression: 5.2,
-    dampingRelaxation: 4.5,
-    maxSuspensionTravel: 0.14,
-    maxSuspensionForce: 260,
+    suspensionStiffness: 46,
+    dampingCompression: 5.0,
+    dampingRelaxation: 4.2,
+    maxSuspensionTravel: 0.16,
+    maxSuspensionForce: 285,
     radius: 0.13,
-    frictionSlip: 4.4,
-    rollInfluence: 0.085,
+    frictionSlip: 4.8,
+    rollInfluence: 0.08,
     isFrontWheel: i < 2,
     useCustomSlidingRotationalSpeed: true,
     customSlidingRotationalSpeed: 18
@@ -1046,6 +1052,9 @@ function resetCar() {
 
 let steerState = 0;
 let throttleState = 0;
+const localAirTorque = new CANNON.Vec3();
+const worldAirTorque = new CANNON.Vec3();
+
 function updateDrivingControls(delta) {
   if (!joined) {
     for (let i = 0; i < 4; i++) {
@@ -1058,37 +1067,72 @@ function updateDrivingControls(delta) {
   const forward = keys.w || keys.arrowup ? 1 : 0;
   const reverse = keys.s || keys.arrowdown ? -1 : 0;
   const throttle = forward + reverse;
-  const steerTarget = (keys.a || keys.arrowleft ? 1 : 0) - (keys.d || keys.arrowright ? 1 : 0);
-  steerState += (steerTarget - steerState) * 0.22;
+  const steerTarget = (keys.a || keys.arrowleft ? 1 : 0) -
+    (keys.d || keys.arrowright ? 1 : 0);
+
+  // Time-based smoothing keeps the handling stable across frame rates.
+  const steerResponse = 1 - Math.exp(-11 * delta);
+  const throttleResponse = 1 - Math.exp(-6.5 * delta);
+  steerState += (steerTarget - steerState) * steerResponse;
+  throttleState += (throttle - throttleState) * throttleResponse;
 
   const speed = chassisBody.velocity.length();
-  const speedSteerScale = THREE.MathUtils.clamp(1 - speed / 30, 0.52, 1);
-  const steeringAngle = steerState * 0.40 * speedSteerScale;
-
+  const speedSteerScale = THREE.MathUtils.clamp(1 - speed / 29, 0.48, 1);
+  const steeringAngle = steerState * 0.42 * speedSteerScale;
   vehicle.setSteeringValue(steeringAngle, 0);
   vehicle.setSteeringValue(steeringAngle, 1);
-  // Positive force is forward for this chassis orientation. Progressive,
-  // moderate power helps prevent abrupt pitching and uncontrolled wheelies.
-  throttleState += (throttle - throttleState) * 0.12;
-  const speedLimitScale = THREE.MathUtils.clamp(1 - speed / 24, 0.28, 1);
-  const engineForce = throttleState * 25 * speedLimitScale;
-  // Slow the chassis horizontally instead of applying wheel-brake torque.
-  // This avoids the abrupt nose-down pitching that was causing front flips.
+
+  // Progressive four-wheel drive with a gradual top-speed fade.
+  const speedLimitScale = THREE.MathUtils.clamp(1 - speed / 27, 0.24, 1);
+  const engineForce = throttleState * 30 * speedLimitScale;
   for (let i = 0; i < 4; i++) {
     vehicle.applyEngineForce(engineForce, i);
     vehicle.setBrake(0, i);
   }
+
+  // Smooth chassis drag braking, retained from the last working build.
   if (keys[" "] && delta > 0) {
     const brakeFactor = Math.exp(-2.7 * delta);
     chassisBody.velocity.x *= brakeFactor;
     chassisBody.velocity.z *= brakeFactor;
   }
 
-  // Reduce excessive pitch and roll spin while grounded, but keep jumps lively.
-  const groundedWheels = vehicle.wheelInfos.filter((wheel) => wheel.isInContact).length;
-  if (groundedWheels >= 2) {
+  const groundedWheels = vehicle.wheelInfos.reduce(
+    (count, wheel) => count + (wheel.isInContact ? 1 : 0),
+    0
+  );
+
+  // Do not apply flight controls while the truck is merely settling at spawn.
+  const airborne = groundedWheels <= 1 && chassisBody.position.y > 0.42;
+
+  if (airborne) {
+    // RC-style attitude control while airborne:
+    // W raises the nose, S lowers it, A/D yaw the truck, and a small roll
+    // component banks it into turns.
+    localAirTorque.set(
+      throttleState * 1.35,
+      steerState * 0.9,
+      -steerState * 0.18
+    );
+
+    // Cannon-es 0.20 exposes applyTorque() in world space. Convert the
+    // locally-authored torque into world space before applying it. Feature
+    // detection makes this optional feature fail-safe instead of crashing
+    // the animation loop if a physics library changes unexpectedly.
+    if (
+      typeof chassisBody.vectorToWorldFrame === "function" &&
+      typeof chassisBody.applyTorque === "function"
+    ) {
+      chassisBody.vectorToWorldFrame(localAirTorque, worldAirTorque);
+      chassisBody.applyTorque(worldAirTorque);
+    }
+  } else if (groundedWheels >= 3) {
+    // Let tire contact settle small pitch/roll oscillations on the ground.
     chassisBody.angularVelocity.x *= 0.94;
     chassisBody.angularVelocity.z *= 0.94;
+  } else {
+    chassisBody.angularVelocity.x *= 0.985;
+    chassisBody.angularVelocity.z *= 0.985;
   }
 }
 
