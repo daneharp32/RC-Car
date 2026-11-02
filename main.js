@@ -944,12 +944,12 @@ function makeCarVisual(color, playerName = "") {
 
     // A 2D profile in q/y, rotated onto either side of the truck.
     // q = -z means the front of the truck is on the positive side of the shape.
-    function sideShape(parent, side, material, draw) {
+    function sideShape(parent, side, material, draw, surfaceOffset = 0) {
       const shape = new THREE.Shape();
       draw(shape);
       const mesh = addMesh(parent, new THREE.ShapeGeometry(shape, 32), material);
       mesh.rotation.y = Math.PI / 2;
-      mesh.position.x = side * 0.354;
+      mesh.position.x = side * (0.354 + surfaceOffset);
       material.side = THREE.DoubleSide;
       return mesh;
     }
@@ -1046,14 +1046,14 @@ function makeCarVisual(color, playerName = "") {
         shape.lineTo(-0.025, 0.455);
         shape.lineTo(-0.095, 0.462);
         shape.closePath();
-      });
+      }, 0.004);
       sideShape(sideWindows, side, glass, (shape) => {
         shape.moveTo(0.015, 0.355);
         shape.lineTo(0.205, 0.355);
         shape.lineTo(0.170, 0.458);
         shape.lineTo(0.025, 0.458);
         shape.closePath();
-      });
+      }, 0.004);
       cylinderBetween(sideWindows, [side * 0.344, 0.347, -0.025],
         [side * 0.278, 0.475, -0.065], 0.012, shellBlack, 10);
       cylinderBetween(sideWindows, [side * 0.344, 0.350, 0.205],
@@ -1074,7 +1074,7 @@ function makeCarVisual(color, playerName = "") {
         shape.lineTo(-0.355, 0.285);
         shape.lineTo(-0.59, 0.292);
         shape.closePath();
-      });
+      }, 0.004);
       cylinderBetween(rearQuarter, [side * 0.36, 0.285, 0.39],
         [side * 0.35, 0.30, 0.62], 0.012, lightGray, 10);
       roundedBox(rearQuarter, [0.018, 0.014, 0.25], gray,
@@ -1144,7 +1144,7 @@ function makeCarVisual(color, playerName = "") {
     for (const side of [-1, 1]) {
       for (const z of [-0.29, 0.29]) {
         const flare = new THREE.Mesh(
-          new THREE.TorusGeometry(0.158, 0.018, 10, 48, Math.PI), shellBlack
+          new THREE.TorusGeometry(0.178, 0.020, 10, 48, Math.PI), shellBlack
         );
         flare.rotation.y = Math.PI / 2;
         flare.position.set(side * 0.372, 0.145, z / 0.75);
@@ -1153,7 +1153,7 @@ function makeCarVisual(color, playerName = "") {
         flare.receiveShadow = true;
         arches.add(flare);
         const lip = new THREE.Mesh(
-          new THREE.TorusGeometry(0.145, 0.006, 7, 44, Math.PI), orangeLight
+          new THREE.TorusGeometry(0.160, 0.006, 7, 44, Math.PI), orangeLight
         );
         lip.rotation.y = Math.PI / 2;
         lip.position.set(side * 0.374, 0.145, z / 0.75);
