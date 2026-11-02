@@ -845,93 +845,131 @@ function makeCarVisual(color, playerName = "") {
   function makeBodyShell() {
     const shellGeometryGroup = new THREE.Group();
     shellGeometryGroup.name = "shell-geometry";
+    // Chassis and shell have an overall visual length scale of 1.26.
+    // This inner scale keeps the body length realistic relative to the wheelbase.
     shellGeometryGroup.scale.z = 0.75;
     shellGroup.add(shellGeometryGroup);
 
-    const orange = new THREE.MeshStandardMaterial({ color: 0xff4b0b, roughness: 0.32, metalness: 0.05 });
-    const orangeLight = new THREE.MeshStandardMaterial({ color: 0xff6820, roughness: 0.34, metalness: 0.04 });
-    const shellBlack = new THREE.MeshStandardMaterial({ color: 0x11161b, roughness: 0.4, metalness: 0.1 });
-    const charcoal = new THREE.MeshStandardMaterial({ color: 0x30383e, roughness: 0.48, metalness: 0.18 });
-    const gray = new THREE.MeshStandardMaterial({ color: 0x7b858a, roughness: 0.44, metalness: 0.28 });
-    const lightGray = new THREE.MeshStandardMaterial({ color: 0xb5bdc0, roughness: 0.3, metalness: 0.74 });
+    const orange = new THREE.MeshStandardMaterial({
+      color: 0xff4b0b, roughness: 0.36, metalness: 0.025
+    });
+    const orangeLight = new THREE.MeshStandardMaterial({
+      color: 0xff6420, roughness: 0.38, metalness: 0.02
+    });
+    const deepOrange = new THREE.MeshStandardMaterial({
+      color: 0xd83a08, roughness: 0.42, metalness: 0.02
+    });
+    const black = new THREE.MeshStandardMaterial({
+      color: 0x10151a, roughness: 0.43, metalness: 0.08
+    });
+    const charcoal = new THREE.MeshStandardMaterial({
+      color: 0x30383d, roughness: 0.5, metalness: 0.12
+    });
+    const gray = new THREE.MeshStandardMaterial({
+      color: 0x737e84, roughness: 0.45, metalness: 0.24
+    });
+    const grayLight = new THREE.MeshStandardMaterial({
+      color: 0xb0b8bc, roughness: 0.31, metalness: 0.68
+    });
     const glass = new THREE.MeshPhysicalMaterial({
-      color: 0x101c27, roughness: 0.16, metalness: 0.16,
-      transparent: true, opacity: 0.96, clearcoat: 0.8, clearcoatRoughness: 0.12,
-      side: THREE.DoubleSide
+      color: 0x0b1721, roughness: 0.2, metalness: 0.15,
+      clearcoat: 0.85, clearcoatRoughness: 0.14,
+      transparent: true, opacity: 0.96, side: THREE.DoubleSide
     });
-    const headlamp = new THREE.MeshStandardMaterial({
-      color: 0xf5e9cf, emissive: 0x8b6231, emissiveIntensity: 0.18, roughness: 0.24
+    const lamp = new THREE.MeshStandardMaterial({
+      color: 0xf7e7c8, emissive: 0x8b592a, emissiveIntensity: 0.16,
+      roughness: 0.25
     });
-    const tailLamp = new THREE.MeshStandardMaterial({
-      color: 0xb92725, emissive: 0x5e0c09, emissiveIntensity: 0.16, roughness: 0.28
+    const redLamp = new THREE.MeshStandardMaterial({
+      color: 0xb52724, emissive: 0x4d0807, emissiveIntensity: 0.15
     });
 
-    // z is the truck's length axis; negative z is the nose.
-    const profiles = [
-      [-0.72, 0.25, 0.218, 0.145],
-      [-0.64, 0.33, 0.263, 0.148],
-      [-0.49, 0.372, 0.292, 0.150],
-      [-0.30, 0.365, 0.302, 0.150],
-      [-0.18, 0.331, 0.337, 0.155],
-      [-0.075, 0.315, 0.475, 0.180],
-      [0.205, 0.315, 0.490, 0.180],
-      [0.305, 0.315, 0.365, 0.160],
-      [0.425, 0.360, 0.305, 0.150],
-      [0.605, 0.350, 0.283, 0.145],
-      [0.720, 0.285, 0.230, 0.140]
+    // The longitudinal profile controls the entire continuous shell.
+    // Negative Z is the nose; positive Z is the rear bed.
+    const profilePoints = [
+      [-0.72, 0.250, 0.215],
+      [-0.64, 0.330, 0.264],
+      [-0.49, 0.372, 0.294],
+      [-0.30, 0.374, 0.304],
+      [-0.19, 0.350, 0.344],
+      [-0.075, 0.295, 0.474],
+      [0.205, 0.295, 0.490],
+      [0.305, 0.332, 0.370],
+      [0.425, 0.374, 0.310],
+      [0.605, 0.354, 0.286],
+      [0.720, 0.286, 0.230]
     ];
-    const topCurve = new THREE.CatmullRomCurve3(
-      profiles.map(([z, width, top]) => new THREE.Vector3(z, width, top)),
-      false, "centripetal"
+    const profileCurve = new THREE.CatmullRomCurve3(
+      profilePoints.map(([z, width, top]) => new THREE.Vector3(z, width, top)),
+      false,
+      "centripetal"
     );
-    const edgeCurve = new THREE.CatmullRomCurve3(
-      profiles.map(([z, , , edge]) => new THREE.Vector3(z, edge, 0)),
-      false, "centripetal"
-    );
-    const topSamples = topCurve.getPoints(120);
-    const edgeSamples = edgeCurve.getPoints(120);
-    const rows = topSamples.map((p, i) => ({
-      z: p.x, width: p.y, top: p.z, edge: edgeSamples[i].y
+    const sampledProfiles = profileCurve.getPoints(160).map((p) => ({
+      z: p.x,
+      width: p.y,
+      top: p.z,
+      bottom: 0.145
     }));
 
-    function atZ(z) {
-      if (z <= rows[0].z) return rows[0];
-      if (z >= rows[rows.length - 1].z) return rows[rows.length - 1];
-      for (let i = 0; i < rows.length - 1; i++) {
-        const a = rows[i], b = rows[i + 1];
+    function getProfile(z) {
+      if (z <= sampledProfiles[0].z) return sampledProfiles[0];
+      const last = sampledProfiles[sampledProfiles.length - 1];
+      if (z >= last.z) return last;
+      for (let i = 0; i < sampledProfiles.length - 1; i++) {
+        const a = sampledProfiles[i];
+        const b = sampledProfiles[i + 1];
         if (z >= a.z && z <= b.z) {
           const t = (z - a.z) / Math.max(0.00001, b.z - a.z);
           return {
             z,
             width: THREE.MathUtils.lerp(a.width, b.width, t),
             top: THREE.MathUtils.lerp(a.top, b.top, t),
-            edge: THREE.MathUtils.lerp(a.edge, b.edge, t)
+            bottom: THREE.MathUtils.lerp(a.bottom, b.bottom, t)
           };
         }
       }
-      return rows[rows.length - 1];
+      return last;
     }
 
-    function loft(parent, material, z0, z1, widthFactor = 1, lift = 0, rowCount = 80, colCount = 28) {
-      const positions = [], indices = [];
-      for (let r = 0; r <= rowCount; r++) {
-        const z = THREE.MathUtils.lerp(z0, z1, r / rowCount);
-        const p = atZ(z);
-        for (let c = 0; c <= colCount; c++) {
-          const across = ((c / colCount) * 2 - 1) * widthFactor;
-          const x = p.width * across;
-          const crown = 1 - Math.pow(Math.abs(across), 1.62);
-          const y = p.edge + (p.top - p.edge) * crown + lift;
-          positions.push(x, y, z);
+    // A superellipse-like cross-section creates broad, softly rounded sides
+    // and a wide roof/hood crown rather than a pointed or faceted tube.
+    const crossExponent = 0.28;
+    function surfacePoint(z, across, upper = true) {
+      const p = getProfile(z);
+      const absAcross = THREE.MathUtils.clamp(Math.abs(across), 0, 1);
+      const cosValue = Math.pow(absAcross, 1 / crossExponent);
+      const sinMagnitude = Math.sqrt(Math.max(0, 1 - cosValue * cosValue));
+      const sinValue = upper ? sinMagnitude : -sinMagnitude;
+      const heightFactor = 0.5 + 0.5 * Math.sign(sinValue) *
+        Math.pow(Math.abs(sinValue), crossExponent);
+      return {
+        x: p.width * across,
+        y: p.bottom + (p.top - p.bottom) * heightFactor,
+        z
+      };
+    }
+
+    function makeSurfacePatch(parent, id, label, description, material, z0, z1, across0, across1, lift = 0.003) {
+      const part = makePart(parent, id, label, description);
+      const rows = 48;
+      const columns = 20;
+      const positions = [];
+      const indices = [];
+      for (let row = 0; row <= rows; row++) {
+        const z = THREE.MathUtils.lerp(z0, z1, row / rows);
+        for (let column = 0; column <= columns; column++) {
+          const across = THREE.MathUtils.lerp(across0, across1, column / columns);
+          const point = surfacePoint(z, across, true);
+          positions.push(point.x, point.y + lift, point.z);
         }
       }
-      for (let r = 0; r < rowCount; r++) {
-        for (let c = 0; c < colCount; c++) {
-          const a = r * (colCount + 1) + c;
+      for (let row = 0; row < rows; row++) {
+        for (let column = 0; column < columns; column++) {
+          const a = row * (columns + 1) + column;
           const b = a + 1;
-          const d = (r + 1) * (colCount + 1) + c;
-          const e = d + 1;
-          indices.push(a, d, b, b, d, e);
+          const d = (row + 1) * (columns + 1) + column;
+          const c = d + 1;
+          indices.push(a, d, b, b, d, c);
         }
       }
       const geometry = new THREE.BufferGeometry();
@@ -939,313 +977,345 @@ function makeCarVisual(color, playerName = "") {
       geometry.setIndex(indices);
       geometry.computeVertexNormals();
       material.side = THREE.DoubleSide;
-      return addMesh(parent, geometry, material);
+      addMesh(part, geometry, material);
+      return part;
     }
 
-    // A 2D profile in q/y, rotated onto either side of the truck.
-    // q = -z means the front of the truck is on the positive side of the shape.
-    function sideShape(parent, side, material, draw, surfaceOffset = 0) {
-      const shape = new THREE.Shape();
-      draw(shape);
-      const mesh = addMesh(parent, new THREE.ShapeGeometry(shape, 32), material);
-      mesh.rotation.y = Math.PI / 2;
-      mesh.position.x = side * (0.354 + surfaceOffset);
-      material.side = THREE.DoubleSide;
-      return mesh;
-    }
-
-    function quad(parent, points, material) {
+    function makeSidePatch(parent, id, label, description, material, side, z0, z1, vertical0, vertical1, offset = 0.003) {
+      const part = makePart(parent, id, label, description);
+      const rows = 42;
+      const columns = 14;
+      const positions = [];
+      const indices = [];
+      for (let row = 0; row <= rows; row++) {
+        const z = THREE.MathUtils.lerp(z0, z1, row / rows);
+        const p = getProfile(z);
+        for (let column = 0; column <= columns; column++) {
+          const v = THREE.MathUtils.lerp(vertical0, vertical1, column / columns);
+          const signedSin = Math.sign(2 * v - 1) * Math.pow(Math.abs(2 * v - 1), 1 / crossExponent);
+          const cosValue = Math.sqrt(Math.max(0, 1 - signedSin * signedSin));
+          const across = side * Math.pow(cosValue, crossExponent);
+          const point = surfacePoint(z, across, v >= 0.5);
+          positions.push(
+            point.x + side * offset,
+            p.bottom + (p.top - p.bottom) * v,
+            z
+          );
+        }
+      }
+      for (let row = 0; row < rows; row++) {
+        for (let column = 0; column < columns; column++) {
+          const a = row * (columns + 1) + column;
+          const b = a + 1;
+          const d = (row + 1) * (columns + 1) + column;
+          const c = d + 1;
+          indices.push(a, d, b, b, d, c);
+        }
+      }
       const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute("position", new THREE.Float32BufferAttribute(points.flat(), 3));
-      geometry.setIndex([0, 1, 2, 0, 2, 3]);
+      geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setIndex(indices);
       geometry.computeVertexNormals();
       material.side = THREE.DoubleSide;
-      return addMesh(parent, geometry, material);
+      addMesh(part, geometry, material);
+      return part;
     }
 
-    // Main orange one-piece skin with molded short-course wheel openings.
-    const skin = makePart(
-      shellGeometryGroup, "shell-orange-main", "Orange polycarbonate body",
-      "The main short-course shell: a long low hood, flared wheel openings, compact cab and short rear bed. It covers the electronics while leaving the four tires exposed."
+    // One continuous, closed, smooth body surface. This replaces the former
+    // disconnected orange side plates and floating hood/cab pieces.
+    const mainBody = makePart(
+      shellGeometryGroup,
+      "shell-orange-main",
+      "Continuous orange short-course body",
+      "The single molded polycarbonate body shell. The hood, fenders, cab sides and rear body are formed as one continuous surface."
     );
-    loft(skin, orange, -0.72, 0.72, 1, 0, 120, 32);
-    for (const side of [-1, 1]) {
-      sideShape(skin, side, orange, (shape) => {
-        shape.moveTo(-0.72, 0.15);
-        shape.lineTo(-0.60, 0.15);
-        shape.quadraticCurveTo(-0.3867, 0.355, -0.1733, 0.15);
-        shape.lineTo(0.1733, 0.15);
-        shape.quadraticCurveTo(0.3867, 0.355, 0.60, 0.15);
-        shape.lineTo(0.70, 0.165);
-        shape.lineTo(0.71, 0.235);
-        shape.lineTo(0.60, 0.28);
-        shape.lineTo(0.435, 0.30);
-        shape.lineTo(0.34, 0.355);
-        shape.lineTo(0.275, 0.475);
-        shape.lineTo(-0.075, 0.49);
-        shape.lineTo(-0.225, 0.34);
-        shape.lineTo(-0.575, 0.292);
-        shape.lineTo(-0.72, 0.235);
-        shape.closePath();
-      });
+    const longitudinalSegments = 160;
+    const ringSegments = 64;
+    const positions = [];
+    const indices = [];
+    for (let row = 0; row <= longitudinalSegments; row++) {
+      const z = THREE.MathUtils.lerp(-0.72, 0.72, row / longitudinalSegments);
+      for (let column = 0; column < ringSegments; column++) {
+        const angle = (column / ringSegments) * Math.PI * 2;
+        const cosValue = Math.cos(angle);
+        const sinValue = Math.sin(angle);
+        const x = Math.sign(cosValue) * Math.pow(Math.abs(cosValue), crossExponent);
+        const yFactor = 0.5 + 0.5 * Math.sign(sinValue) *
+          Math.pow(Math.abs(sinValue), crossExponent);
+        const p = getProfile(z);
+        positions.push(
+          p.width * x,
+          p.bottom + (p.top - p.bottom) * yFactor,
+          z
+        );
+      }
     }
-
-    // Black center hood graphic and two inset vents over the orange hood.
-    const hood = makePart(
-      shellGeometryGroup, "shell-hood-graphics", "Black hood panel and vents",
-      "A satin-black hood center sits inside the orange bonnet, with orange pinstripes and two small cooling vents."
-    );
-    loft(hood, shellBlack, -0.655, -0.205, 0.55, 0.004, 40, 20);
-    for (const side of [-1, 1]) {
-      roundedBox(hood, [0.088, 0.012, 0.05], shellBlack,
-        [side * 0.244, 0.293, -0.455], [0.05, 0, side * 0.08], 0.007);
-      roundedBox(hood, [0.048, 0.008, 0.022], lightGray,
-        [side * 0.244, 0.301, -0.455], [0.05, 0, side * 0.08], 0.004);
+    for (let row = 0; row < longitudinalSegments; row++) {
+      for (let column = 0; column < ringSegments; column++) {
+        const next = (column + 1) % ringSegments;
+        const a = row * ringSegments + column;
+        const b = row * ringSegments + next;
+        const d = (row + 1) * ringSegments + column;
+        const c = (row + 1) * ringSegments + next;
+        indices.push(a, b, d, b, c, d);
+      }
     }
-    loft(hood, orangeLight, -0.625, -0.235, 0.585, 0.006, 34, 2);
-
-    // Low black roof and roof intake.
-    const roof = makePart(
-      shellGeometryGroup, "shell-black-roof", "Black cab roof",
-      "Low black roof panel with softly rounded shoulders and a small molded roof intake."
-    );
-    loft(roof, shellBlack, -0.065, 0.235, 0.90, 0.009, 38, 22);
-    roundedBox(roof, [0.145, 0.022, 0.092], charcoal,
-      [0, 0.495, 0.095], null, 0.018);
-    roundedBox(roof, [0.105, 0.009, 0.055], shellBlack,
-      [0, 0.510, 0.095], null, 0.012);
-
-    // Front and rear smoked glass.
-    const windshield = makePart(
-      shellGeometryGroup, "shell-windscreen", "Tinted windshield and rear window",
-      "Dark smoked polycarbonate glazing follows the steep windshield and rear cab angle. Black borders frame both windows."
-    );
-    quad(windshield, [
-      [-0.238, 0.337, -0.175], [0.238, 0.337, -0.175],
-      [0.205, 0.475, -0.065], [-0.205, 0.475, -0.065]
-    ], glass);
-    quad(windshield, [
-      [-0.205, 0.475, 0.218], [0.205, 0.475, 0.218],
-      [0.240, 0.355, 0.315], [-0.240, 0.355, 0.315]
-    ], glass);
-    for (const side of [-1, 1]) {
-      cylinderBetween(windshield, [side * 0.238, 0.337, -0.175],
-        [side * 0.205, 0.475, -0.065], 0.009, shellBlack, 10);
-      cylinderBetween(windshield, [side * 0.205, 0.475, 0.218],
-        [side * 0.240, 0.355, 0.315], 0.009, shellBlack, 10);
+    const frontCenter = positions.length / 3;
+    positions.push(0, 0.18, -0.72);
+    const rearCenter = positions.length / 3;
+    positions.push(0, 0.18, 0.72);
+    for (let column = 0; column < ringSegments; column++) {
+      const next = (column + 1) % ringSegments;
+      indices.push(frontCenter, next, column);
+      const last = longitudinalSegments * ringSegments;
+      indices.push(rearCenter, last + column, last + next);
     }
+    const bodyGeometry = new THREE.BufferGeometry();
+    bodyGeometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    bodyGeometry.setIndex(indices);
+    bodyGeometry.computeVertexNormals();
+    addMesh(mainBody, bodyGeometry, orange).material.side = THREE.DoubleSide;
 
-    const sideWindows = makePart(
-      shellGeometryGroup, "shell-side-windows", "Tinted side windows and cab pillars",
-      "Smoked driver and passenger windows with thick black pillars and a separate quarter-window section."
+    // Hood: a low, flush black center panel with fine orange pinstripes.
+    makeSurfacePatch(
+      shellGeometryGroup,
+      "shell-hood-graphics",
+      "Black hood center and orange pinstripes",
+      "The hood remains orange around a narrow satin-black center stripe with two fine orange accent lines. The graphics follow the molded hood surface."
+      , black, -0.645, -0.225, -0.43, 0.43, 0.004
     );
     for (const side of [-1, 1]) {
-      sideShape(sideWindows, side, glass, (shape) => {
-        shape.moveTo(-0.205, 0.355);
-        shape.lineTo(-0.025, 0.355);
-        shape.lineTo(-0.025, 0.455);
-        shape.lineTo(-0.095, 0.462);
-        shape.closePath();
-      }, 0.004);
-      sideShape(sideWindows, side, glass, (shape) => {
-        shape.moveTo(0.015, 0.355);
-        shape.lineTo(0.205, 0.355);
-        shape.lineTo(0.170, 0.458);
-        shape.lineTo(0.025, 0.458);
-        shape.closePath();
-      }, 0.004);
-      cylinderBetween(sideWindows, [side * 0.344, 0.347, -0.025],
-        [side * 0.278, 0.475, -0.065], 0.012, shellBlack, 10);
-      cylinderBetween(sideWindows, [side * 0.344, 0.350, 0.205],
-        [side * 0.255, 0.475, 0.205], 0.012, shellBlack, 10);
-      cylinderBetween(sideWindows, [side * 0.350, 0.350, 0.015],
-        [side * 0.350, 0.350, 0.190], 0.008, charcoal, 8);
-    }
-
-    // Gray rear bed and quarter panels.
-    const rearQuarter = makePart(
-      shellGeometryGroup, "shell-gray-rear-quarter", "Graphite rear bed and quarter panels",
-      "Dark gray rear fender/bed sections contrast with the orange doors and black roof. Raised lips and panel creases give the rear body more depth."
-    );
-    for (const side of [-1, 1]) {
-      sideShape(rearQuarter, side, charcoal, (shape) => {
-        shape.moveTo(-0.68, 0.18);
-        shape.lineTo(-0.39, 0.18);
-        shape.lineTo(-0.355, 0.285);
-        shape.lineTo(-0.59, 0.292);
-        shape.closePath();
-      }, 0.004);
-      cylinderBetween(rearQuarter, [side * 0.36, 0.285, 0.39],
-        [side * 0.35, 0.30, 0.62], 0.012, lightGray, 10);
-      roundedBox(rearQuarter, [0.018, 0.014, 0.25], gray,
-        [side * 0.356, 0.285, 0.50], null, 0.005);
-    }
-    loft(rearQuarter, charcoal, 0.405, 0.675, 0.88, 0.006, 28, 18);
-
-    // Lower black rocker, gray skirt and generic short-course race-number decals.
-    const graphics = makePart(
-      shellGeometryGroup, "shell-door-graphics", "Orange doors and racing graphics",
-      "Orange door panels carry angular black/gray racing graphics and a white number. The livery uses no sponsor logos."
-    );
-    for (const side of [-1, 1]) {
-      roundedBox(graphics, [0.018, 0.035, 0.30], shellBlack,
-        [side * 0.359, 0.178, 0.015], null, 0.006);
-      roundedBox(graphics, [0.012, 0.012, 0.22], orangeLight,
-        [side * 0.368, 0.199, 0.015], null, 0.004);
-
-      const decalCanvas = document.createElement("canvas");
-      decalCanvas.width = 512;
-      decalCanvas.height = 256;
-      const ctx = decalCanvas.getContext("2d");
-      ctx.clearRect(0, 0, 512, 256);
-      ctx.fillStyle = "rgba(12,16,20,.94)";
-      ctx.beginPath();
-      ctx.moveTo(25, 62);
-      ctx.lineTo(480, 34);
-      ctx.lineTo(430, 203);
-      ctx.lineTo(70, 220);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = "#8b9499";
-      ctx.lineWidth = 12;
-      ctx.beginPath();
-      ctx.moveTo(55, 198);
-      ctx.lineTo(440, 58);
-      ctx.stroke();
-      ctx.fillStyle = "#f5f5f3";
-      ctx.strokeStyle = "#11161b";
-      ctx.lineWidth = 14;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.font = "italic 900 132px Arial";
-      ctx.strokeText("27", 270, 119);
-      ctx.fillText("27", 270, 119);
-      ctx.font = "900 24px Arial";
-      ctx.fillStyle = "#ff6a24";
-      ctx.fillText("SHORT COURSE", 255, 205);
-      const texture = new THREE.CanvasTexture(decalCanvas);
-      texture.colorSpace = THREE.SRGBColorSpace;
-      const decalMaterial = new THREE.MeshBasicMaterial({
-        map: texture, transparent: true, depthWrite: false,
-        side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2
-      });
-      const decal = addMesh(
-        graphics, new THREE.PlaneGeometry(0.235, 0.105), decalMaterial,
-        [side * 0.373, 0.255, 0.015], [0, Math.PI / 2, 0]
+      makeSurfacePatch(
+        shellGeometryGroup,
+        `shell-hood-pinstripe-${side}`,
+        "Hood orange pinstripe",
+        "Thin orange accent stripe laid directly on top of the hood graphic.",
+        orangeLight,
+        -0.62, -0.25,
+        side * 0.445, side * 0.475,
+        0.006
       );
-      decal.castShadow = false;
     }
 
-    // Raised arches sit just outside the tires; inner black liners remain visible.
-    const arches = makePart(
-      shellGeometryGroup, "shell-wheel-arch-flares", "Wheel-arch flares and liners",
-      "Rounded short-course fender lips sit outside each tire. Dark inner liners deepen the wheel openings."
+    // Black cab roof is a flush upper panel rather than a raised box.
+    makeSurfacePatch(
+      shellGeometryGroup,
+      "shell-black-roof",
+      "Black cab roof",
+      "Low black roof panel with smooth transitions into the windshield and rear cab glass.",
+      black,
+      -0.055, 0.235, -0.77, 0.77, 0.004
+    );
+
+    // The windshield and rear glass are conforming surfaces on the same body.
+    makeSurfacePatch(
+      shellGeometryGroup,
+      "shell-windscreen",
+      "Tinted front windshield",
+      "Dark smoked windshield fitted flush to the steeply sloped front cab. It is a surface panel, not a floating vertical sheet.",
+      glass,
+      -0.185, -0.065, -0.72, 0.72, 0.007
+    );
+    makeSurfacePatch(
+      shellGeometryGroup,
+      "shell-rear-window",
+      "Tinted rear cab window",
+      "Smoked rear cab glass follows the sloping transition between the roof and rear bed.",
+      glass,
+      0.235, 0.305, -0.70, 0.70, 0.007
+    );
+
+    // Both side windows conform to the curved cab flank.
+    for (const side of [-1, 1]) {
+      makeSidePatch(
+        shellGeometryGroup,
+        `shell-side-windows-${side}`,
+        side < 0 ? "Left tinted side windows" : "Right tinted side windows",
+        "Dark smoked driver/passenger glazing follows the cab side and sits flush with the body contour.",
+        glass,
+        side,
+        -0.055, 0.225,
+        0.72, 0.965,
+        0.004
+      );
+    }
+
+    // Graphite rear bed / quarter panels are separate paint regions on the
+    // continuous shell, not independent upright blocks.
+    makeSurfacePatch(
+      shellGeometryGroup,
+      "shell-gray-rear-bed",
+      "Graphite-gray rear bed",
+      "Dark graphite bed panel contrasts with the orange hood and black cab roof. Its edges follow the rear body crown.",
+      charcoal,
+      0.36, 0.665, -0.82, 0.82, 0.005
     );
     for (const side of [-1, 1]) {
-      for (const z of [-0.29, 0.29]) {
+      makeSidePatch(
+        shellGeometryGroup,
+        `shell-gray-rear-quarter-${side}`,
+        side < 0 ? "Left graphite rear quarter" : "Right graphite rear quarter",
+        "Graphite-gray rear quarter panel blends into the bed and rear fender.",
+        gray,
+        side,
+        0.34, 0.68,
+        0.50, 0.88,
+        0.005
+      );
+      makeSidePatch(
+        shellGeometryGroup,
+        `shell-orange-door-${side}`,
+        side < 0 ? "Left orange door" : "Right orange door",
+        "Orange door section with a black and gray lower racing stripe.",
+        orange,
+        side,
+        -0.20, 0.30,
+        0.50, 0.72,
+        0.006
+      );
+      makeSidePatch(
+        shellGeometryGroup,
+        `shell-gray-rocker-${side}`,
+        side < 0 ? "Left gray lower rocker" : "Right gray lower rocker",
+        "Low graphite-gray and silver rocker trim beneath the orange door.",
+        charcoal,
+        side,
+        -0.18, 0.30,
+        0.33, 0.43,
+        0.008
+      );
+    }
+
+    // Simple door graphic decals lie close to the door surface and do not
+    // imitate protected sponsor marks from the reference image.
+    for (const side of [-1, 1]) {
+      const stripe = makePart(
+        shellGeometryGroup,
+        `shell-door-stripe-${side}`,
+        side < 0 ? "Left door racing stripe" : "Right door racing stripe",
+        "Angular black and silver short-course racing stripe applied to the orange door."
+      );
+      makeSidePatch(
+        stripe,
+        `door-stripe-dark-${side}`,
+        "Black door graphic",
+        "Black lower-door graphic.",
+        black,
+        side,
+        -0.115, 0.22,
+        0.54, 0.62,
+        0.012
+      );
+      makeSidePatch(
+        stripe,
+        `door-stripe-silver-${side}`,
+        "Silver door accent",
+        "A narrow silver accent separates the orange and black paint sections.",
+        grayLight,
+        side,
+        -0.10, 0.20,
+        0.625, 0.645,
+        0.014
+      );
+    }
+
+    // Rounded wheel-arch flares sit directly outside the existing wheel
+    // centers. Their centers are compensated for the shell's inner length scale.
+    const arches = makePart(
+      shellGeometryGroup,
+      "shell-wheel-arch-flares",
+      "Short-course wheel-arch flares",
+      "Four rounded fender lips follow the tire openings and sit just outside the tread without forming separate oversized rings."
+    );
+    for (const side of [-1, 1]) {
+      for (const z of [-0.29 / 0.75, 0.29 / 0.75]) {
         const flare = new THREE.Mesh(
-          new THREE.TorusGeometry(0.178, 0.020, 10, 48, Math.PI), shellBlack
+          new THREE.TorusGeometry(0.166, 0.014, 10, 56, Math.PI),
+          black
         );
         flare.rotation.y = Math.PI / 2;
-        flare.position.set(side * 0.372, 0.145, z / 0.75);
+        flare.position.set(side * 0.378, 0.145, z);
         flare.scale.y = 0.75;
         flare.castShadow = true;
         flare.receiveShadow = true;
         arches.add(flare);
+
         const lip = new THREE.Mesh(
-          new THREE.TorusGeometry(0.160, 0.006, 7, 44, Math.PI), orangeLight
+          new THREE.TorusGeometry(0.153, 0.0055, 8, 52, Math.PI),
+          orangeLight
         );
         lip.rotation.y = Math.PI / 2;
-        lip.position.set(side * 0.374, 0.145, z / 0.75);
+        lip.position.set(side * 0.380, 0.145, z);
         lip.scale.y = 0.75;
         arches.add(lip);
       }
-      roundedBox(arches, [0.028, 0.045, 0.34], shellBlack,
-        [side * 0.36, 0.145, 0], null, 0.012);
     }
 
-    // Front grille, detailed lights and gray tubular impact bumper.
+    // Front fascia sits at the nose of the continuous body.
     const front = makePart(
-      shellGeometryGroup, "shell-front-fascia", "Front grille, headlights and gray bumper",
-      "The short-course nose has a dark horizontal grille, paired projector-style headlights, a gray lower valance and tubular front impact bar."
+      shellGeometryGroup,
+      "shell-front-fascia",
+      "Front grille, lamps and gray bumper",
+      "Low dark grille, compact headlights and a gray front bumper follow the short-course truck nose."
     );
-    roundedBox(front, [0.36, 0.067, 0.024], shellBlack, [0, 0.207, -0.704], null, 0.012);
+    roundedBox(front, [0.36, 0.048, 0.018], black, [0, 0.223, -0.695], null, 0.008);
     for (let i = 0; i < 5; i++) {
-      roundedBox(front, [0.012, 0.045, 0.009], gray,
-        [-0.13 + i * 0.065, 0.207, -0.719], null, 0.003);
+      roundedBox(front, [0.012, 0.032, 0.008], grayLight,
+        [-0.13 + i * 0.065, 0.223, -0.707], null, 0.003);
     }
     for (const side of [-1, 1]) {
-      roundedBox(front, [0.115, 0.057, 0.025], charcoal,
-        [side * 0.25, 0.235, -0.684], null, 0.012);
-      roundedBox(front, [0.085, 0.037, 0.012], headlamp,
-        [side * 0.25, 0.239, -0.701], null, 0.01);
-      for (let i = 0; i < 2; i++) {
-        const lens = new THREE.Mesh(new THREE.SphereGeometry(0.013, 12, 10), lightGray);
-        lens.scale.set(1, 0.72, 0.45);
-        lens.position.set(side * (0.225 + i * 0.048), 0.239, -0.711);
-        front.add(lens);
-      }
+      roundedBox(front, [0.10, 0.048, 0.018], charcoal,
+        [side * 0.245, 0.235, -0.672], null, 0.008);
+      roundedBox(front, [0.074, 0.027, 0.009], lamp,
+        [side * 0.245, 0.238, -0.685], null, 0.006);
     }
-    roundedBox(front, [0.67, 0.074, 0.082], gray,
-      [0, 0.105, -0.723], null, 0.025);
-    roundedBox(front, [0.53, 0.027, 0.055], shellBlack,
-      [0, 0.135, -0.754], null, 0.012);
-    cylinderBetween(front, [-0.31, 0.17, -0.735], [0.31, 0.17, -0.735], 0.014, lightGray, 12);
+    roundedBox(front, [0.66, 0.075, 0.08], gray,
+      [0, 0.135, -0.735], null, 0.022);
+    roundedBox(front, [0.54, 0.026, 0.03], black,
+      [0, 0.166, -0.765], null, 0.01);
+    cylinderBetween(front, [-0.30, 0.18, -0.735], [0.30, 0.18, -0.735], 0.012, grayLight, 12);
     for (const side of [-1, 1]) {
       cylinderBetween(front, [side * 0.29, 0.12, -0.735],
-        [side * 0.26, 0.235, -0.716], 0.014, lightGray, 10);
-      roundedBox(front, [0.018, 0.025, 0.018], headlamp,
-        [side * 0.33, 0.215, -0.66], null, 0.004);
+        [side * 0.25, 0.245, -0.68], 0.012, grayLight, 10);
     }
 
-    // Rear tailgate and gray impact bumper.
+    // Rear tailgate and broad gray rear impact bumper.
     const rear = makePart(
-      shellGeometryGroup, "shell-rear-tailgate", "Rear tailgate, lamps and bumper",
-      "A dark tailgate panel with red corner lights and a broad gray rear impact bumper completes the short-course body."
+      shellGeometryGroup,
+      "shell-rear-tailgate",
+      "Rear tailgate, lamps and gray bumper",
+      "Graphite rear tailgate with paired red tail lamps and a broad gray rear impact bumper."
     );
-    roundedBox(rear, [0.43, 0.075, 0.025], charcoal, [0, 0.212, 0.709], null, 0.012);
+    roundedBox(rear, [0.43, 0.062, 0.018], charcoal, [0, 0.225, 0.704], null, 0.01);
     for (const side of [-1, 1]) {
-      roundedBox(rear, [0.095, 0.05, 0.027], tailLamp,
-        [side * 0.25, 0.23, 0.705], null, 0.01);
+      roundedBox(rear, [0.075, 0.045, 0.022], redLamp,
+        [side * 0.25, 0.23, 0.71], null, 0.008);
     }
-    roundedBox(rear, [0.64, 0.07, 0.075], gray,
-      [0, 0.105, 0.73], null, 0.02);
-    roundedBox(rear, [0.28, 0.024, 0.02], shellBlack,
-      [0, 0.13, 0.766], null, 0.006);
+    roundedBox(rear, [0.63, 0.068, 0.072], gray,
+      [0, 0.135, 0.735], null, 0.02);
 
-    // Mirrors, wipers and molded bed-rail detail.
+    // Small mirrors, wipers, molded door handles and bed-rail trim.
     const trim = makePart(
-      shellGeometryGroup, "shell-exterior-trim", "Mirrors, wipers and bed rails",
-      "Small black side mirrors, windshield wipers, roof antenna base and raised rear bed rails finish the shell."
+      shellGeometryGroup,
+      "shell-exterior-trim",
+      "Mirrors, wipers and molded trim",
+      "Small black mirrors, close-fitting windshield wipers, door handles and gray rear bed-rail trim."
     );
     for (const side of [-1, 1]) {
-      cylinderBetween(trim, [side * 0.30, 0.33, -0.18],
-        [side * 0.365, 0.34, -0.215], 0.009, shellBlack, 10);
-      roundedBox(trim, [0.055, 0.035, 0.06], shellBlack,
-        [side * 0.375, 0.345, -0.225], [0, 0, side * 0.08], 0.01);
-      cylinderBetween(trim, [side * 0.16, 0.344, -0.18],
-        [side * 0.06, 0.346, -0.18], 0.004, lightGray, 8);
-      cylinderBetween(trim, [side * 0.15, 0.345, -0.155],
-        [side * 0.05, 0.347, -0.155], 0.004, lightGray, 8);
-      roundedBox(trim, [0.026, 0.012, 0.27], shellBlack,
-        [side * 0.345, 0.282, 0.51], null, 0.006);
+      cylinderBetween(trim, [side * 0.285, 0.365, -0.16],
+        [side * 0.365, 0.365, -0.20], 0.008, black, 10);
+      roundedBox(trim, [0.05, 0.028, 0.045], black,
+        [side * 0.37, 0.37, -0.21], [0, 0, side * 0.06], 0.008);
+      roundedBox(trim, [0.018, 0.022, 0.060], charcoal,
+        [side * 0.375, 0.245, 0.06], null, 0.005);
     }
-    roundedBox(trim, [0.07, 0.026, 0.06], shellBlack, [0, 0.30, 0.61], null, 0.009);
-    cylinderBetween(trim, [0, 0.30, 0.61], [0, 0.41, 0.63], 0.004, lightGray, 8);
-
-    // Subtle gray lower side panels tie the rear bed into the front bumper.
-    const lowerTrim = makePart(
-      shellGeometryGroup, "shell-gray-lower-accents", "Gray lower side accents",
-      "Gray lower trim runs below the orange doors and visually links the graphite rear panels to the front bumper."
-    );
+    cylinderBetween(trim, [-0.14, 0.35, -0.18], [0.14, 0.35, -0.18], 0.0035, grayLight, 8);
+    cylinderBetween(trim, [-0.12, 0.35, -0.15], [0.12, 0.35, -0.15], 0.0035, grayLight, 8);
     for (const side of [-1, 1]) {
-      roundedBox(lowerTrim, [0.018, 0.018, 0.19], gray,
-        [side * 0.365, 0.165, -0.17], null, 0.005);
-      roundedBox(lowerTrim, [0.014, 0.009, 0.22], orangeLight,
-        [side * 0.369, 0.196, -0.14], null, 0.004);
+      roundedBox(trim, [0.018, 0.014, 0.22], grayLight,
+        [side * 0.342, 0.285, 0.52], null, 0.004);
     }
   }
-
   makeBodyShell();
   if (playerName) {
     const labelCanvas = document.createElement("canvas");
