@@ -1618,9 +1618,308 @@ const displayRing = new THREE.Mesh(new THREE.TorusGeometry(1.76, 0.025, 8, 80),
 displayRing.rotation.x = Math.PI / 2;
 displayRing.position.y = 0.01;
 garageGroup.add(displayRing);
-const showroomLight = new THREE.PointLight(0x7dbfff, 24, 15, 2);
+
 showroomLight.position.set(0, 4.8, 1.5);
 garageGroup.add(showroomLight);
+
+// Detailed RC workshop environment used behind the main menu and vehicle garage.
+const workshopGroup = new THREE.Group();
+workshopGroup.name = "detailed-rc-workshop";
+garageGroup.add(workshopGroup);
+
+const shopWall = new THREE.MeshStandardMaterial({ color: 0x28323a, roughness: 0.9 });
+const shopWallPanel = new THREE.MeshStandardMaterial({ color: 0x36424a, roughness: 0.82 });
+const shopConcrete = new THREE.MeshStandardMaterial({ color: 0x596168, roughness: 0.94 });
+const shopDark = new THREE.MeshStandardMaterial({ color: 0x11171c, roughness: 0.74 });
+const shopSteel = new THREE.MeshStandardMaterial({ color: 0x78848a, metalness: 0.72, roughness: 0.36 });
+const shopAluminum = new THREE.MeshStandardMaterial({ color: 0xb6c0c4, metalness: 0.82, roughness: 0.28 });
+const shopOrange = new THREE.MeshStandardMaterial({ color: 0xd94b1e, metalness: 0.12, roughness: 0.5 });
+const shopYellow = new THREE.MeshStandardMaterial({ color: 0xe1b33b, roughness: 0.72 });
+const shopRubber = new THREE.MeshStandardMaterial({ color: 0x171a1d, roughness: 0.98 });
+const shopBlue = new THREE.MeshStandardMaterial({ color: 0x315a78, roughness: 0.62 });
+const shopWood = new THREE.MeshStandardMaterial({ color: 0x594c3c, roughness: 0.9 });
+const shopBinBlue = new THREE.MeshStandardMaterial({ color: 0x315d78, roughness: 0.84 });
+const shopBinRed = new THREE.MeshStandardMaterial({ color: 0x8d382b, roughness: 0.85 });
+const shopGlow = new THREE.MeshStandardMaterial({
+  color: 0xe5f2f5, emissive: 0xc2e8ff, emissiveIntensity: 1.4,
+  roughness: 0.25, metalness: 0.02
+});
+
+function shopBox(size, material, position, rotation = null, bevel = 0.025) {
+  const smallest = Math.min(...size);
+  const radius = Math.max(0.001, Math.min(bevel, smallest * 0.22));
+  const mesh = new THREE.Mesh(
+    new RoundedBoxGeometry(size[0], size[1], size[2], 3, radius),
+    material
+  );
+  mesh.position.set(...position);
+  if (rotation) mesh.rotation.set(...rotation);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  workshopGroup.add(mesh);
+  return mesh;
+}
+
+function shopCylinder(radiusTop, radiusBottom, height, material, position, rotation = null, segments = 18) {
+  const mesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(radiusTop, radiusBottom, height, segments),
+    material
+  );
+  mesh.position.set(...position);
+  if (rotation) mesh.rotation.set(...rotation);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  workshopGroup.add(mesh);
+  return mesh;
+}
+
+function shopBeam(start, end, radius, material, segments = 10) {
+  const a = new THREE.Vector3(...start);
+  const b = new THREE.Vector3(...end);
+  const axis = b.clone().sub(a);
+  const mesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(radius, radius, axis.length(), segments),
+    material
+  );
+  mesh.position.copy(a).add(b).multiplyScalar(0.5);
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis.normalize());
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  workshopGroup.add(mesh);
+  return mesh;
+}
+
+function shopSign(textLines, width, height, accent = "#f06b37") {
+  const canvas = document.createElement("canvas");
+  canvas.width = 768;
+  canvas.height = 256;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#111b24";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = accent;
+  ctx.fillRect(0, 0, 18, canvas.height);
+  ctx.fillStyle = "#e8eef1";
+  ctx.font = "900 54px Arial";
+  ctx.textBaseline = "middle";
+  ctx.fillText(textLines[0], 48, 92);
+  ctx.fillStyle = "#9caeb8";
+  ctx.font = "700 26px Arial";
+  ctx.fillText(textLines[1] || "", 50, 164);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const material = new THREE.MeshBasicMaterial({ map: texture });
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(width, height), material);
+  sign.castShadow = false;
+  sign.position.set(0, 0, 0);
+  return sign;
+}
+
+// Upgrade the former bare wall into an industrial workshop back wall.
+shopBox([23.8, 0.035, 0.05], shopSteel, [0, 0.16, -5.00], null, 0.012);
+for (let x = -7.5; x <= 7.5; x += 1.5) {
+  shopBox([0.035, 5.6, 0.09], shopWallPanel, [x, 2.75, -5.0], null, 0.008);
+}
+shopBox([23.7, 0.18, 0.12], shopDark, [0, 0.20, -4.93], null, 0.02);
+shopBox([23.7, 0.12, 0.12], shopSteel, [0, 5.35, -4.96], null, 0.02);
+
+// Steel roof trusses and overhead cable trays.
+for (const z of [-4.4, -2.3, 0.1]) {
+  shopBeam([-7.8, 5.25, z], [7.8, 5.25, z], 0.045, shopSteel, 8);
+  shopBeam([-7.8, 5.25, z], [-6.9, 4.55, z], 0.026, shopSteel, 8);
+  shopBeam([7.8, 5.25, z], [6.9, 4.55, z], 0.026, shopSteel, 8);
+}
+shopBox([0.16, 0.12, 9.2], shopDark, [0, 5.18, -2.4], null, 0.02);
+shopBox([0.045, 0.045, 9.1], shopOrange, [0, 5.27, -2.4], null, 0.01);
+
+// A segmented roller garage door occupies the middle of the back wall.
+shopBox([8.9, 3.95, 0.16], shopDark, [0, 2.33, -4.82], null, 0.025);
+shopBox([8.55, 3.65, 0.08], shopWallPanel, [0, 2.34, -4.715], null, 0.015);
+for (let y = 0.62; y <= 4.0; y += 0.30) {
+  shopBox([8.42, 0.055, 0.045], shopSteel, [0, y, -4.655], null, 0.012);
+}
+for (const x of [-4.36, 4.36]) {
+  shopBox([0.14, 4.05, 0.20], shopDark, [x, 2.30, -4.62], null, 0.025);
+  shopBox([0.035, 3.8, 0.035], shopOrange, [x + (x < 0 ? 0.08 : -0.08), 2.32, -4.50], null, 0.008);
+}
+shopBox([8.95, 0.14, 0.24], shopSteel, [0, 4.38, -4.62], null, 0.02);
+shopBox([0.65, 0.10, 0.08], shopDark, [0, 2.2, -4.59], null, 0.025);
+
+// Workshop sign over the garage door.
+const workshopSign = shopSign(["RC MOTORSPORTS", "PIT BAY 01  •  SERVICE / SETUP"], 3.3, 1.08, "#e46a36");
+workshopSign.position.set(0, 4.93, -4.57);
+workshopGroup.add(workshopSign);
+
+// Left-side mechanic's workbench with a timber top and steel frame.
+shopBox([3.45, 0.14, 0.78], shopWood, [-4.45, 1.08, -3.98], null, 0.035);
+shopBox([3.5, 0.035, 0.82], shopDark, [-4.45, 0.99, -3.98], null, 0.014);
+for (const x of [-5.95, -2.95]) {
+  for (const z of [-4.25, -3.72]) {
+    shopBox([0.09, 0.94, 0.09], shopSteel, [x, 0.52, z], null, 0.012);
+    shopBox([0.14, 0.06, 0.14], shopDark, [x, 0.10, z], null, 0.012);
+  }
+}
+shopBox([2.65, 0.56, 0.08], shopDark, [-4.45, 0.65, -3.56], null, 0.02);
+for (let i = 0; i < 5; i++) {
+  const x = -5.55 + i * 0.55;
+  shopBox([0.46, 0.085, 0.02], shopSteel, [x, 0.78, -3.505], null, 0.008);
+  shopBox([0.055, 0.018, 0.01], shopDark, [x, 0.78, -3.49], null, 0.003);
+}
+
+// Drawer cabinet beneath the workbench.
+shopBox([1.05, 0.68, 0.54], shopBlue, [-3.25, 0.48, -3.98], null, 0.028);
+for (let i = 0; i < 4; i++) {
+  const y = 0.23 + i * 0.16;
+  shopBox([0.90, 0.125, 0.025], shopWallPanel, [-3.25, y, -3.695], null, 0.012);
+  shopBox([0.18, 0.025, 0.035], shopAluminum, [-3.25, y, -3.67], null, 0.01);
+}
+
+// Pegboard, framed edges and a neat collection of hanging hand tools.
+shopBox([3.25, 1.42, 0.09], shopWood, [-4.48, 2.62, -4.73], null, 0.02);
+shopBox([3.12, 1.29, 0.035], shopWallPanel, [-4.48, 2.62, -4.66], null, 0.015);
+for (let x = -5.95; x <= -3.0; x += 0.18) {
+  for (let y = 2.08; y <= 3.18; y += 0.18) {
+    shopCylinder(0.012, 0.012, 0.008, shopDark, [x, y, -4.632], [Math.PI / 2, 0, 0], 8);
+  }
+}
+for (let i = 0; i < 7; i++) {
+  const x = -5.72 + i * 0.40;
+  const y = 2.48 + (i % 2) * 0.16;
+  shopBeam([x, y - 0.22, -4.59], [x + 0.045, y + 0.18, -4.59], 0.018, shopAluminum, 8);
+  shopCylinder(0.035, 0.035, 0.025, shopOrange, [x, y + 0.20, -4.58], [Math.PI / 2, 0, 0], 10);
+}
+for (let i = 0; i < 4; i++) {
+  const x = -5.7 + i * 0.72;
+  shopBeam([x, 2.18, -4.58], [x + 0.08, 2.58, -4.58], 0.011, shopYellow, 8);
+}
+
+// Bench-top vise, parts trays, bottles, screwdriver set and a small drill.
+shopBox([0.42, 0.12, 0.32], shopSteel, [-5.55, 1.20, -4.06], null, 0.025);
+shopBox([0.28, 0.08, 0.16], shopDark, [-5.55, 1.29, -4.06], null, 0.015);
+shopBeam([-5.68, 1.29, -4.06], [-5.42, 1.29, -4.06], 0.025, shopAluminum);
+for (let i = 0; i < 3; i++) {
+  shopBox([0.28, 0.10, 0.22], i === 1 ? shopBinRed : shopBinBlue,
+    [-4.55 + i * 0.38, 1.21, -4.0], null, 0.025);
+}
+for (let i = 0; i < 3; i++) {
+  shopCylinder(0.055, 0.065, 0.24, i === 1 ? shopOrange : shopBlue,
+    [-3.55 + i * 0.20, 1.25, -4.05], null, 16);
+  shopCylinder(0.056, 0.056, 0.025, shopDark,
+    [-3.55 + i * 0.20, 1.385, -4.05], null, 16);
+}
+shopBox([0.22, 0.16, 0.30], shopBlue, [-4.95, 1.19, -3.98], [0.08, 0, 0.18], 0.035);
+shopCylinder(0.055, 0.055, 0.05, shopDark, [-4.95, 1.30, -3.98], null, 14);
+
+// Right-side storage rack with bins and boxed spare parts.
+for (const y of [1.15, 2.2, 3.25]) {
+  shopBox([2.75, 0.09, 0.68], shopSteel, [4.55, y, -4.18], null, 0.018);
+  for (const x of [3.25, 5.85]) {
+    shopBox([0.07, 1.10, 0.08], shopDark, [x, y - 0.48, -4.18], null, 0.012);
+  }
+  for (let i = 0; i < 5; i++) {
+    const x = 3.45 + i * 0.53;
+    const binMaterial = (i % 2) ? shopBinBlue : shopBinRed;
+    shopBox([0.42, 0.32, 0.48], binMaterial, [x, y + 0.19, -4.12], null, 0.025);
+    shopBox([0.34, 0.035, 0.025], shopDark, [x, y + 0.21, -3.87], null, 0.008);
+    shopBox([0.12, 0.035, 0.015], shopAluminum, [x, y + 0.21, -3.85], null, 0.006);
+  }
+}
+// Large labeled parts cabinet at the outer end of the rack.
+shopBox([0.78, 1.42, 0.62], shopBlue, [6.7, 1.05, -4.12], null, 0.04);
+for (let i = 0; i < 6; i++) {
+  const y = 0.48 + i * 0.19;
+  shopBox([0.63, 0.14, 0.025], shopDark, [6.7, y, -3.79], null, 0.01);
+  shopBox([0.14, 0.022, 0.028], shopAluminum, [6.7, y, -3.75], null, 0.006);
+}
+
+// Vertical tire rack and spare short-course tires.
+shopBox([0.12, 1.9, 0.64], shopDark, [7.55, 1.05, -2.7], null, 0.025);
+for (let i = 0; i < 3; i++) {
+  const tire = new THREE.Mesh(
+    new THREE.TorusGeometry(0.36, 0.105, 12, 36),
+    shopRubber
+  );
+  tire.rotation.y = Math.PI / 2;
+  tire.position.set(7.40, 0.52 + i * 0.55, -2.7);
+  tire.castShadow = true;
+  workshopGroup.add(tire);
+  const center = new THREE.Mesh(
+    new THREE.TorusGeometry(0.19, 0.025, 8, 28),
+    shopSteel
+  );
+  center.rotation.y = Math.PI / 2;
+  center.position.set(7.39, 0.52 + i * 0.55, -2.7);
+  workshopGroup.add(center);
+}
+
+// Small air compressor and coiled hose near the left wall.
+shopCylinder(0.34, 0.34, 1.05, shopBlue, [-7.35, 0.47, -2.45], [0, 0, Math.PI / 2], 24);
+for (const x of [-7.88, -6.82]) {
+  shopCylinder(0.11, 0.11, 0.06, shopDark, [x, 0.22, -2.45], [0, 0, Math.PI / 2], 14);
+}
+shopBox([0.28, 0.26, 0.36], shopDark, [-7.35, 0.81, -2.48], null, 0.025);
+shopCylinder(0.10, 0.10, 0.04, shopAluminum, [-7.35, 0.97, -2.48], null, 14);
+shopBeam([-7.05, 0.70, -2.48], [-6.85, 1.16, -2.48], 0.015, shopOrange);
+shopBeam([-6.85, 1.16, -2.48], [-6.6, 1.16, -2.48], 0.015, shopOrange);
+
+// Rolling tool trolley in the right foreground.
+shopBox([0.84, 0.70, 0.58], shopOrange, [4.65, 0.46, -1.95], null, 0.04);
+shopBox([0.90, 0.08, 0.64], shopDark, [4.65, 0.86, -1.95], null, 0.025);
+for (let i = 0; i < 4; i++) {
+  const y = 0.23 + i * 0.15;
+  shopBox([0.72, 0.115, 0.025], shopWallPanel, [4.65, y, -1.64], null, 0.01);
+  shopBox([0.18, 0.018, 0.025], shopAluminum, [4.65, y, -1.61], null, 0.006);
+}
+for (const x of [4.33, 4.97]) {
+  shopCylinder(0.065, 0.065, 0.045, shopDark, [x, 0.10, -1.78], [Math.PI / 2, 0, 0], 14);
+}
+
+// Floor safety lines, service bay stripes and small drainage grates.
+for (const x of [-7.1, 7.1]) {
+  shopBox([0.05, 0.008, 7.0], shopYellow, [x, 0.012, -0.2], null, 0.004);
+}
+for (const x of [-6.75, 6.75]) {
+  for (let i = 0; i < 8; i++) {
+    shopBox([0.028, 0.009, 0.14], shopDark, [x, 0.014, -3.6 + i * 0.45], null, 0.003);
+  }
+}
+shopBox([1.35, 0.012, 0.28], shopDark, [-6.0, 0.015, 0.35], null, 0.012);
+for (let i = 0; i < 8; i++) {
+  shopBox([0.025, 0.008, 0.24], shopSteel, [-6.55 + i * 0.16, 0.023, 0.35], null, 0.002);
+}
+
+// Ceiling-mounted LED light housings and illuminated diffuser panels.
+for (const x of [-4.2, 0, 4.2]) {
+  shopBox([1.75, 0.12, 0.52], shopDark, [x, 5.05, -2.5], null, 0.035);
+  shopBox([1.53, 0.025, 0.36], shopGlow, [x, 4.978, -2.5], null, 0.02);
+  shopBeam([x - 0.68, 5.12, -2.5], [x - 0.68, 4.80, -2.5], 0.018, shopSteel);
+  shopBeam([x + 0.68, 5.12, -2.5], [x + 0.68, 4.80, -2.5], 0.018, shopSteel);
+}
+const shopLightLeft = new THREE.PointLight(0xffdfc2, 32, 12, 2);
+shopLightLeft.position.set(-4.4, 4.3, -1.7);
+workshopGroup.add(shopLightLeft);
+const shopLightRight = new THREE.PointLight(0xd5eaff, 30, 12, 2);
+shopLightRight.position.set(4.2, 4.4, -2.0);
+workshopGroup.add(shopLightRight);
+const shopLightFront = new THREE.PointLight(0xfff1dc, 22, 10, 2);
+shopLightFront.position.set(0, 4.3, 2.2);
+workshopGroup.add(shopLightFront);
+
+// Small wall-mounted service poster and a pit-bay number plate.
+const setupSign = shopSign(["SUSPENSION SETUP", "CAMBER  •  TOE  •  RIDE HEIGHT"], 2.15, 0.72, "#d7a74b");
+setupSign.position.set(-7.9, 3.4, -4.54);
+workshopGroup.add(setupSign);
+const bayPlate = shopSign(["01", "RC PIT LANE"], 1.05, 0.62, "#5ca5cf");
+bayPlate.position.set(7.45, 4.1, -4.55);
+workshopGroup.add(bayPlate);
+
+// Keep the original turntable, but give it a subdued workshop finish rather
+// than a bright arcade-blue glow.
+displayPad.material.color.setHex(0x2c343b);
+displayPad.material.metalness = 0.28;
+displayRing.material.color.setHex(0xb56a37);
+showroomStripe.material.color.setHex(0x9e7045);
+workshopGroup.visible = true;
+
 garageGroup.visible = true;
 for (const item of arenaVisuals) item.visible = false;
 
