@@ -338,6 +338,17 @@ function makeCarVisual(color, playerName = "") {
         indices.push(a, b, d, b, c, d);
       }
     }
+    const frontCap = vertices.length / 3;
+    vertices.push(0, (0.055 + sections[0].z) * 0.5, sections[0].x);
+    const rearCap = vertices.length / 3;
+    const lastSection = sections[sections.length - 1];
+    vertices.push(0, (0.055 + lastSection.z) * 0.5, lastSection.x);
+    for (let j = 0; j < ringSegments; j++) {
+      const next = (j + 1) % ringSegments;
+      indices.push(frontCap, next, j);
+      const last = (sections.length - 1) * ringSegments;
+      indices.push(rearCap, last + j, last + next);
+    }
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
     geometry.setIndex(indices);
@@ -386,7 +397,7 @@ function makeCarVisual(color, playerName = "") {
 
     for (const side of [-1, 1]) {
       // Wheel-arch flares: upper semicircles sit just outside the body skin.
-      for (const z of [-0.292, 0.292]) {
+      for (const z of [-0.29 / 1.16, 0.29 / 1.16]) {
         const flare = new THREE.Mesh(
           new THREE.TorusGeometry(0.178, 0.021, 9, 40, Math.PI),
           carbon
@@ -511,7 +522,7 @@ function makeCarVisual(color, playerName = "") {
     }
 
     // Four independently detailed coil-over shocks and suspension arms.
-    for (const z of [-0.292, 0.292]) {
+    for (const z of [-0.292 / 1.16, 0.292 / 1.16]) {
       for (const side of [-1, 1]) {
         const top = [side * 0.195, 0.275, z + (z < 0 ? 0.075 : -0.075)];
         const bottom = [side * 0.275, 0.025, z];
@@ -550,22 +561,31 @@ function makeCarVisual(color, playerName = "") {
     );
     tire.rotation.z = Math.PI / 2;
 
-    // Alternating center and shoulder lugs wrap around the tyre.
+    // Alternating center and shoulder lugs are instanced to keep draw calls low.
+    const treadInstances = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(0.041, 0.026, 0.032),
+      tireMaterial,
+      84
+    );
+    const treadDummy = new THREE.Object3D();
+    let treadIndex = 0;
     for (let n = 0; n < 28; n++) {
       const angle = (n / 28) * Math.PI * 2;
       for (const lane of [-0.041, 0, 0.041]) {
-        const lug = new THREE.Mesh(
-          new THREE.BoxGeometry(0.041, 0.026, 0.032),
-          tireMaterial
+        treadDummy.position.set(
+          lane,
+          Math.cos(angle) * (tireRadius + 0.006),
+          Math.sin(angle) * (tireRadius + 0.006)
         );
-        lug.position.set(lane, Math.cos(angle) * (tireRadius + 0.006),
-          Math.sin(angle) * (tireRadius + 0.006));
-        lug.rotation.x = -angle;
-        lug.rotation.z = lane * 2.2;
-        lug.castShadow = true;
-        pivot.add(lug);
+        treadDummy.rotation.set(-angle, 0, lane * 2.2);
+        treadDummy.updateMatrix();
+        treadInstances.setMatrixAt(treadIndex++, treadDummy.matrix);
       }
     }
+    treadInstances.instanceMatrix.needsUpdate = true;
+    treadInstances.castShadow = true;
+    treadInstances.receiveShadow = true;
+    pivot.add(treadInstances);
 
     for (const side of [-1, 1]) {
       const faceX = side * (tireWidth * 0.5 + 0.002);
@@ -605,15 +625,37 @@ function makeCarVisual(color, playerName = "") {
       beadlock.castShadow = true;
       pivot.add(beadlock);
 
-      for (let spoke = 0; spoke < 8; spoke++) {
-        const angle = (spoke / 8) * Math.PI * 2 + 0.16;
-        const center = [side * 0.078, 0, 0];
-        const end = [
-          side * 0.078,
-          Math.cos(angle) * 0.075,
-          Math.sin(angle) * 0.075
-        ];
-        cylinderBetween(pivot, center, end, 0.0085, hubMaterial, 8);
+      if (side === 1) {
+        const spokeInstances = new THREE.InstancedMesh(
+          new THREE.CylinderGeometry(0.0085, 0.0085, 1, 8),
+          hubMaterial,
+          16
+        );
+        const spokeDummy = new THREE.Object3D();
+        let spokeIndex = 0;
+        for (const faceSide of [-1, 1]) {
+          for (let spoke = 0; spoke < 8; spoke++) {
+            const angle = (spoke / 8) * Math.PI * 2 + 0.16;
+            const start = new THREE.Vector3(faceSide * 0.078, 0, 0);
+            const end = new THREE.Vector3(
+              faceSide * 0.078,
+              Math.cos(angle) * 0.075,
+              Math.sin(angle) * 0.075
+            );
+            const direction = end.clone().sub(start);
+            spokeDummy.position.copy(start).add(end).multiplyScalar(0.5);
+            spokeDummy.quaternion.setFromUnitVectors(
+              new THREE.Vector3(0, 1, 0),
+              direction.clone().normalize()
+            );
+            spokeDummy.scale.set(1, direction.length(), 1);
+            spokeDummy.updateMatrix();
+            spokeInstances.setMatrixAt(spokeIndex++, spokeDummy.matrix);
+          }
+        }
+        spokeInstances.instanceMatrix.needsUpdate = true;
+        spokeInstances.castShadow = true;
+        pivot.add(spokeInstances);
       }
 
       const centerCap = new THREE.Mesh(
@@ -625,15 +667,33 @@ function makeCarVisual(color, playerName = "") {
       centerCap.castShadow = true;
       pivot.add(centerCap);
 
-      for (let bolt = 0; bolt < 6; bolt++) {
-        const angle = (bolt / 6) * Math.PI * 2;
-        const nut = new THREE.Mesh(
+      if (side === 1) {
+        const nutInstances = new THREE.InstancedMesh(
           new THREE.CylinderGeometry(0.006, 0.006, 0.012, 8),
-          alloy
+          alloy,
+          12
         );
-        nut.rotation.z = Math.PI / 2;
-        nut.position.set(side * 0.091, Math.cos(angle) * 0.067, Math.sin(angle) * 0.067);
-        pivot.add(nut);
+        const nutDummy = new THREE.Object3D();
+        let nutIndex = 0;
+        for (const faceSide of [-1, 1]) {
+          for (let bolt = 0; bolt < 6; bolt++) {
+            const angle = (bolt / 6) * Math.PI * 2;
+            nutDummy.position.set(
+              faceSide * 0.091,
+              Math.cos(angle) * 0.067,
+              Math.sin(angle) * 0.067
+            );
+            nutDummy.quaternion.setFromUnitVectors(
+              new THREE.Vector3(0, 1, 0),
+              new THREE.Vector3(faceSide, 0, 0)
+            );
+            nutDummy.scale.set(1, 1, 1);
+            nutDummy.updateMatrix();
+            nutInstances.setMatrixAt(nutIndex++, nutDummy.matrix);
+          }
+        }
+        nutInstances.instanceMatrix.needsUpdate = true;
+        pivot.add(nutInstances);
       }
     }
 
