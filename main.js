@@ -5,7 +5,6 @@ import { joinRoom, selfId } from "https://esm.sh/trystero@0.26.0";
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("gameCanvas");
-const inputSurface = $("gameInputSurface");
 const joinPanel = $("joinPanel");
 const mainMenuPanel = $("mainMenuPanel");
 const garagePanel = $("garagePanel");
@@ -69,11 +68,10 @@ grid.material.opacity = 0.09;
 scene.add(grid);
 
 const jumpLocations = [
-  // Main kicker: much wider and taller, with a steeper takeoff face.
-  { x: 0, z: -13, yaw: 0, width: 6.8, length: 6.2, height: 2.25 },
-  { x: -15, z: 7, yaw: 0, width: 4.8, length: 4.8, height: 0.95 },
-  { x: 16, z: 18, yaw: 0, width: 5.0, length: 5.0, height: 1.05 },
-  { x: 4, z: 34, yaw: 0, width: 4.6, length: 4.8, height: 0.9 }
+  { x: 0, z: -12, yaw: 0 },
+  { x: -15, z: 7, yaw: 0 },
+  { x: 16, z: 18, yaw: 0 },
+  { x: 4, z: 34, yaw: 0 }
 ];
 const jumpMaterial = new THREE.MeshStandardMaterial({ color: 0x806b50, roughness: 0.96 });
 const arenaVisuals = [groundMesh, grid];
@@ -102,10 +100,7 @@ function makeRampGeometry(width, length, height) {
 }
 
 for (const jump of jumpLocations) {
-  const ramp = new THREE.Mesh(
-    makeRampGeometry(jump.width, jump.length, jump.height),
-    jumpMaterial
-  );
+  const ramp = new THREE.Mesh(makeRampGeometry(4.4, 4.2, 0.62), jumpMaterial);
   ramp.position.set(jump.x, 0, jump.z);
   ramp.rotation.y = jump.yaw;
   ramp.castShadow = true;
@@ -121,7 +116,7 @@ const world = new CANNON.World({
   gravity: new CANNON.Vec3(0, -9.82, 0)
 });
 world.broadphase = new CANNON.SAPBroadphase(world);
-world.solver.iterations = 14;
+world.solver.iterations = 12;
 world.allowSleep = false;
 world.defaultContactMaterial.friction = 0.35;
 world.defaultContactMaterial.restitution = 0.02;
@@ -133,9 +128,7 @@ world.addBody(groundBody);
 
 // Matching convex wedge colliders keep the approach edge flush with the ground.
 for (const jump of jumpLocations) {
-  const w = jump.width / 2;
-  const l = jump.length / 2;
-  const h = jump.height;
+  const w = 2.2, l = 2.1, h = 0.62;
   const vertices = [
     new CANNON.Vec3(-w, 0, l), new CANNON.Vec3(w, 0, l),
     new CANNON.Vec3(-w, 0, -l), new CANNON.Vec3(w, 0, -l),
@@ -196,14 +189,14 @@ for (let i = 0; i < 4; i++) {
     directionLocal: new CANNON.Vec3(0, -1, 0),
     axleLocal: new CANNON.Vec3(-1, 0, 0),
     suspensionRestLength: 0.12,
-    suspensionStiffness: 48,
-    dampingCompression: 5.0,
-    dampingRelaxation: 4.0,
-    maxSuspensionTravel: 0.16,
-    maxSuspensionForce: 300,
+    suspensionStiffness: 43,
+    dampingCompression: 5.2,
+    dampingRelaxation: 4.5,
+    maxSuspensionTravel: 0.14,
+    maxSuspensionForce: 260,
     radius: 0.13,
-    frictionSlip: 5.0,
-    rollInfluence: 0.075,
+    frictionSlip: 4.4,
+    rollInfluence: 0.085,
     isFrontWheel: i < 2,
     useCustomSlidingRotationalSpeed: true,
     customSlidingRotationalSpeed: 18
@@ -787,7 +780,6 @@ let viewMode = "menu";
 function setArenaVisible(visible) {
   for (const item of arenaVisuals) item.visible = visible;
   garageGroup.visible = !visible;
-  if (visible) localCar.root.visible = true;
 }
 function parkCarForShowroom() {
   chassisBody.position.set(0, 0.24, 0);
@@ -841,20 +833,8 @@ function showDriveScreen() {
   hud.style.display = "none";
   $("topStatus").style.display = "flex";
   setArenaVisible(true);
-
-  // Reset both orbit axes so a previous showroom view cannot leave the
-  // track camera pointed away from the car.
   cameraOrbitYaw = 0;
-  cameraOrbitPitch = 0;
   resetCar();
-  updateLocalVisual();
-
-  // Start with a known-good chase view before the first drive frame.
-  const p = localCar.root.position;
-  camera.position.set(p.x, p.y + 2.7, p.z + 6.0);
-  camera.up.set(0, 1, 0);
-  camera.lookAt(p.x, p.y + 0.22, p.z - 0.65);
-  camera.updateMatrixWorld(true);
 }
 const remotePlayers = new Map();
 const remotePalette = [0x42c7c2, 0x76a8ff, 0xe879b2, 0xa2d66d, 0xb18aff, 0xff795e];
@@ -992,100 +972,58 @@ function updateRemoteVisuals(delta) {
   updatePlayerCount();
 }
 
-// Dedicated transparent surface handles orbit input above the canvas.
-// UI panels remain at higher z-indexes, so their buttons and fields stay usable.
+// Drag the view around the car. Pointer events support both mouse and touch.
 let cameraOrbitYaw = 0;
-let cameraOrbitPitch = 0;
 let cameraDragging = false;
 let cameraPointerId = null;
 let cameraLastX = 0;
-let cameraLastY = 0;
+canvas.style.touchAction = "none";
+canvas.style.cursor = "grab";
 
-inputSurface.tabIndex = 0;
-inputSurface.style.touchAction = "none";
-inputSurface.style.cursor = "grab";
-
-inputSurface.addEventListener("pointerdown", (event) => {
-  if (event.pointerType === "mouse" && event.button !== 0) return;
+canvas.addEventListener("pointerdown", (event) => {
+  if (event.button !== 0 && event.pointerType === "mouse") return;
   cameraDragging = true;
   cameraPointerId = event.pointerId;
   cameraLastX = event.clientX;
-  cameraLastY = event.clientY;
-  inputSurface.style.cursor = "grabbing";
-  if (joined) inputSurface.focus({ preventScroll: true });
-  try {
-    inputSurface.setPointerCapture(event.pointerId);
-  } catch (error) {
-    // The surface still receives pointer events while the pointer stays over it.
-  }
+  canvas.style.cursor = "grabbing";
+  canvas.setPointerCapture(event.pointerId);
 });
 
-function handleCameraPointerMove(event) {
+canvas.addEventListener("pointermove", (event) => {
   if (!cameraDragging || event.pointerId !== cameraPointerId) return;
-  const dx = event.clientX - cameraLastX;
-  const dy = event.clientY - cameraLastY;
+  const deltaX = event.clientX - cameraLastX;
   cameraLastX = event.clientX;
-  cameraLastY = event.clientY;
-  cameraOrbitYaw += dx * 0.006;
-  cameraOrbitPitch = THREE.MathUtils.clamp(
-    cameraOrbitPitch - dy * 0.0045,
-    -0.28,
-    0.82
-  );
-}
+  cameraOrbitYaw += deltaX * 0.006;
+});
 
 function stopCameraDrag(event) {
   if (!cameraDragging || (event && event.pointerId !== cameraPointerId)) return;
   cameraDragging = false;
   cameraPointerId = null;
-  inputSurface.style.cursor = "grab";
+  canvas.style.cursor = "grab";
 }
-// Capture on window so movement/release remains reliable even if the browser
-// retargets a captured pointer or the pointer leaves the input surface.
-window.addEventListener("pointermove", handleCameraPointerMove, true);
-window.addEventListener("pointerup", stopCameraDrag, true);
-window.addEventListener("pointercancel", stopCameraDrag, true);
-window.addEventListener("blur", () => stopCameraDrag());
+canvas.addEventListener("pointerup", stopCameraDrag);
+canvas.addEventListener("pointercancel", stopCameraDrag);
+canvas.addEventListener("lostpointercapture", stopCameraDrag);
 
-// Keyboard controls use physical key codes so WASD and arrows work
-// consistently regardless of keyboard layout or page focus.
+// Keyboard controls
 const keys = Object.create(null);
-const codeToControl = {
-  KeyW: "w",
-  KeyA: "a",
-  KeyS: "s",
-  KeyD: "d",
-  Space: " ",
-  KeyR: "r",
-  ArrowUp: "arrowup",
-  ArrowDown: "arrowdown",
-  ArrowLeft: "arrowleft",
-  ArrowRight: "arrowright"
-};
-const controlKeys = new Set(Object.values(codeToControl));
+const controlKeys = new Set(["w", "a", "s", "d", " ", "r", "arrowup", "arrowdown", "arrowleft", "arrowright"]);
 
-function clearDrivingKeys() {
-  for (const key of Object.keys(keys)) keys[key] = false;
-}
 window.addEventListener("keydown", (event) => {
-  const key = codeToControl[event.code] || event.key.toLowerCase();
-  const typingInForm = ["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName);
-  if (!controlKeys.has(key)) return;
-  if (!joined && typingInForm) return;
-
-  event.preventDefault();
-  keys[key] = true;
+  const key = event.key.toLowerCase();
+  if (controlKeys.has(key) && !["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName)) {
+    event.preventDefault();
+    keys[key] = true;
+  }
   if (key === "r" && !event.repeat && joined) resetCar();
-}, true);
+});
 
 window.addEventListener("keyup", (event) => {
-  const key = codeToControl[event.code] || event.key.toLowerCase();
-  if (controlKeys.has(key)) keys[key] = false;
-}, true);
-
-window.addEventListener("blur", clearDrivingKeys);
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden) clearDrivingKeys();
+  keys[event.key.toLowerCase()] = false;
+});
+window.addEventListener("blur", () => {
+  for (const key of Object.keys(keys)) keys[key] = false;
 });
 
 function resetCar() {
@@ -1120,65 +1058,37 @@ function updateDrivingControls(delta) {
   const forward = keys.w || keys.arrowup ? 1 : 0;
   const reverse = keys.s || keys.arrowdown ? -1 : 0;
   const throttle = forward + reverse;
-  const steerTarget =
-    (keys.a || keys.arrowleft ? 1 : 0) -
-    (keys.d || keys.arrowright ? 1 : 0);
-
-  // Use time-based input smoothing so handling stays consistent at different
-  // frame rates and direction changes do not snap the truck.
-  const steerResponse = 1 - Math.exp(-11 * delta);
-  const throttleResponse = 1 - Math.exp(-6.5 * delta);
-  steerState += (steerTarget - steerState) * steerResponse;
-  throttleState += (throttle - throttleState) * throttleResponse;
+  const steerTarget = (keys.a || keys.arrowleft ? 1 : 0) - (keys.d || keys.arrowright ? 1 : 0);
+  steerState += (steerTarget - steerState) * 0.22;
 
   const speed = chassisBody.velocity.length();
-  const speedSteerScale = THREE.MathUtils.clamp(1 - speed / 29, 0.48, 1);
-  const steeringAngle = steerState * 0.43 * speedSteerScale;
+  const speedSteerScale = THREE.MathUtils.clamp(1 - speed / 30, 0.52, 1);
+  const steeringAngle = steerState * 0.40 * speedSteerScale;
 
   vehicle.setSteeringValue(steeringAngle, 0);
   vehicle.setSteeringValue(steeringAngle, 1);
-
-  // Progressive 4WD power with a smoother top-speed fade.
-  const speedLimitScale = THREE.MathUtils.clamp(1 - speed / 29, 0.22, 1);
-  const engineForce = throttleState * 34 * speedLimitScale;
+  // Positive force is forward for this chassis orientation. Progressive,
+  // moderate power helps prevent abrupt pitching and uncontrolled wheelies.
+  throttleState += (throttle - throttleState) * 0.12;
+  const speedLimitScale = THREE.MathUtils.clamp(1 - speed / 24, 0.28, 1);
+  const engineForce = throttleState * 25 * speedLimitScale;
+  // Slow the chassis horizontally instead of applying wheel-brake torque.
+  // This avoids the abrupt nose-down pitching that was causing front flips.
   for (let i = 0; i < 4; i++) {
     vehicle.applyEngineForce(engineForce, i);
     vehicle.setBrake(0, i);
   }
-
-  // Space acts like a controlled drag brake rather than abruptly locking the
-  // wheels, which helps avoid pitching the truck over its front bumper.
   if (keys[" "] && delta > 0) {
-    const brakeFactor = Math.exp(-3.1 * delta);
+    const brakeFactor = Math.exp(-2.7 * delta);
     chassisBody.velocity.x *= brakeFactor;
     chassisBody.velocity.z *= brakeFactor;
   }
 
+  // Reduce excessive pitch and roll spin while grounded, but keep jumps lively.
   const groundedWheels = vehicle.wheelInfos.filter((wheel) => wheel.isInContact).length;
-  const airborne = groundedWheels <= 1;
-
-  if (airborne) {
-    // Mid-air RC control:
-    // W / Up raises the nose, S / Down lowers it, and A / D rotate the truck
-    // around its vertical axis. A small coupled roll makes steering feel less
-    // like an arcade spin while still letting players correct a jump.
-    const pitchInput = throttleState;
-    const yawInput = steerState;
-    const airTorque = new CANNON.Vec3(
-      pitchInput * 1.45,
-      yawInput * 0.95,
-      yawInput * 0.22
-    );
-    chassisBody.applyLocalTorque(airTorque);
-  } else if (groundedWheels >= 3) {
-    // Tire contact and suspension settle small chassis oscillations on the
-    // ground without suppressing airborne rotation.
+  if (groundedWheels >= 2) {
     chassisBody.angularVelocity.x *= 0.94;
     chassisBody.angularVelocity.z *= 0.94;
-  } else {
-    // One- and two-wheel landings keep a little freedom for suspension roll.
-    chassisBody.angularVelocity.x *= 0.985;
-    chassisBody.angularVelocity.z *= 0.985;
   }
 }
 
@@ -1229,20 +1139,10 @@ async function joinArena() {
     };
 
     joined = true;
-    // The room form is hidden below; move focus to the game canvas so
-    // keyboard driving works immediately without an extra click.
-    if (document.activeElement && typeof document.activeElement.blur === "function") {
-      document.activeElement.blur();
-    }
-    inputSurface.focus({ preventScroll: true });
-    clearDrivingKeys();
     $("roomValue").textContent = joinedRoomCode.toUpperCase();
     joinPanel.style.display = "none";
     hud.style.display = "block";
     viewMode = "drive";
-    setArenaVisible(true);
-    localCar.root.visible = true;
-    updateLocalVisual();
     $("statusDot").classList.remove("live");
     $("topStatus").textContent = "WAITING FOR DRIVERS";
     updatePlayerCount();
@@ -1273,8 +1173,7 @@ async function leaveArena() {
   peersConnected = false;
   for (const remote of remotePlayers.values()) scene.remove(remote.visual.root);
   remotePlayers.clear();
-  clearDrivingKeys();
-  stopCameraDrag();
+  for (const key of Object.keys(keys)) keys[key] = false;
   updatePlayerCount();
   hud.style.display = "none";
   joinPanel.style.display = "block";
@@ -1300,22 +1199,14 @@ $("driverName").addEventListener("keydown", (event) => {
 });
 
 function resize() {
-  const width = Math.max(1, window.innerWidth);
-  const height = Math.max(1, window.innerHeight);
+  const width = window.innerWidth;
+  const height = window.innerHeight;
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.7));
   renderer.setSize(width, height, false);
-  renderer.domElement.style.width = "100%";
-  renderer.domElement.style.height = "100%";
-  renderer.setViewport(0, 0, width, height);
-  renderer.setScissorTest(false);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.7));
 }
 window.addEventListener("resize", resize);
-window.addEventListener("orientationchange", resize);
-document.addEventListener("fullscreenchange", () => {
-  requestAnimationFrame(resize);
-});
 
 let lastTime = performance.now();
 let networkTimer = 0;
@@ -1340,48 +1231,25 @@ function animate(now) {
     const height = viewMode === "garage" ? 1.75 : 2.15;
     const orbitDirection = new THREE.Vector3(0, 0, 1)
       .applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraOrbitYaw + (viewMode === "menu" ? -0.18 : 0));
-    const showroomHorizontalDistance = distance * Math.cos(cameraOrbitPitch);
-    const showroomCameraHeight = height + distance * Math.sin(cameraOrbitPitch);
     const showroomCamera = localCar.root.position.clone()
-      .addScaledVector(orbitDirection, showroomHorizontalDistance)
-      .add(new THREE.Vector3(0, showroomCameraHeight, 0));
+      .addScaledVector(orbitDirection, distance)
+      .add(new THREE.Vector3(0, height, 0));
     camera.position.lerp(showroomCamera, 1 - Math.exp(-2.4 * delta));
     camera.lookAt(localCar.root.position.clone().add(new THREE.Vector3(0, 0.12, 0)));
   } else {
-  // Drive view: always orbit around the actual local truck position.
-  // Reassert arena visibility here as a recovery guard for fullscreen changes.
-  for (const item of arenaVisuals) item.visible = true;
-  garageGroup.visible = false;
-  localCar.root.visible = true;
-
-  const carPosition = localCar.root.position;
-  const carForward = new THREE.Vector3(0, 0, -1)
-    .applyQuaternion(localCar.root.quaternion);
+  // Follow horizontal heading only; ignore chassis pitch and roll.
+  const carForward = new THREE.Vector3(0, 0, -1).applyQuaternion(localCar.root.quaternion);
   carForward.y = 0;
-  if (!Number.isFinite(carForward.x) || !Number.isFinite(carForward.z) ||
-      carForward.lengthSq() < 0.0001) {
-    carForward.set(0, 0, -1);
-  }
+  if (carForward.lengthSq() < 0.0001) carForward.set(0, 0, -1);
   carForward.normalize();
-
-  const orbitForward = carForward.clone()
-    .applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraOrbitYaw);
-  const cameraHorizontalDistance = 6.0 * Math.cos(cameraOrbitPitch);
-  const cameraHeight = 2.6 + 6.0 * Math.sin(cameraOrbitPitch);
-  const desiredCamera = carPosition.clone()
-    .addScaledVector(orbitForward, -cameraHorizontalDistance)
-    .add(new THREE.Vector3(0, cameraHeight, 0));
-
-  if (![desiredCamera.x, desiredCamera.y, desiredCamera.z].every(Number.isFinite)) {
-    cameraOrbitYaw = 0;
-    cameraOrbitPitch = 0;
-    desiredCamera.set(carPosition.x, carPosition.y + 2.7, carPosition.z + 6.0);
-  }
-
-  camera.position.lerp(desiredCamera, 1 - Math.exp(-4.0 * delta));
-  const lookTarget = carPosition.clone()
+  const cameraDirection = carForward.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraOrbitYaw);
+  const desiredCamera = localCar.root.position.clone()
+    .addScaledVector(cameraDirection, -5.8)
+    .add(new THREE.Vector3(0, 2.8, 0));
+  camera.position.lerp(desiredCamera, 1 - Math.exp(-2.8 * delta));
+  const lookTarget = localCar.root.position.clone()
     .add(new THREE.Vector3(0, 0.28, 0))
-    .addScaledVector(carForward, 0.35);
+    .addScaledVector(carForward, 0.85);
   camera.up.set(0, 1, 0);
   camera.lookAt(lookTarget);
   }
