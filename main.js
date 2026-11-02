@@ -1625,6 +1625,51 @@ garageGroup.visible = true;
 for (const item of arenaVisuals) item.visible = false;
 
 let viewMode = "menu";
+let garageShellInstalled = true;
+let garageShellAnimation = null;
+const garageShellDuration = 520;
+const garageShellAttachedPosition = new THREE.Vector3(0, 0, 0);
+const garageShellRemovedPosition = new THREE.Vector3(0.08, 1.12, -0.16);
+const garageShellAttachedRotation = new THREE.Euler(0, 0, 0);
+const garageShellRemovedRotation = new THREE.Euler(-0.12, 0, 0.09);
+const garageShellAttachedScale = new THREE.Vector3(1, 1, 1);
+const garageShellRemovedScale = new THREE.Vector3(1.012, 1.012, 1.012);
+
+function applyGarageShellPose(progress) {
+  const t = THREE.MathUtils.clamp(progress, 0, 1);
+  localCar.shellGroup.position.lerpVectors(garageShellAttachedPosition, garageShellRemovedPosition, t);
+  localCar.shellGroup.rotation.set(
+    THREE.MathUtils.lerp(garageShellAttachedRotation.x, garageShellRemovedRotation.x, t),
+    THREE.MathUtils.lerp(garageShellAttachedRotation.y, garageShellRemovedRotation.y, t),
+    THREE.MathUtils.lerp(garageShellAttachedRotation.z, garageShellRemovedRotation.z, t)
+  );
+  localCar.shellGroup.scale.lerpVectors(garageShellAttachedScale, garageShellRemovedScale, t);
+}
+
+function resetGarageShellState(visible = true) {
+  garageShellAnimation = null;
+  garageShellInstalled = !!visible;
+  applyGarageShellPose(0);
+  localCar.setShellVisible(garageShellInstalled);
+  const button = $("shellToggleButton");
+  if (button) button.textContent = garageShellInstalled ? "REMOVE BODY SHELL" : "INSTALL BODY SHELL";
+}
+
+function updateGarageShellAnimation(now) {
+  if (!garageShellAnimation) return;
+  const animation = garageShellAnimation;
+  const linear = THREE.MathUtils.clamp((now - animation.startTime) / garageShellDuration, 0, 1);
+  const eased = linear * linear * (3 - 2 * linear);
+  const progress = THREE.MathUtils.lerp(animation.from, animation.to, eased);
+  applyGarageShellPose(progress);
+
+  if (linear >= 1) {
+    garageShellAnimation = null;
+    applyGarageShellPose(0);
+    if (animation.to === 1) localCar.setShellVisible(false);
+  }
+}
+
 const garageRaycaster = new THREE.Raycaster();
 const garagePointer = new THREE.Vector2();
 let activeGaragePart = null;
@@ -1641,7 +1686,7 @@ function clearGaragePartHover() {
   const title = $("partHoverTitle");
   const description = $("partHoverDescription");
   if (title) title.textContent = "HOVER OVER A COMPONENT";
-  if (description) description.textContent = "Move your pointer over the body shell to identify the complete shell as one part.";
+  if (description) description.textContent = "Move your pointer over a visible component to identify it.";
 }
 
 function updateGaragePartHover(event) {
@@ -1654,7 +1699,9 @@ function updateGaragePartHover(event) {
   garagePointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   garagePointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   garageRaycaster.setFromCamera(garagePointer, camera);
-  const intersections = garageRaycaster.intersectObject(localCar.root, true);
+  // Do not raycast the shell at all when it has been removed.
+  const hoverTarget = garageShellInstalled ? localCar.root : localCar.chassisGroup;
+  const intersections = garageRaycaster.intersectObject(hoverTarget, true);
   let found = null;
   let foundObject = null;
   for (const hit of intersections) {
@@ -1710,7 +1757,7 @@ function parkCarForShowroom() {
 }
 function showMainMenu() {
   clearGaragePartHover();
-  localCar.setShellVisible(true);
+  resetGarageShellState(true);
   viewMode = "menu";
   mainMenuPanel.style.display = "block";
   garagePanel.style.display = "none";
@@ -1722,7 +1769,7 @@ function showMainMenu() {
 }
 function showGarage() {
   clearGaragePartHover();
-  localCar.setShellVisible(true);
+  resetGarageShellState(true);
   viewMode = "garage";
   mainMenuPanel.style.display = "none";
   garagePanel.style.display = "block";
@@ -1733,12 +1780,26 @@ function showGarage() {
   parkCarForShowroom();
 }
 function setGarageShellVisible(visible) {
-  localCar.setShellVisible(visible);
-  $("shellToggleButton").textContent = visible ? "REMOVE BODY SHELL" : "INSTALL BODY SHELL";
+  if (garageShellAnimation || visible === garageShellInstalled) return;
+
   clearGaragePartHover();
+  const installing = !!visible;
+  const from = installing ? 1 : 0;
+  const to = installing ? 0 : 1;
+
+  // Keep the shell visible while it lifts away or settles back onto the chassis.
+  localCar.setShellVisible(true);
+  applyGarageShellPose(from);
+  garageShellInstalled = installing;
+  $("shellToggleButton").textContent = installing ? "REMOVE BODY SHELL" : "INSTALL BODY SHELL";
+  garageShellAnimation = {
+    from,
+    to,
+    startTime: performance.now()
+  };
 }
 $("shellToggleButton").addEventListener("click", () => {
-  setGarageShellVisible(!localCar.shellGroup.visible);
+  setGarageShellVisible(!garageShellInstalled);
 });
 
 function showDriveScreen() {
@@ -2188,6 +2249,7 @@ function animate(now) {
       drivingControlErrorReported = true;
     }
   }
+  updateGarageShellAnimation(now);
   world.step(FIXED_STEP, delta, 3);
   updateLocalVisual();
   updateRemoteVisuals(delta);
