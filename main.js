@@ -843,6 +843,11 @@ function makeCarVisual(color, playerName = "") {
   // Slash-inspired short-course polycarbonate shell. The lofted orange skin,
   // black roof/hood, gray rear quarters, windows and trim are separate parts.
   function makeBodyShell() {
+    const shellGeometryGroup = new THREE.Group();
+    shellGeometryGroup.name = "shell-geometry";
+    shellGeometryGroup.scale.z = 0.75;
+    shellGroup.add(shellGeometryGroup);
+
     const orange = new THREE.MeshStandardMaterial({ color: 0xff4b0b, roughness: 0.32, metalness: 0.05 });
     const orangeLight = new THREE.MeshStandardMaterial({ color: 0xff6820, roughness: 0.34, metalness: 0.04 });
     const shellBlack = new THREE.MeshStandardMaterial({ color: 0x11161b, roughness: 0.4, metalness: 0.1 });
@@ -868,8 +873,8 @@ function makeCarVisual(color, playerName = "") {
       [-0.49, 0.372, 0.292, 0.150],
       [-0.30, 0.365, 0.302, 0.150],
       [-0.18, 0.331, 0.337, 0.155],
-      [-0.075, 0.272, 0.475, 0.180],
-      [0.205, 0.272, 0.490, 0.180],
+      [-0.075, 0.315, 0.475, 0.180],
+      [0.205, 0.315, 0.490, 0.180],
       [0.305, 0.315, 0.365, 0.160],
       [0.425, 0.360, 0.305, 0.150],
       [0.605, 0.350, 0.283, 0.145],
@@ -960,17 +965,17 @@ function makeCarVisual(color, playerName = "") {
 
     // Main orange one-piece skin with molded short-course wheel openings.
     const skin = makePart(
-      shellGroup, "shell-orange-main", "Orange polycarbonate body",
+      shellGeometryGroup, "shell-orange-main", "Orange polycarbonate body",
       "The main short-course shell: a long low hood, flared wheel openings, compact cab and short rear bed. It covers the electronics while leaving the four tires exposed."
     );
     loft(skin, orange, -0.72, 0.72, 1, 0, 120, 32);
     for (const side of [-1, 1]) {
       sideShape(skin, side, orange, (shape) => {
         shape.moveTo(-0.72, 0.15);
-        shape.lineTo(-0.555, 0.15);
-        shape.quadraticCurveTo(-0.365, 0.355, -0.175, 0.15);
-        shape.lineTo(0.175, 0.15);
-        shape.quadraticCurveTo(0.365, 0.355, 0.555, 0.15);
+        shape.lineTo(-0.60, 0.15);
+        shape.quadraticCurveTo(-0.3867, 0.355, -0.1733, 0.15);
+        shape.lineTo(0.1733, 0.15);
+        shape.quadraticCurveTo(0.3867, 0.355, 0.60, 0.15);
         shape.lineTo(0.70, 0.165);
         shape.lineTo(0.71, 0.235);
         shape.lineTo(0.60, 0.28);
@@ -987,7 +992,7 @@ function makeCarVisual(color, playerName = "") {
 
     // Black center hood graphic and two inset vents over the orange hood.
     const hood = makePart(
-      shellGroup, "shell-hood-graphics", "Black hood panel and vents",
+      shellGeometryGroup, "shell-hood-graphics", "Black hood panel and vents",
       "A satin-black hood center sits inside the orange bonnet, with orange pinstripes and two small cooling vents."
     );
     loft(hood, shellBlack, -0.655, -0.205, 0.55, 0.004, 40, 20);
@@ -1001,7 +1006,7 @@ function makeCarVisual(color, playerName = "") {
 
     // Low black roof and roof intake.
     const roof = makePart(
-      shellGroup, "shell-black-roof", "Black cab roof",
+      shellGeometryGroup, "shell-black-roof", "Black cab roof",
       "Low black roof panel with softly rounded shoulders and a small molded roof intake."
     );
     loft(roof, shellBlack, -0.065, 0.235, 0.90, 0.009, 38, 22);
@@ -1012,7 +1017,7 @@ function makeCarVisual(color, playerName = "") {
 
     // Front and rear smoked glass.
     const windshield = makePart(
-      shellGroup, "shell-windscreen", "Tinted windshield and rear window",
+      shellGeometryGroup, "shell-windscreen", "Tinted windshield and rear window",
       "Dark smoked polycarbonate glazing follows the steep windshield and rear cab angle. Black borders frame both windows."
     );
     quad(windshield, [
@@ -1031,7 +1036,7 @@ function makeCarVisual(color, playerName = "") {
     }
 
     const sideWindows = makePart(
-      shellGroup, "shell-side-windows", "Tinted side windows and cab pillars",
+      shellGeometryGroup, "shell-side-windows", "Tinted side windows and cab pillars",
       "Smoked driver and passenger windows with thick black pillars and a separate quarter-window section."
     );
     for (const side of [-1, 1]) {
@@ -1059,7 +1064,7 @@ function makeCarVisual(color, playerName = "") {
 
     // Gray rear bed and quarter panels.
     const rearQuarter = makePart(
-      shellGroup, "shell-gray-rear-quarter", "Graphite rear bed and quarter panels",
+      shellGeometryGroup, "shell-gray-rear-quarter", "Graphite rear bed and quarter panels",
       "Dark gray rear fender/bed sections contrast with the orange doors and black roof. Raised lips and panel creases give the rear body more depth."
     );
     for (const side of [-1, 1]) {
@@ -1079,7 +1084,7 @@ function makeCarVisual(color, playerName = "") {
 
     // Lower black rocker, gray skirt and generic short-course race-number decals.
     const graphics = makePart(
-      shellGroup, "shell-door-graphics", "Orange doors and racing graphics",
+      shellGeometryGroup, "shell-door-graphics", "Orange doors and racing graphics",
       "Orange door panels carry angular black/gray racing graphics and a white number. The livery uses no sponsor logos."
     );
     for (const side of [-1, 1]) {
@@ -1133,7 +1138,7 @@ function makeCarVisual(color, playerName = "") {
 
     // Raised arches sit just outside the tires; inner black liners remain visible.
     const arches = makePart(
-      shellGroup, "shell-wheel-arch-flares", "Wheel-arch flares and liners",
+      shellGeometryGroup, "shell-wheel-arch-flares", "Wheel-arch flares and liners",
       "Rounded short-course fender lips sit outside each tire. Dark inner liners deepen the wheel openings."
     );
     for (const side of [-1, 1]) {
@@ -1142,7 +1147,8 @@ function makeCarVisual(color, playerName = "") {
           new THREE.TorusGeometry(0.158, 0.018, 10, 48, Math.PI), shellBlack
         );
         flare.rotation.y = Math.PI / 2;
-        flare.position.set(side * 0.372, 0.145, z);
+        flare.position.set(side * 0.372, 0.145, z / 0.75);
+        flare.scale.y = 0.75;
         flare.castShadow = true;
         flare.receiveShadow = true;
         arches.add(flare);
@@ -1150,7 +1156,8 @@ function makeCarVisual(color, playerName = "") {
           new THREE.TorusGeometry(0.145, 0.006, 7, 44, Math.PI), orangeLight
         );
         lip.rotation.y = Math.PI / 2;
-        lip.position.set(side * 0.374, 0.145, z);
+        lip.position.set(side * 0.374, 0.145, z / 0.75);
+        lip.scale.y = 0.75;
         arches.add(lip);
       }
       roundedBox(arches, [0.028, 0.045, 0.34], shellBlack,
@@ -1159,7 +1166,7 @@ function makeCarVisual(color, playerName = "") {
 
     // Front grille, detailed lights and gray tubular impact bumper.
     const front = makePart(
-      shellGroup, "shell-front-fascia", "Front grille, headlights and gray bumper",
+      shellGeometryGroup, "shell-front-fascia", "Front grille, headlights and gray bumper",
       "The short-course nose has a dark horizontal grille, paired projector-style headlights, a gray lower valance and tubular front impact bar."
     );
     roundedBox(front, [0.36, 0.067, 0.024], shellBlack, [0, 0.207, -0.704], null, 0.012);
@@ -1193,7 +1200,7 @@ function makeCarVisual(color, playerName = "") {
 
     // Rear tailgate and gray impact bumper.
     const rear = makePart(
-      shellGroup, "shell-rear-tailgate", "Rear tailgate, lamps and bumper",
+      shellGeometryGroup, "shell-rear-tailgate", "Rear tailgate, lamps and bumper",
       "A dark tailgate panel with red corner lights and a broad gray rear impact bumper completes the short-course body."
     );
     roundedBox(rear, [0.43, 0.075, 0.025], charcoal, [0, 0.212, 0.709], null, 0.012);
@@ -1208,7 +1215,7 @@ function makeCarVisual(color, playerName = "") {
 
     // Mirrors, wipers and molded bed-rail detail.
     const trim = makePart(
-      shellGroup, "shell-exterior-trim", "Mirrors, wipers and bed rails",
+      shellGeometryGroup, "shell-exterior-trim", "Mirrors, wipers and bed rails",
       "Small black side mirrors, windshield wipers, roof antenna base and raised rear bed rails finish the shell."
     );
     for (const side of [-1, 1]) {
@@ -1228,7 +1235,7 @@ function makeCarVisual(color, playerName = "") {
 
     // Subtle gray lower side panels tie the rear bed into the front bumper.
     const lowerTrim = makePart(
-      shellGroup, "shell-gray-lower-accents", "Gray lower side accents",
+      shellGeometryGroup, "shell-gray-lower-accents", "Gray lower side accents",
       "Gray lower trim runs below the orange doors and visually links the graphite rear panels to the front bumper."
     );
     for (const side of [-1, 1]) {
