@@ -978,29 +978,57 @@ function updateRemoteVisuals(delta) {
   updatePlayerCount();
 }
 
-// Drag the view around the car. Pointer events support both mouse and touch.
+// Drag the view around the car. Listen at window level so a transparent
+// overlay or HUD cannot accidentally swallow the drag after joining a room.
 let cameraOrbitYaw = 0;
+let cameraOrbitPitch = 0;
 let cameraDragging = false;
 let cameraPointerId = null;
 let cameraLastX = 0;
+let cameraLastY = 0;
+canvas.tabIndex = 0;
 canvas.style.touchAction = "none";
 canvas.style.cursor = "grab";
 
-canvas.addEventListener("pointerdown", (event) => {
-  if (event.button !== 0 && event.pointerType === "mouse") return;
+function isInteractiveUiTarget(target) {
+  return target instanceof Element &&
+    !!target.closest("button, input, textarea, select, a, [contenteditable='true']");
+}
+
+window.addEventListener("pointerdown", (event) => {
+  if (event.pointerType === "mouse" && event.button !== 0) return;
+  if (isInteractiveUiTarget(event.target)) return;
+
   cameraDragging = true;
   cameraPointerId = event.pointerId;
   cameraLastX = event.clientX;
+  cameraLastY = event.clientY;
   canvas.style.cursor = "grabbing";
-  canvas.setPointerCapture(event.pointerId);
-});
 
-canvas.addEventListener("pointermove", (event) => {
+  // Pointer capture keeps drag movement continuous when the pointer leaves
+  // the canvas. Window listeners remain as a fallback for unusual targets.
+  try {
+    if (event.target && typeof event.target.setPointerCapture === "function") {
+      event.target.setPointerCapture(event.pointerId);
+    }
+  } catch (error) {
+    // The window-level handlers still receive normal pointer movement.
+  }
+}, true);
+
+window.addEventListener("pointermove", (event) => {
   if (!cameraDragging || event.pointerId !== cameraPointerId) return;
   const deltaX = event.clientX - cameraLastX;
+  const deltaY = event.clientY - cameraLastY;
   cameraLastX = event.clientX;
+  cameraLastY = event.clientY;
   cameraOrbitYaw += deltaX * 0.006;
-});
+  cameraOrbitPitch = THREE.MathUtils.clamp(
+    cameraOrbitPitch - deltaY * 0.0045,
+    -0.28,
+    0.82
+  );
+}, true);
 
 function stopCameraDrag(event) {
   if (!cameraDragging || (event && event.pointerId !== cameraPointerId)) return;
@@ -1008,9 +1036,9 @@ function stopCameraDrag(event) {
   cameraPointerId = null;
   canvas.style.cursor = "grab";
 }
-canvas.addEventListener("pointerup", stopCameraDrag);
-canvas.addEventListener("pointercancel", stopCameraDrag);
-canvas.addEventListener("lostpointercapture", stopCameraDrag);
+window.addEventListener("pointerup", stopCameraDrag, true);
+window.addEventListener("pointercancel", stopCameraDrag, true);
+window.addEventListener("blur", () => stopCameraDrag(), true);
 
 // Keyboard controls
 const keys = Object.create(null);
@@ -1018,7 +1046,8 @@ const controlKeys = new Set(["w", "a", "s", "d", " ", "r", "arrowup", "arrowdown
 
 window.addEventListener("keydown", (event) => {
   const key = event.key.toLowerCase();
-  if (controlKeys.has(key) && !["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName)) {
+  const typingInForm = ["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName);
+  if (controlKeys.has(key) && (joined || !typingInForm)) {
     event.preventDefault();
     keys[key] = true;
   }
@@ -1173,6 +1202,13 @@ async function joinArena() {
     };
 
     joined = true;
+    // The room form is hidden below; move focus to the game canvas so
+    // keyboard driving works immediately without an extra click.
+    if (document.activeElement && typeof document.activeElement.blur === "function") {
+      document.activeElement.blur();
+    }
+    canvas.focus({ preventScroll: true });
+    for (const key of Object.keys(keys)) keys[key] = false;
     $("roomValue").textContent = joinedRoomCode.toUpperCase();
     joinPanel.style.display = "none";
     hud.style.display = "block";
@@ -1208,6 +1244,7 @@ async function leaveArena() {
   for (const remote of remotePlayers.values()) scene.remove(remote.visual.root);
   remotePlayers.clear();
   for (const key of Object.keys(keys)) keys[key] = false;
+  stopCameraDrag();
   updatePlayerCount();
   hud.style.display = "none";
   joinPanel.style.display = "block";
@@ -1265,9 +1302,11 @@ function animate(now) {
     const height = viewMode === "garage" ? 1.75 : 2.15;
     const orbitDirection = new THREE.Vector3(0, 0, 1)
       .applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraOrbitYaw + (viewMode === "menu" ? -0.18 : 0));
+    const showroomHorizontalDistance = distance * Math.cos(cameraOrbitPitch);
+    const showroomCameraHeight = height + distance * Math.sin(cameraOrbitPitch);
     const showroomCamera = localCar.root.position.clone()
-      .addScaledVector(orbitDirection, distance)
-      .add(new THREE.Vector3(0, height, 0));
+      .addScaledVector(orbitDirection, showroomHorizontalDistance)
+      .add(new THREE.Vector3(0, showroomCameraHeight, 0));
     camera.position.lerp(showroomCamera, 1 - Math.exp(-2.4 * delta));
     camera.lookAt(localCar.root.position.clone().add(new THREE.Vector3(0, 0.12, 0)));
   } else {
@@ -1277,9 +1316,11 @@ function animate(now) {
   if (carForward.lengthSq() < 0.0001) carForward.set(0, 0, -1);
   carForward.normalize();
   const cameraDirection = carForward.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraOrbitYaw);
+  const cameraHorizontalDistance = 5.8 * Math.cos(cameraOrbitPitch);
+  const cameraHeight = 2.8 + 5.8 * Math.sin(cameraOrbitPitch);
   const desiredCamera = localCar.root.position.clone()
-    .addScaledVector(cameraDirection, -5.8)
-    .add(new THREE.Vector3(0, 2.8, 0));
+    .addScaledVector(cameraDirection, -cameraHorizontalDistance)
+    .add(new THREE.Vector3(0, cameraHeight, 0));
   camera.position.lerp(desiredCamera, 1 - Math.exp(-2.8 * delta));
   const lookTarget = localCar.root.position.clone()
     .add(new THREE.Vector3(0, 0.28, 0))
