@@ -1064,12 +1064,13 @@ function makeCarVisual(color, playerName = "") {
         const cosValue = Math.cos(angle);
         const sinValue = Math.sin(angle);
         const x = Math.sign(cosValue) * Math.pow(Math.abs(cosValue), crossExponent);
-        const yFactor = 0.5 + 0.5 * Math.sign(sinValue) *
-          Math.pow(Math.abs(sinValue), crossExponent);
         const p = getProfile(z);
+        const y = sinValue >= 0
+          ? p.bottom + (p.top - p.bottom) * Math.pow(sinValue, crossExponent)
+          : p.bottom - 0.045 * Math.pow(Math.abs(sinValue), 0.65);
         positions.push(
           p.width * x,
-          p.bottom + (p.top - p.bottom) * yFactor,
+          y,
           z
         );
       }
