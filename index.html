@@ -337,6 +337,14 @@
     });
     window.__rcCarReportStartupError = showStartupError;
     window.__rcCarBootStage = "HTML loaded; waiting for game module";
+    window.setTimeout(() => {
+      if (!window.__rcCarFirstFrameRendered && !document.getElementById("startupErrorPanel")) {
+        showStartupError(
+          "Startup timeout",
+          "The game did not render its first 3D frame within 15 seconds. The stage below shows the last completed startup step."
+        );
+      }
+    }, 15000);
   })();
 </script>
 <script type="module" src="./main.js"></script>
