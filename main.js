@@ -5,6 +5,7 @@ import { joinRoom, selfId } from "https://esm.sh/trystero@0.26.0";
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("gameCanvas");
+const inputSurface = $("gameInputSurface");
 const joinPanel = $("joinPanel");
 const mainMenuPanel = $("mainMenuPanel");
 const garagePanel = $("garagePanel");
@@ -978,87 +979,98 @@ function updateRemoteVisuals(delta) {
   updatePlayerCount();
 }
 
-// Drag the view around the car. Listen at window level so a transparent
-// overlay or HUD cannot accidentally swallow the drag after joining a room.
+// Dedicated transparent surface handles orbit input above the canvas.
+// UI panels remain at higher z-indexes, so their buttons and fields stay usable.
 let cameraOrbitYaw = 0;
 let cameraOrbitPitch = 0;
 let cameraDragging = false;
 let cameraPointerId = null;
 let cameraLastX = 0;
 let cameraLastY = 0;
-canvas.tabIndex = 0;
-canvas.style.touchAction = "none";
-canvas.style.cursor = "grab";
 
-function isInteractiveUiTarget(target) {
-  return target instanceof Element &&
-    !!target.closest("button, input, textarea, select, a, [contenteditable='true']");
-}
+inputSurface.tabIndex = 0;
+inputSurface.style.touchAction = "none";
+inputSurface.style.cursor = "grab";
 
-window.addEventListener("pointerdown", (event) => {
+inputSurface.addEventListener("pointerdown", (event) => {
   if (event.pointerType === "mouse" && event.button !== 0) return;
-  if (isInteractiveUiTarget(event.target)) return;
-
   cameraDragging = true;
   cameraPointerId = event.pointerId;
   cameraLastX = event.clientX;
   cameraLastY = event.clientY;
-  canvas.style.cursor = "grabbing";
-
-  // Pointer capture keeps drag movement continuous when the pointer leaves
-  // the canvas. Window listeners remain as a fallback for unusual targets.
+  inputSurface.style.cursor = "grabbing";
+  if (joined) inputSurface.focus({ preventScroll: true });
   try {
-    if (event.target && typeof event.target.setPointerCapture === "function") {
-      event.target.setPointerCapture(event.pointerId);
-    }
+    inputSurface.setPointerCapture(event.pointerId);
   } catch (error) {
-    // The window-level handlers still receive normal pointer movement.
+    // The surface still receives pointer events while the pointer stays over it.
   }
-}, true);
+});
 
-window.addEventListener("pointermove", (event) => {
+inputSurface.addEventListener("pointermove", (event) => {
   if (!cameraDragging || event.pointerId !== cameraPointerId) return;
-  const deltaX = event.clientX - cameraLastX;
-  const deltaY = event.clientY - cameraLastY;
+  const dx = event.clientX - cameraLastX;
+  const dy = event.clientY - cameraLastY;
   cameraLastX = event.clientX;
   cameraLastY = event.clientY;
-  cameraOrbitYaw += deltaX * 0.006;
+  cameraOrbitYaw += dx * 0.006;
   cameraOrbitPitch = THREE.MathUtils.clamp(
-    cameraOrbitPitch - deltaY * 0.0045,
+    cameraOrbitPitch - dy * 0.0045,
     -0.28,
     0.82
   );
-}, true);
+});
 
 function stopCameraDrag(event) {
   if (!cameraDragging || (event && event.pointerId !== cameraPointerId)) return;
   cameraDragging = false;
   cameraPointerId = null;
-  canvas.style.cursor = "grab";
+  inputSurface.style.cursor = "grab";
 }
-window.addEventListener("pointerup", stopCameraDrag, true);
-window.addEventListener("pointercancel", stopCameraDrag, true);
-window.addEventListener("blur", () => stopCameraDrag(), true);
+inputSurface.addEventListener("pointerup", stopCameraDrag);
+inputSurface.addEventListener("pointercancel", stopCameraDrag);
+inputSurface.addEventListener("lostpointercapture", stopCameraDrag);
+window.addEventListener("blur", () => stopCameraDrag());
 
-// Keyboard controls
+// Keyboard controls use physical key codes so WASD and arrows work
+// consistently regardless of keyboard layout or page focus.
 const keys = Object.create(null);
-const controlKeys = new Set(["w", "a", "s", "d", " ", "r", "arrowup", "arrowdown", "arrowleft", "arrowright"]);
+const codeToControl = {
+  KeyW: "w",
+  KeyA: "a",
+  KeyS: "s",
+  KeyD: "d",
+  Space: " ",
+  KeyR: "r",
+  ArrowUp: "arrowup",
+  ArrowDown: "arrowdown",
+  ArrowLeft: "arrowleft",
+  ArrowRight: "arrowright"
+};
+const controlKeys = new Set(Object.values(codeToControl));
 
-window.addEventListener("keydown", (event) => {
-  const key = event.key.toLowerCase();
-  const typingInForm = ["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName);
-  if (controlKeys.has(key) && (joined || !typingInForm)) {
-    event.preventDefault();
-    keys[key] = true;
-  }
-  if (key === "r" && !event.repeat && joined) resetCar();
-});
-
-window.addEventListener("keyup", (event) => {
-  keys[event.key.toLowerCase()] = false;
-});
-window.addEventListener("blur", () => {
+function clearDrivingKeys() {
   for (const key of Object.keys(keys)) keys[key] = false;
+}
+document.addEventListener("keydown", (event) => {
+  const key = codeToControl[event.code] || event.key.toLowerCase();
+  const typingInForm = ["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName);
+  if (!controlKeys.has(key)) return;
+  if (!joined && typingInForm) return;
+
+  event.preventDefault();
+  keys[key] = true;
+  if (key === "r" && !event.repeat && joined) resetCar();
+}, true);
+
+document.addEventListener("keyup", (event) => {
+  const key = codeToControl[event.code] || event.key.toLowerCase();
+  if (controlKeys.has(key)) keys[key] = false;
+}, true);
+
+window.addEventListener("blur", clearDrivingKeys);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) clearDrivingKeys();
 });
 
 function resetCar() {
@@ -1207,8 +1219,8 @@ async function joinArena() {
     if (document.activeElement && typeof document.activeElement.blur === "function") {
       document.activeElement.blur();
     }
-    canvas.focus({ preventScroll: true });
-    for (const key of Object.keys(keys)) keys[key] = false;
+    inputSurface.focus({ preventScroll: true });
+    clearDrivingKeys();
     $("roomValue").textContent = joinedRoomCode.toUpperCase();
     joinPanel.style.display = "none";
     hud.style.display = "block";
@@ -1243,7 +1255,7 @@ async function leaveArena() {
   peersConnected = false;
   for (const remote of remotePlayers.values()) scene.remove(remote.visual.root);
   remotePlayers.clear();
-  for (const key of Object.keys(keys)) keys[key] = false;
+  clearDrivingKeys();
   stopCameraDrag();
   updatePlayerCount();
   hud.style.display = "none";
