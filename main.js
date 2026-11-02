@@ -1007,7 +1007,7 @@ inputSurface.addEventListener("pointerdown", (event) => {
   }
 });
 
-inputSurface.addEventListener("pointermove", (event) => {
+function handleCameraPointerMove(event) {
   if (!cameraDragging || event.pointerId !== cameraPointerId) return;
   const dx = event.clientX - cameraLastX;
   const dy = event.clientY - cameraLastY;
@@ -1019,7 +1019,7 @@ inputSurface.addEventListener("pointermove", (event) => {
     -0.28,
     0.82
   );
-});
+}
 
 function stopCameraDrag(event) {
   if (!cameraDragging || (event && event.pointerId !== cameraPointerId)) return;
@@ -1027,9 +1027,11 @@ function stopCameraDrag(event) {
   cameraPointerId = null;
   inputSurface.style.cursor = "grab";
 }
-inputSurface.addEventListener("pointerup", stopCameraDrag);
-inputSurface.addEventListener("pointercancel", stopCameraDrag);
-inputSurface.addEventListener("lostpointercapture", stopCameraDrag);
+// Capture on window so movement/release remains reliable even if the browser
+// retargets a captured pointer or the pointer leaves the input surface.
+window.addEventListener("pointermove", handleCameraPointerMove, true);
+window.addEventListener("pointerup", stopCameraDrag, true);
+window.addEventListener("pointercancel", stopCameraDrag, true);
 window.addEventListener("blur", () => stopCameraDrag());
 
 // Keyboard controls use physical key codes so WASD and arrows work
@@ -1052,7 +1054,7 @@ const controlKeys = new Set(Object.values(codeToControl));
 function clearDrivingKeys() {
   for (const key of Object.keys(keys)) keys[key] = false;
 }
-document.addEventListener("keydown", (event) => {
+window.addEventListener("keydown", (event) => {
   const key = codeToControl[event.code] || event.key.toLowerCase();
   const typingInForm = ["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName);
   if (!controlKeys.has(key)) return;
@@ -1063,7 +1065,7 @@ document.addEventListener("keydown", (event) => {
   if (key === "r" && !event.repeat && joined) resetCar();
 }, true);
 
-document.addEventListener("keyup", (event) => {
+window.addEventListener("keyup", (event) => {
   const key = codeToControl[event.code] || event.key.toLowerCase();
   if (controlKeys.has(key)) keys[key] = false;
 }, true);
