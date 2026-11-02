@@ -304,13 +304,13 @@
         (document.body || document.documentElement).appendChild(panel);
       }
       panel.textContent =
-        "RC CAR SIMULATOR — STARTUP DIAGNOSTIC\\n" +
-        "Type: " + kind + "\\n" +
-        "Message: " + String(message || "The browser did not provide an error message") + "\\n" +
-        (source ? "File: " + source + "\\n" : "") +
-        (line ? "Line: " + line + (column ? ", column: " + column : "") + "\\n" : "") +
-        (stack ? "\\n" + String(stack).slice(0, 2600) : "") +
-        "\\n\\nPlease send a screenshot of this message.";
+        "RC CAR SIMULATOR — STARTUP DIAGNOSTIC\n" +
+        "Type: " + kind + "\n" +
+        "Message: " + String(message || "The browser did not provide an error message") + "\n" +
+        (source ? "File: " + source + "\n" : "") +
+        (line ? "Line: " + line + (column ? ", column: " + column : "") + "\n" : "") +
+        (stack ? "\n" + String(stack).slice(0, 2600) : "") +
+        "\n\nPlease send a screenshot of this message.";
     }
     window.addEventListener("error", (event) => {
       const resource = event.target && (event.target.src || event.target.href);
