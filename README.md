@@ -7,7 +7,8 @@ A browser-based 3D RC car driving game with peer-to-peer multiplayer.
 ```text
 RC-Car/
 ├── index.html      # Menus, HUD, page structure, and CSS
-├── main.js         # App startup, track visuals, renderer, and animation loop
+├── main.js         # App startup, renderer, and animation loop
+├── track.js        # Closed dirt course, scenery, curbs, jumps, and start/finish
 ├── car.js          # Detailed RC truck, chassis, wheels, and removable body shell
 ├── physics.js      # Cannon-es world, ramp colliders, suspension, and vehicle physics
 ├── garage.js       # Showroom, component hover inspection, and shell animation
@@ -41,11 +42,12 @@ The project imports Three.js, Cannon-es, and Trystero from CDNs, so an internet 
 ## Code map
 
 1. **main.js** — creates the renderer and arena, connects the systems, and runs the frame loop.
-2. **car.js** — builds the detailed short-course truck, chassis components, wheels, body shell, and player name tags.
-3. **physics.js** — creates the Cannon-es world, ramp colliders, chassis body, raycast vehicle, and suspension.
-4. **garage.js** — creates the showroom, handles menu/garage transitions, component hover labels, and shell removal animation.
-5. **controls.js** — handles keyboard input, camera dragging, vehicle reset, steering, throttle, braking, and airborne control.
-6. **multiplayer.js** — joins/leaves rooms, sends snapshots, receives player state, and updates remote vehicle visuals.
+2. **track.js** — builds the closed dirt circuit, textured surfaces, red/white curbs, jumps, scenery, and start/finish gantry.
+3. **car.js** — builds the detailed short-course truck, chassis components, wheels, body shell, and player name tags.
+4. **physics.js** — creates the Cannon-es world, ramp colliders, chassis body, raycast vehicle, and suspension.
+5. **garage.js** — creates the showroom, handles menu/garage transitions, component hover labels, and shell removal animation.
+6. **controls.js** — handles keyboard input, camera dragging, vehicle reset, steering, throttle, braking, and airborne control.
+7. **multiplayer.js** — joins/leaves rooms, sends snapshots, receives player state, and updates remote vehicle visuals.
 
 ## Multiplayer notes
 
