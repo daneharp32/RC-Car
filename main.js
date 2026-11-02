@@ -220,47 +220,53 @@ function makeCarVisual(color, playerName = "") {
   const shellGroup = new THREE.Group();
   root.add(chassisGroup, shellGroup);
 
-  // The visual body is deliberately fuller and longer, while the physics
-  // chassis and wheel connection points remain unchanged.
-  chassisGroup.scale.set(1.14, 1.13, 1.16);
-  shellGroup.scale.set(1.14, 1.13, 1.16);
+  // Chassis-only pass: the shell group remains empty and hidden until a later
+  // body-shell pass. The physics wheel locations are deliberately unchanged.
+  shellGroup.visible = false;
 
-  const paint = new THREE.MeshStandardMaterial({
-    color, roughness: 0.29, metalness: 0.08
-  });
-  const paintDark = new THREE.MeshStandardMaterial({ color: 0x18232d, roughness: 0.42 });
-  const glass = new THREE.MeshPhysicalMaterial({
-    color: 0x102b3d, roughness: 0.13, metalness: 0.12,
-    clearcoat: 0.75, clearcoatRoughness: 0.12
-  });
-  const carbon = new THREE.MeshStandardMaterial({ color: 0x11171c, roughness: 0.84 });
-  const graphite = new THREE.MeshStandardMaterial({ color: 0x303b43, metalness: 0.56, roughness: 0.38 });
-  const alloy = new THREE.MeshStandardMaterial({ color: 0xa8b4ba, metalness: 0.78, roughness: 0.27 });
-  const springMetal = new THREE.MeshStandardMaterial({ color: 0xe1e7e9, metalness: 0.72, roughness: 0.24 });
-  const red = new THREE.MeshStandardMaterial({ color: 0xd94b37, roughness: 0.38 });
-  const amber = new THREE.MeshStandardMaterial({
-    color: 0xffe5ad, emissive: 0xffa83d, emissiveIntensity: 0.75
-  });
-  const tireMaterial = new THREE.MeshStandardMaterial({ color: 0x141719, roughness: 0.98 });
-  const rimMaterial = new THREE.MeshStandardMaterial({ color: 0xc0c9cd, metalness: 0.78, roughness: 0.26 });
-  const hubMaterial = new THREE.MeshStandardMaterial({ color: 0x313b42, metalness: 0.48, roughness: 0.42 });
+  const carbon = new THREE.MeshStandardMaterial({ color: 0x171e24, roughness: 0.78, metalness: 0.18 });
+  const carbonEdge = new THREE.MeshStandardMaterial({ color: 0x303b43, roughness: 0.62, metalness: 0.24 });
+  const alloy = new THREE.MeshStandardMaterial({ color: 0xaab5bb, roughness: 0.28, metalness: 0.82 });
+  const darkMetal = new THREE.MeshStandardMaterial({ color: 0x39454d, roughness: 0.38, metalness: 0.72 });
+  const blackPlastic = new THREE.MeshStandardMaterial({ color: 0x101519, roughness: 0.7 });
+  const blue = new THREE.MeshStandardMaterial({ color: 0x1766b6, roughness: 0.28, metalness: 0.52 });
+  const blueDark = new THREE.MeshStandardMaterial({ color: 0x12395e, roughness: 0.42, metalness: 0.32 });
+  const red = new THREE.MeshStandardMaterial({ color: 0xb93332, roughness: 0.35, metalness: 0.52 });
+  const redBright = new THREE.MeshStandardMaterial({ color: 0xe04438, roughness: 0.34, metalness: 0.36 });
+  const springSilver = new THREE.MeshStandardMaterial({ color: 0xe0e5e6, roughness: 0.24, metalness: 0.78 });
+  const rubber = new THREE.MeshStandardMaterial({ color: 0x151719, roughness: 0.98 });
+  const rubberSide = new THREE.MeshStandardMaterial({ color: 0x202528, roughness: 0.94 });
+  const rimRed = new THREE.MeshStandardMaterial({ color: 0xb83236, roughness: 0.31, metalness: 0.67 });
+  const rimSilver = new THREE.MeshStandardMaterial({ color: 0xd0d7da, roughness: 0.25, metalness: 0.8 });
+  const wireRed = new THREE.MeshStandardMaterial({ color: 0xd9342c, roughness: 0.38, metalness: 0.16 });
+  const wireBlack = new THREE.MeshStandardMaterial({ color: 0x171b20, roughness: 0.48, metalness: 0.12 });
+  const wireBlue = new THREE.MeshStandardMaterial({ color: 0x168ad2, roughness: 0.42, metalness: 0.16 });
+  const amber = new THREE.MeshStandardMaterial({ color: 0xffbd58, emissive: 0x7d3100, emissiveIntensity: 0.18 });
 
-  function addMesh(parent, geometry, material, position = [0, 0, 0], rotation = null) {
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.set(...position);
-    if (rotation) mesh.rotation.set(...rotation);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    parent.add(mesh);
-    return mesh;
+  function makePart(parent, id, label, description) {
+    const group = new THREE.Group();
+    group.name = id;
+    group.userData.partInfo = { id, label, description };
+    parent.add(group);
+    return group;
   }
 
-  function roundedBox(parent, size, material, position, rotation = null, radius = null) {
+  function addMesh(parent, geometry, material, position = [0, 0, 0], rotation = null) {
+    const object = new THREE.Mesh(geometry, material);
+    object.position.set(...position);
+    if (rotation) object.rotation.set(...rotation);
+    object.castShadow = true;
+    object.receiveShadow = true;
+    parent.add(object);
+    return object;
+  }
+
+  function roundedBox(parent, size, material, position, rotation = null, requestedBevel = null) {
     const smallest = Math.min(...size);
-    const bevel = radius ?? Math.min(0.035, smallest * 0.22);
+    const bevel = Math.min(requestedBevel ?? 0.025, smallest * 0.22);
     return addMesh(
       parent,
-      new RoundedBoxGeometry(size[0], size[1], size[2], 4, bevel),
+      new RoundedBoxGeometry(size[0], size[1], size[2], 4, Math.max(0.001, bevel)),
       material,
       position,
       rotation
@@ -271,438 +277,560 @@ function makeCarVisual(color, playerName = "") {
     const a = new THREE.Vector3(...start);
     const b = new THREE.Vector3(...end);
     const direction = b.clone().sub(a);
-    const length = direction.length();
-    const mesh = addMesh(
+    const length = Math.max(0.001, direction.length());
+    const object = addMesh(
       parent,
       new THREE.CylinderGeometry(endRadius, radius, length, radialSegments, 1, false),
       material,
       a.clone().add(b).multiplyScalar(0.5).toArray()
     );
-    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
-    return mesh;
+    object.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+    return object;
   }
 
-  function tubeBetween(parent, start, end, radius, material) {
+  function addBolt(parent, x, y, z, radius = 0.008, material = alloy) {
+    const washer = addMesh(
+      parent,
+      new THREE.CylinderGeometry(radius * 1.55, radius * 1.55, 0.004, 12),
+      darkMetal,
+      [x, y - 0.002, z]
+    );
+    const head = addMesh(
+      parent,
+      new THREE.CylinderGeometry(radius, radius, 0.009, 6),
+      material,
+      [x, y + 0.004, z]
+    );
+    return [washer, head];
+  }
+
+  function addWire(parent, points, radius, material) {
+    const curve = new THREE.CatmullRomCurve3(
+      points.map((point) => new THREE.Vector3(point[0], point[1], point[2]))
+    );
+    return addMesh(parent, new THREE.TubeGeometry(curve, 28, radius, 7, false), material);
+  }
+
+  function addCoil(parent, start, end, coilRadius, turns, material) {
     const a = new THREE.Vector3(...start);
     const b = new THREE.Vector3(...end);
-    const curve = new THREE.LineCurve3(a, b);
-    return addMesh(parent, new THREE.TubeGeometry(curve, 1, radius, 8, false), material);
-  }
-
-  function panel(parent, points, material) {
-    const geometry = new THREE.BufferGeometry();
-    const positions = points.flat();
-    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setIndex([0, 1, 2, 0, 2, 3]);
-    geometry.computeVertexNormals();
-    return addMesh(parent, geometry, material);
-  }
-
-  function makeBodyShell() {
-    // A continuous lofted shell replaces the old stack of rectangular body
-    // pieces. Superellipse sections give the pickup body rounded shoulders.
-    const profiles = [
-      [-0.535, 0.245, 0.175],
-      [-0.455, 0.315, 0.215],
-      [-0.315, 0.337, 0.245],
-      [-0.205, 0.323, 0.275],
-      [-0.125, 0.286, 0.385],
-      [-0.045, 0.278, 0.425],
-      [ 0.105, 0.278, 0.435],
-      [ 0.185, 0.300, 0.390],
-      [ 0.285, 0.332, 0.292],
-      [ 0.425, 0.322, 0.258],
-      [ 0.525, 0.250, 0.175]
-    ];
-    const profileCurve = new THREE.CatmullRomCurve3(
-      profiles.map(([z, width, top]) => new THREE.Vector3(z, width, top)),
-      false,
-      "centripetal"
-    );
-    const sections = profileCurve.getPoints(72);
-    const ringSegments = 32;
-    const vertices = [];
-    const indices = [];
-    for (const section of sections) {
-      for (let j = 0; j < ringSegments; j++) {
-        const angle = (j / ringSegments) * Math.PI * 2;
-        const c = Math.cos(angle);
-        const s = Math.sin(angle);
-        const superX = Math.sign(c) * Math.pow(Math.abs(c), 0.68);
-        const superY = Math.sign(s) * Math.pow(Math.abs(s), 0.68);
-        const x = section.y * superX;
-        const y = 0.055 + (section.z - 0.055) * (0.5 + 0.5 * superY);
-        vertices.push(x, y, section.x);
-      }
-    }
-    for (let i = 0; i < sections.length - 1; i++) {
-      for (let j = 0; j < ringSegments; j++) {
-        const a = i * ringSegments + j;
-        const b = i * ringSegments + (j + 1) % ringSegments;
-        const c = (i + 1) * ringSegments + (j + 1) % ringSegments;
-        const d = (i + 1) * ringSegments + j;
-        indices.push(a, b, d, b, c, d);
-      }
-    }
-    const frontCap = vertices.length / 3;
-    vertices.push(0, (0.055 + sections[0].z) * 0.5, sections[0].x);
-    const rearCap = vertices.length / 3;
-    const lastSection = sections[sections.length - 1];
-    vertices.push(0, (0.055 + lastSection.z) * 0.5, lastSection.x);
-    for (let j = 0; j < ringSegments; j++) {
-      const next = (j + 1) % ringSegments;
-      indices.push(frontCap, next, j);
-      const last = (sections.length - 1) * ringSegments;
-      indices.push(rearCap, last + j, last + next);
-    }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
-    geometry.setIndex(indices);
-    geometry.computeVertexNormals();
-    const body = addMesh(shellGroup, geometry, paint);
-    body.material.side = THREE.DoubleSide;
-
-    // Deep glazing follows the sloped cab instead of looking like flat blocks.
-    const glassDark = new THREE.MeshStandardMaterial({
-      color: 0x0b1d2a, roughness: 0.19, metalness: 0.16
-    });
-    panel(shellGroup, [
-      [-0.226, 0.278, -0.185], [0.226, 0.278, -0.185],
-      [0.232, 0.388, -0.105], [-0.232, 0.388, -0.105]
-    ], glass);
-    panel(shellGroup, [
-      [-0.225, 0.282, 0.221], [0.225, 0.282, 0.221],
-      [0.224, 0.382, 0.142], [-0.224, 0.382, 0.142]
-    ], glass);
-
-    for (const side of [-1, 1]) {
-      const x = side * 0.278;
-      panel(shellGroup, [
-        [x, 0.286, -0.092], [x, 0.286, 0.015],
-        [side * 0.272, 0.385, 0.015], [side * 0.272, 0.389, -0.070]
-      ], glassDark);
-      panel(shellGroup, [
-        [side * 0.278, 0.286, 0.035], [side * 0.292, 0.279, 0.190],
-        [side * 0.268, 0.375, 0.132], [side * 0.272, 0.385, 0.035]
-      ], glass);
-      // Window pillars, door crease and lower side sill.
-      cylinderBetween(shellGroup, [side * 0.274, 0.275, -0.105], [side * 0.272, 0.397, -0.072], 0.009, carbon, 8);
-      cylinderBetween(shellGroup, [side * 0.274, 0.278, 0.020], [side * 0.270, 0.397, 0.020], 0.009, carbon, 8);
-      cylinderBetween(shellGroup, [side * 0.285, 0.278, 0.155], [side * 0.268, 0.385, 0.142], 0.009, carbon, 8);
-      roundedBox(shellGroup, [0.025, 0.012, 0.46], carbon, [side * 0.319, 0.080, 0.005], null, 0.005);
-      roundedBox(shellGroup, [0.012, 0.018, 0.075], graphite, [side * 0.326, 0.225, 0.055], null, 0.005);
-      roundedBox(shellGroup, [0.018, 0.035, 0.055], paintDark, [side * 0.326, 0.205, 0.055], null, 0.006);
-    }
-
-    // Raised cab roof, hood crown, rear bed rails and aerodynamic tail wing.
-    roundedBox(shellGroup, [0.43, 0.025, 0.225], paint, [0, 0.417, 0.025], null, 0.025);
-    roundedBox(shellGroup, [0.54, 0.025, 0.12], paint, [0, 0.247, -0.365], [-0.04, 0, 0], 0.018);
-    roundedBox(shellGroup, [0.48, 0.022, 0.025], carbon, [0, 0.283, -0.405], null, 0.008);
-    roundedBox(shellGroup, [0.025, 0.012, 0.24], carbon, [-0.115, 0.271, -0.325], null, 0.005);
-    roundedBox(shellGroup, [0.025, 0.012, 0.24], carbon, [0.115, 0.271, -0.325], null, 0.005);
-
-    for (const side of [-1, 1]) {
-      // Wheel-arch flares: upper semicircles sit just outside the body skin.
-      for (const z of [-0.29 / 1.16, 0.29 / 1.16]) {
-        const flare = new THREE.Mesh(
-          new THREE.TorusGeometry(0.178, 0.021, 9, 40, Math.PI),
-          carbon
-        );
-        flare.rotation.y = Math.PI / 2;
-        flare.position.set(side * 0.324, 0.105, z);
-        flare.castShadow = true;
-        flare.receiveShadow = true;
-        shellGroup.add(flare);
-      }
-      roundedBox(shellGroup, [0.038, 0.035, 0.48], paintDark, [side * 0.322, 0.075, 0.005], null, 0.012);
-      roundedBox(shellGroup, [0.024, 0.018, 0.30], paintDark, [side * 0.329, 0.145, 0.015], null, 0.008);
-    }
-
-    // Front bumper, grille, lights and rear bumper/tail lamps.
-    roundedBox(shellGroup, [0.68, 0.085, 0.105], carbon, [0, 0.075, -0.535], null, 0.025);
-    roundedBox(shellGroup, [0.36, 0.066, 0.022], paintDark, [0, 0.157, -0.503], null, 0.012);
-    for (let i = 0; i < 5; i++) {
-      roundedBox(shellGroup, [0.012, 0.045, 0.008], graphite, [-0.14 + i * 0.07, 0.157, -0.517], null, 0.003);
-    }
-    for (const side of [-1, 1]) {
-      roundedBox(shellGroup, [0.115, 0.042, 0.026], amber, [side * 0.225, 0.182, -0.484], null, 0.009);
-      roundedBox(shellGroup, [0.112, 0.038, 0.025], red, [side * 0.225, 0.145, 0.508], null, 0.008);
-      roundedBox(shellGroup, [0.045, 0.045, 0.08], carbon, [side * 0.235, 0.335, 0.388], [0.08, 0, side * 0.04], 0.012);
-    }
-    roundedBox(shellGroup, [0.66, 0.08, 0.10], carbon, [0, 0.075, 0.535], null, 0.022);
-    roundedBox(shellGroup, [0.57, 0.028, 0.13], carbon, [0, 0.335, 0.475], [-0.08, 0, 0], 0.012);
-    for (const side of [-1, 1]) {
-      cylinderBetween(shellGroup, [side * 0.205, 0.18, 0.405], [side * 0.205, 0.325, 0.485], 0.012, graphite, 10);
-    }
-  }
-
-  function makeShock(top, bottom, accentMaterial) {
-    const a = new THREE.Vector3(...top);
-    const b = new THREE.Vector3(...bottom);
     const axis = b.clone().sub(a).normalize();
-    const mid = a.clone().lerp(b, 0.53);
-    const bodyStart = a.clone().lerp(b, 0.24);
-    const bodyEnd = a.clone().lerp(b, 0.77);
-
-    cylinderBetween(chassisGroup, bodyStart.toArray(), bodyEnd.toArray(), 0.022, graphite, 14, 0.018);
-    cylinderBetween(chassisGroup, mid.clone().lerp(b, 0.18).toArray(), b.toArray(), 0.009, alloy, 10, 0.007);
-    cylinderBetween(chassisGroup, a.toArray(), a.clone().add(axis.clone().multiplyScalar(0.035)).toArray(), 0.018, carbon, 12);
-    cylinderBetween(chassisGroup, b.clone().add(axis.clone().multiplyScalar(-0.035)).toArray(), b.toArray(), 0.017, red, 12);
-
-    // A true helical spring around the damper body.
     const reference = Math.abs(axis.y) < 0.9
       ? new THREE.Vector3(0, 1, 0)
       : new THREE.Vector3(1, 0, 0);
     const u = axis.clone().cross(reference).normalize();
     const v = axis.clone().cross(u).normalize();
-    const coilStart = a.clone().lerp(b, 0.23);
-    const coilEnd = a.clone().lerp(b, 0.76);
-    const turns = 6.5;
-    const coilPoints = [];
-    const steps = 104;
+    const points = [];
+    const steps = Math.max(72, Math.ceil(turns * 18));
     for (let i = 0; i <= steps; i++) {
       const t = i / steps;
       const angle = t * turns * Math.PI * 2;
-      const center = coilStart.clone().lerp(coilEnd, t);
-      center.addScaledVector(u, Math.cos(angle) * 0.029);
-      center.addScaledVector(v, Math.sin(angle) * 0.029);
-      coilPoints.push(center);
+      const point = a.clone().lerp(b, t);
+      point.addScaledVector(u, Math.cos(angle) * coilRadius);
+      point.addScaledVector(v, Math.sin(angle) * coilRadius);
+      points.push(point);
     }
-    const coilCurve = new THREE.CatmullRomCurve3(coilPoints);
-    addMesh(chassisGroup, new THREE.TubeGeometry(coilCurve, 128, 0.0055, 7, false), accentMaterial);
-
-    cylinderBetween(chassisGroup, a.clone().add(axis.clone().multiplyScalar(0.012)).toArray(),
-      a.clone().add(axis.clone().multiplyScalar(0.052)).toArray(), 0.027, alloy, 12);
-    cylinderBetween(chassisGroup, b.clone().add(axis.clone().multiplyScalar(-0.052)).toArray(),
-      b.clone().add(axis.clone().multiplyScalar(-0.012)).toArray(), 0.026, alloy, 12);
+    const curve = new THREE.CatmullRomCurve3(points);
+    return addMesh(parent, new THREE.TubeGeometry(curve, steps, 0.0055, 7, false), material);
   }
 
-  function makeChassisDetails() {
-    // Molded chassis tub, side braces, bumpers and front/rear gearboxes.
-    roundedBox(chassisGroup, [0.49, 0.075, 0.86], carbon, [0, -0.035, 0], null, 0.035);
-    roundedBox(chassisGroup, [0.37, 0.045, 0.55], graphite, [0, 0.012, 0.015], null, 0.018);
-    roundedBox(chassisGroup, [0.57, 0.075, 0.105], carbon, [0, -0.002, -0.485], null, 0.022);
-    roundedBox(chassisGroup, [0.57, 0.075, 0.105], carbon, [0, -0.002, 0.485], null, 0.022);
+  function addShock(parent, id, label, description, top, bottom, springMaterial) {
+    const group = makePart(parent, id, label, description);
+    const a = new THREE.Vector3(...top);
+    const b = new THREE.Vector3(...bottom);
+    const axis = b.clone().sub(a).normalize();
+    const housingStart = a.clone().lerp(b, 0.20);
+    const housingEnd = a.clone().lerp(b, 0.76);
+    const shaftStart = a.clone().lerp(b, 0.58);
+    const shaftEnd = b.clone().lerp(a, 0.06);
 
-    for (const z of [-0.292, 0.292]) {
-      const gearbox = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), graphite);
-      gearbox.scale.set(0.13, 0.095, 0.105);
-      gearbox.position.set(0, 0.03, z);
-      gearbox.castShadow = true;
-      gearbox.receiveShadow = true;
-      chassisGroup.add(gearbox);
-      roundedBox(chassisGroup, [0.34, 0.025, 0.075], carbon, [0, -0.012, z], null, 0.01);
-      for (const side of [-1, 1]) {
-        cylinderBetween(chassisGroup, [side * 0.08, 0.025, z], [side * 0.30, 0.025, z], 0.013, alloy, 10);
-      }
-    }
+    cylinderBetween(group, housingStart.toArray(), housingEnd.toArray(), 0.022, blueDark, 16, 0.020);
+    cylinderBetween(group, housingStart.clone().addScaledVector(axis, 0.02).toArray(),
+      housingStart.clone().addScaledVector(axis, 0.055).toArray(), 0.029, red, 14);
+    cylinderBetween(group, housingEnd.clone().addScaledVector(axis, -0.018).toArray(),
+      housingEnd.clone().addScaledVector(axis, -0.052).toArray(), 0.025, darkMetal, 14);
+    cylinderBetween(group, shaftStart.toArray(), shaftEnd.toArray(), 0.008, alloy, 12, 0.007);
+    cylinderBetween(group, a.clone().addScaledVector(axis, 0.015).toArray(),
+      a.clone().addScaledVector(axis, 0.055).toArray(), 0.025, blackPlastic, 12);
+    cylinderBetween(group, b.clone().addScaledVector(axis, -0.045).toArray(),
+      b.clone().addScaledVector(axis, -0.008).toArray(), 0.024, redBright, 12);
+    addCoil(
+      group,
+      a.clone().lerp(b, 0.27).toArray(),
+      a.clone().lerp(b, 0.72).toArray(),
+      0.031,
+      6.2,
+      springMaterial
+    );
+    const eyeTop = addMesh(group, new THREE.SphereGeometry(0.028, 12, 10), carbonEdge, a.toArray());
+    const eyeBottom = addMesh(group, new THREE.SphereGeometry(0.027, 12, 10), carbonEdge, b.toArray());
+    eyeTop.scale.set(1.0, 1.0, 0.72);
+    eyeBottom.scale.set(1.0, 1.0, 0.72);
+    return group;
+  }
 
-    // Center driveshaft and realistic brushless motor can, end cap and fins.
-    cylinderBetween(chassisGroup, [0, 0.065, -0.205], [0, 0.065, 0.205], 0.018, alloy, 12);
-    const motorCenter = [0.105, 0.145, 0.175];
-    cylinderBetween(chassisGroup, [motorCenter[0] - 0.105, motorCenter[1], motorCenter[2]],
-      [motorCenter[0] + 0.105, motorCenter[1], motorCenter[2]], 0.055, graphite, 24);
-    for (let i = -3; i <= 3; i++) {
-      const x = motorCenter[0] + i * 0.024;
-      const fin = new THREE.Mesh(new THREE.TorusGeometry(0.051, 0.0045, 6, 24), alloy);
-      fin.rotation.y = Math.PI / 2;
-      fin.position.set(x, motorCenter[1], motorCenter[2]);
-      fin.castShadow = true;
-      chassisGroup.add(fin);
-    }
-    cylinderBetween(chassisGroup, [motorCenter[0] - 0.119, motorCenter[1], motorCenter[2]],
-      [motorCenter[0] - 0.108, motorCenter[1], motorCenter[2]], 0.048, carbon, 20);
-    cylinderBetween(chassisGroup, [motorCenter[0] + 0.108, motorCenter[1], motorCenter[2]],
-      [motorCenter[0] + 0.122, motorCenter[1], motorCenter[2]], 0.043, alloy, 20);
-    roundedBox(chassisGroup, [0.018, 0.08, 0.045], red, [motorCenter[0] + 0.124, motorCenter[1], motorCenter[2]], null, 0.006);
+  // Main molded tub / aluminum lower chassis plate. All other components are
+  // mounted as individual named groups on top of this part.
+  const chassis = makePart(
+    chassisGroup,
+    "main-chassis",
+    "Main chassis plate",
+    "The long structural tub that holds the drivetrain, battery, steering gear and electronics. The dark composite finish and raised side rails protect the components."
+  );
+  roundedBox(chassis, [0.49, 0.068, 0.94], carbon, [0, -0.045, 0], null, 0.035);
+  roundedBox(chassis, [0.405, 0.015, 0.77], carbonEdge, [0, -0.005, 0.015], null, 0.014);
+  roundedBox(chassis, [0.026, 0.035, 0.88], blackPlastic, [-0.218, 0.012, 0], null, 0.009);
+  roundedBox(chassis, [0.026, 0.035, 0.88], blackPlastic, [0.218, 0.012, 0], null, 0.009);
+  for (const x of [-0.16, 0.16]) {
+    roundedBox(chassis, [0.018, 0.013, 0.76], alloy, [x, 0.008, 0.005], null, 0.005);
+  }
+  for (const z of [-0.39, -0.29, -0.19, 0.19, 0.29, 0.39]) {
+    for (const x of [-0.17, 0.17]) addBolt(chassis, x, 0.026, z, 0.0065);
+  }
+  for (let i = 0; i < 7; i++) {
+    roundedBox(chassis, [0.018, 0.012, 0.085], blackPlastic, [-0.105 + i * 0.035, 0.012, -0.32], null, 0.004);
+    roundedBox(chassis, [0.018, 0.012, 0.085], blackPlastic, [-0.105 + i * 0.035, 0.012, 0.32], null, 0.004);
+  }
 
-    // ESC with cooling ribs, battery pack and retaining straps.
-    roundedBox(chassisGroup, [0.145, 0.065, 0.135], carbon, [-0.105, 0.115, 0.17], null, 0.016);
-    roundedBox(chassisGroup, [0.12, 0.012, 0.105], graphite, [-0.105, 0.153, 0.17], null, 0.006);
-    for (let i = 0; i < 5; i++) {
-      roundedBox(chassisGroup, [0.012, 0.012, 0.085], alloy, [-0.145 + i * 0.02, 0.166, 0.17], null, 0.004);
-    }
-    roundedBox(chassisGroup, [0.15, 0.075, 0.25], paintDark, [-0.125, 0.085, -0.08], null, 0.018);
-    for (const z of [-0.16, -0.005]) {
-      roundedBox(chassisGroup, [0.165, 0.012, 0.025], red, [-0.125, 0.126, z], null, 0.005);
-    }
-
-    // Four independently detailed coil-over shocks and suspension arms.
-    for (const z of [-0.292 / 1.16, 0.292 / 1.16]) {
-      for (const side of [-1, 1]) {
-        const top = [side * 0.195, 0.275, z + (z < 0 ? 0.075 : -0.075)];
-        const bottom = [side * 0.275, 0.025, z];
-        makeShock(top, bottom, z < 0 ? springMetal : red);
-        cylinderBetween(chassisGroup, [side * 0.10, -0.035, z], [side * 0.305, -0.045, z], 0.021, carbon, 10);
-        cylinderBetween(chassisGroup, [side * 0.155, -0.012, z], [side * 0.282, 0.015, z], 0.013, alloy, 10);
-        cylinderBetween(chassisGroup, [side * 0.18, 0.015, z], [side * 0.285, 0.025, z], 0.011, red, 10);
-      }
-    }
-
-    // Rear wing hardware, antenna and visible receiver detail.
+  // Front and rear bulkheads / differential cases.
+  for (const end of [
+    { z: -0.355, id: "front-differential", label: "Front differential housing", desc: "Sealed front gearcase transfers drive to the left and right front half-shafts." },
+    { z: 0.355, id: "rear-differential", label: "Rear differential housing", desc: "Rear gearcase distributes motor power to the rear half-shafts." }
+  ]) {
+    const diff = makePart(chassisGroup, end.id, end.label, end.desc);
+    roundedBox(diff, [0.31, 0.115, 0.16], darkMetal, [0, 0.018, end.z], null, 0.035);
+    roundedBox(diff, [0.19, 0.035, 0.17], carbonEdge, [0, 0.079, end.z], null, 0.018);
+    addMesh(diff, new THREE.SphereGeometry(0.074, 20, 14), alloy, [0, 0.04, end.z]).scale.set(1.0, 0.62, 1.0);
     for (const side of [-1, 1]) {
-      cylinderBetween(chassisGroup, [side * 0.19, 0.12, 0.31], [side * 0.19, 0.28, 0.48], 0.013, graphite, 10);
+      cylinderBetween(diff, [side * 0.12, 0.018, end.z], [side * 0.30, -0.005, end.z], 0.014, alloy, 12);
     }
-    roundedBox(chassisGroup, [0.06, 0.025, 0.07], carbon, [0.19, 0.12, 0.04], null, 0.008);
+    for (const x of [-0.12, 0.12]) addBolt(diff, x, 0.095, end.z, 0.006);
   }
 
-  makeChassisDetails();
-  makeBodyShell();
+  // Central longitudinal driveshaft with separate couplers and a center support.
+  const driveshaft = makePart(
+    chassisGroup,
+    "center-driveshaft",
+    "Center driveshaft",
+    "The rotating shaft links the front and rear gearboxes. The silver shaft and dark couplers are visible along the center tunnel."
+  );
+  cylinderBetween(driveshaft, [0, 0.095, -0.275], [0, 0.095, 0.275], 0.014, alloy, 16);
+  for (const z of [-0.245, 0.245]) {
+    cylinderBetween(driveshaft, [0, 0.095, z - 0.018], [0, 0.095, z + 0.018], 0.027, darkMetal, 14);
+    addMesh(driveshaft, new THREE.SphereGeometry(0.027, 12, 10), alloy, [0, 0.095, z]);
+  }
+  roundedBox(driveshaft, [0.075, 0.025, 0.11], blackPlastic, [0, 0.047, 0], null, 0.01);
 
-  // Larger, more realistic all-terrain wheels with sidewall rings,
-  // deep tread blocks, beadlock rings, rotor faces, spokes and hub nuts.
+  // Independent suspension arms, camber links and steering knuckles.
+  for (const corner of [
+    { side: -1, z: -0.29, name: "Front-left" },
+    { side: 1, z: -0.29, name: "Front-right" },
+    { side: -1, z: 0.29, name: "Rear-left" },
+    { side: 1, z: 0.29, name: "Rear-right" }
+  ]) {
+    const isFront = corner.z < 0;
+    const arm = makePart(
+      chassisGroup,
+      `${corner.name.toLowerCase().replace(" ", "-")}-lower-arm`,
+      `${corner.name} lower suspension arm`,
+      "Molded reinforced A-arm connects the chassis hinge pins to the wheel carrier and lets the wheel move vertically with the suspension."
+    );
+    const s = corner.side;
+    const z = corner.z;
+    const innerFront = [s * 0.075, -0.055, z - (isFront ? -0.075 : 0.075)];
+    const innerRear = [s * 0.075, -0.055, z + (isFront ? -0.075 : 0.075)];
+    const outer = [s * 0.292, -0.038, z];
+    cylinderBetween(arm, innerFront, outer, 0.023, carbonEdge, 12, 0.018);
+    cylinderBetween(arm, innerRear, outer, 0.023, carbonEdge, 12, 0.018);
+    cylinderBetween(arm, innerFront, innerRear, 0.018, blackPlastic, 10);
+    addMesh(arm, new THREE.SphereGeometry(0.025, 12, 10), alloy, outer);
+
+    const upper = makePart(
+      chassisGroup,
+      `${corner.name.toLowerCase().replace(" ", "-")}-camber-link`,
+      `${corner.name} upper camber link`,
+      "Adjustable upper link controls wheel camber and keeps the upright aligned as the suspension travels."
+    );
+    cylinderBetween(upper, [s * 0.10, 0.17, z + (isFront ? 0.025 : -0.025)],
+      [s * 0.29, 0.13, z], 0.011, alloy, 10, 0.009);
+    cylinderBetween(upper, [s * 0.12, 0.17, z + (isFront ? 0.025 : -0.025)],
+      [s * 0.12, 0.17, z + (isFront ? 0.025 : -0.025)], 0.014, red, 10);
+
+    const carrier = makePart(
+      chassisGroup,
+      `${corner.name.toLowerCase().replace(" ", "-")}-wheel-carrier`,
+      `${corner.name} wheel carrier / hub`,
+      "The upright holds the axle bearings and connects the steering or rear toe links to the suspension arms."
+    );
+    roundedBox(carrier, [0.075, 0.13, 0.085], blackPlastic, [s * 0.295, 0.005, z], null, 0.018);
+    cylinderBetween(carrier, [s * 0.25, 0.005, z], [s * 0.35, 0.005, z], 0.031, alloy, 16);
+    cylinderBetween(carrier, [s * 0.335, 0.005, z], [s * 0.355, 0.005, z], 0.022, red, 12);
+    addBolt(carrier, s * 0.30, 0.075, z, 0.007);
+  }
+
+  // Front and rear shock towers. Holes and braces make the plates read as
+  // structural towers rather than generic dark blocks.
+  for (const end of [
+    { z: -0.345, id: "front-shock-tower", label: "Front shock tower" },
+    { z: 0.345, id: "rear-shock-tower", label: "Rear shock tower" }
+  ]) {
+    const tower = makePart(
+      chassisGroup,
+      end.id,
+      end.label,
+      "Reinforced vertical plate that anchors the upper shock eyes and suspension bracing."
+    );
+    roundedBox(tower, [0.47, 0.215, 0.032], carbonEdge, [0, 0.17, end.z], null, 0.012);
+    roundedBox(tower, [0.30, 0.055, 0.045], blackPlastic, [0, 0.275, end.z], null, 0.012);
+    for (const x of [-0.19, -0.11, 0, 0.11, 0.19]) {
+      const hole = addMesh(tower, new THREE.CylinderGeometry(0.012, 0.012, 0.007, 12), blackPlastic,
+        [x, 0.19, end.z + (end.z < 0 ? -0.02 : 0.02)], [Math.PI / 2, 0, 0]);
+      hole.castShadow = false;
+      addBolt(tower, x, 0.29, end.z, 0.0055);
+    }
+    for (const side of [-1, 1]) {
+      cylinderBetween(tower, [side * 0.17, 0.07, end.z], [side * 0.21, 0.275, end.z], 0.012, alloy, 10);
+    }
+  }
+
+  // Four individually selectable oil-filled coil-over dampers.
+  for (const corner of [
+    { side: -1, z: -0.29, label: "Front-left" },
+    { side: 1, z: -0.29, label: "Front-right" },
+    { side: -1, z: 0.29, label: "Rear-left" },
+    { side: 1, z: 0.29, label: "Rear-right" }
+  ]) {
+    const s = corner.side;
+    const z = corner.z;
+    const top = [s * 0.19, 0.275, z + (z < 0 ? 0.045 : -0.045)];
+    const bottom = [s * 0.272, -0.012, z];
+    addShock(
+      chassisGroup,
+      `${corner.label.toLowerCase().replace(" ", "-")}-oil-shock`,
+      `${corner.label} oil-filled shock`,
+      "Aluminum-bodied coil-over damper. The silver spring supports the truck while the oil-filled shock body controls how quickly the suspension compresses and rebounds.",
+      top,
+      bottom,
+      springSilver
+    );
+  }
+
+  // Steering servo, servo saver, rack and two front steering links.
+  const steering = makePart(
+    chassisGroup,
+    "steering-servo",
+    "Water-resistant steering servo",
+    "Compact high-torque servo turns the front wheels through the servo horn, steering rack and adjustable tie rods."
+  );
+  roundedBox(steering, [0.15, 0.072, 0.105], blue, [-0.105, 0.105, -0.30], null, 0.016);
+  roundedBox(steering, [0.12, 0.012, 0.08], blueDark, [-0.105, 0.146, -0.30], null, 0.009);
+  for (const x of [-0.16, -0.05]) {
+    roundedBox(steering, [0.025, 0.012, 0.05], alloy, [x, 0.065, -0.30], null, 0.004);
+  }
+  cylinderBetween(steering, [-0.105, 0.15, -0.30], [-0.105, 0.188, -0.30], 0.013, alloy, 12);
+  const servoHorn = addMesh(steering, new THREE.SphereGeometry(0.026, 12, 10), red, [-0.105, 0.19, -0.30]);
+  servoHorn.scale.set(1.35, 0.5, 1.0);
+  roundedBox(steering, [0.31, 0.025, 0.035], darkMetal, [0.025, 0.075, -0.36], null, 0.009);
+  for (const side of [-1, 1]) {
+    cylinderBetween(steering, [0.02, 0.095, -0.36], [side * 0.29, 0.045, -0.29], 0.009, alloy, 10);
+    addBolt(steering, side * 0.29, 0.07, -0.29, 0.006);
+  }
+
+  // Battery tray, strapped LiPo pack and high-current connector.
+  const battery = makePart(
+    chassisGroup,
+    "lipo-battery",
+    "LiPo battery pack and hold-down straps",
+    "Longitudinal battery pack sits low in the tub to keep the center of gravity down. Two cross-straps secure it to the tray."
+  );
+  roundedBox(battery, [0.165, 0.085, 0.405], blueDark, [-0.105, 0.105, -0.005], null, 0.019);
+  roundedBox(battery, [0.15, 0.016, 0.36], blue, [-0.105, 0.153, -0.005], null, 0.009);
+  for (let i = 0; i < 3; i++) {
+    roundedBox(battery, [0.135, 0.008, 0.105], carbonEdge, [-0.105, 0.163, -0.125 + i * 0.12], null, 0.006);
+  }
+  for (const z of [-0.13, 0.12]) {
+    roundedBox(battery, [0.205, 0.018, 0.025], blackPlastic, [-0.105, 0.179, z], null, 0.006);
+    roundedBox(battery, [0.07, 0.012, 0.03], alloy, [-0.105, 0.19, z], null, 0.004);
+  }
+  roundedBox(battery, [0.055, 0.032, 0.045], red, [-0.105, 0.12, -0.225], null, 0.008);
+  roundedBox(battery, [0.035, 0.025, 0.025], amber, [-0.105, 0.12, -0.25], null, 0.005);
+
+  // Brushless motor with anodized can, cooling fins, end bell and fan detail.
+  const motor = makePart(
+    chassisGroup,
+    "brushless-motor",
+    "Brushless electric motor",
+    "Blue anodized brushless motor can with cooling ribs, end bell and shaft. It drives the center transmission through the pinion and spur gear."
+  );
+  cylinderBetween(motor, [0.015, 0.145, 0.205], [0.205, 0.145, 0.205], 0.055, blue, 28);
+  for (let i = 0; i < 7; i++) {
+    const x = 0.035 + i * 0.023;
+    const fin = new THREE.Mesh(new THREE.TorusGeometry(0.053, 0.0045, 7, 28), alloy);
+    fin.rotation.y = Math.PI / 2;
+    fin.position.set(x, 0.145, 0.205);
+    fin.castShadow = true;
+    motor.add(fin);
+  }
+  cylinderBetween(motor, [0.202, 0.145, 0.205], [0.218, 0.145, 0.205], 0.045, darkMetal, 24);
+  cylinderBetween(motor, [0.218, 0.145, 0.205], [0.229, 0.145, 0.205], 0.014, alloy, 16);
+  const fan = addMesh(motor, new THREE.TorusGeometry(0.032, 0.004, 7, 24), redBright, [0.221, 0.145, 0.205]);
+  fan.rotation.y = Math.PI / 2;
+  for (let i = 0; i < 6; i++) {
+    const angle = i * Math.PI / 3;
+    cylinderBetween(
+      motor,
+      [0.222, 0.145, 0.205],
+      [0.222, 0.145 + Math.cos(angle) * 0.027, 0.205 + Math.sin(angle) * 0.027],
+      0.0035,
+      alloy,
+      7
+    );
+  }
+  for (const y of [0.11, 0.18]) {
+    cylinderBetween(motor, [0.045, y, 0.205], [0.175, y, 0.205], 0.003, darkMetal, 7);
+  }
+
+  // Motor gear mesh: exposed spur gear, pinion and protective side guard.
+  const gearing = makePart(
+    chassisGroup,
+    "spur-pinion-gears",
+    "Spur gear, pinion and gear guard",
+    "The small pinion on the motor shaft drives the larger spur gear, transferring motor rotation into the drivetrain. The guard helps keep debris away from the gear mesh."
+  );
+  const spurX = 0.055, spurZ = 0.125, gearY = 0.073;
+  addMesh(gearing, new THREE.CylinderGeometry(0.067, 0.067, 0.018, 36), alloy, [spurX, gearY, spurZ]);
+  addMesh(gearing, new THREE.TorusGeometry(0.058, 0.006, 7, 36), red, [spurX, gearY + 0.012, spurZ]);
+  for (let i = 0; i < 24; i++) {
+    const angle = i * Math.PI * 2 / 24;
+    roundedBox(gearing, [0.015, 0.012, 0.014], alloy,
+      [spurX + Math.cos(angle) * 0.069, gearY, spurZ + Math.sin(angle) * 0.069],
+      [0, -angle, 0], 0.003);
+  }
+  addMesh(gearing, new THREE.CylinderGeometry(0.027, 0.027, 0.025, 20), darkMetal,
+    [0.178, gearY, 0.205]);
+  roundedBox(gearing, [0.11, 0.026, 0.09], blackPlastic, [0.14, 0.045, 0.16], null, 0.012);
+
+  // Electronic speed controller with a finned heat sink and power switch.
+  const esc = makePart(
+    chassisGroup,
+    "electronic-speed-controller",
+    "Electronic speed controller (ESC)",
+    "The ESC regulates power from the LiPo battery to the brushless motor. Its heat sink helps dissipate heat during acceleration."
+  );
+  roundedBox(esc, [0.145, 0.068, 0.17], blackPlastic, [0.13, 0.105, -0.075], null, 0.016);
+  roundedBox(esc, [0.125, 0.014, 0.135], darkMetal, [0.13, 0.146, -0.075], null, 0.007);
+  for (let i = 0; i < 7; i++) {
+    roundedBox(esc, [0.012, 0.018, 0.115], alloy, [0.075 + i * 0.018, 0.163, -0.075], null, 0.004);
+  }
+  roundedBox(esc, [0.035, 0.018, 0.045], red, [0.13, 0.164, -0.15], null, 0.006);
+  addBolt(esc, 0.075, 0.18, -0.14, 0.0045);
+
+  // Sealed receiver box and upright antenna tube.
+  const receiver = makePart(
+    chassisGroup,
+    "radio-receiver",
+    "Radio receiver and antenna",
+    "The receiver gets steering and throttle commands from the transmitter and passes them to the servo and ESC. The antenna tube keeps the antenna wire upright and clear."
+  );
+  roundedBox(receiver, [0.14, 0.065, 0.115], blackPlastic, [-0.12, 0.11, 0.30], null, 0.016);
+  roundedBox(receiver, [0.12, 0.012, 0.095], carbonEdge, [-0.12, 0.149, 0.30], null, 0.008);
+  for (let i = 0; i < 3; i++) {
+    roundedBox(receiver, [0.012, 0.008, 0.035], red, [-0.16 + i * 0.035, 0.158, 0.30], null, 0.003);
+  }
+  cylinderBetween(receiver, [-0.12, 0.15, 0.30], [-0.12, 0.39, 0.30], 0.006, blue, 8, 0.004);
+
+  // Separate selectable wire looms, routed above the chassis so they remain
+  // visible instead of disappearing inside the body shell.
+  const powerWiring = makePart(
+    chassisGroup,
+    "power-wiring",
+    "Battery and motor power leads",
+    "Thick red and black silicone leads connect the battery, ESC and brushless motor. The looped routing leaves room for suspension movement."
+  );
+  addWire(powerWiring, [
+    [-0.105, 0.14, -0.22], [-0.03, 0.22, -0.20],
+    [0.11, 0.22, -0.13], [0.15, 0.19, -0.09]
+  ], 0.006, wireRed);
+  addWire(powerWiring, [
+    [-0.105, 0.125, -0.22], [-0.02, 0.18, -0.18],
+    [0.11, 0.18, -0.13], [0.16, 0.17, -0.08]
+  ], 0.0055, wireBlack);
+  addWire(powerWiring, [
+    [0.15, 0.145, -0.015], [0.22, 0.19, 0.02],
+    [0.225, 0.20, 0.12], [0.19, 0.20, 0.19]
+  ], 0.0055, wireRed);
+  addWire(powerWiring, [
+    [0.135, 0.13, -0.015], [0.20, 0.17, 0.03],
+    [0.205, 0.18, 0.12], [0.18, 0.18, 0.19]
+  ], 0.005, wireBlack);
+
+  const signalWiring = makePart(
+    chassisGroup,
+    "receiver-servo-wiring",
+    "Receiver and servo signal wires",
+    "Thin three-wire servo leads carry the steering and throttle signals between the receiver, steering servo and ESC."
+  );
+  addWire(signalWiring, [
+    [-0.12, 0.16, 0.26], [-0.17, 0.20, 0.16],
+    [-0.17, 0.19, -0.05], [-0.12, 0.17, -0.24]
+  ], 0.0035, wireBlue);
+  addWire(signalWiring, [
+    [-0.105, 0.17, 0.25], [-0.08, 0.20, 0.12],
+    [0.02, 0.19, 0.00], [0.13, 0.18, -0.05]
+  ], 0.0035, wireRed);
+
+  // Front / rear bumpers and body posts remain exposed with the shell removed.
+  const frontBumper = makePart(
+    chassisGroup,
+    "front-bumper",
+    "Front impact bumper",
+    "Flexible front bumper and two mounting braces protect the nose of the chassis during light bumps."
+  );
+  roundedBox(frontBumper, [0.68, 0.085, 0.09], blackPlastic, [0, -0.005, -0.55], null, 0.025);
+  roundedBox(frontBumper, [0.48, 0.045, 0.06], carbonEdge, [0, 0.035, -0.535], null, 0.015);
+  for (const side of [-1, 1]) {
+    cylinderBetween(frontBumper, [side * 0.12, -0.03, -0.46], [side * 0.23, -0.02, -0.53], 0.018, alloy, 10);
+  }
+
+  const rearStructure = makePart(
+    chassisGroup,
+    "rear-bumper-wing-support",
+    "Rear bumper and wing support frame",
+    "The rear bumper protects the back of the chassis. The open tubular frame supports the rear wing when the body shell is removed."
+  );
+  roundedBox(rearStructure, [0.64, 0.07, 0.085], blackPlastic, [0, -0.005, 0.54], null, 0.022);
+  for (const side of [-1, 1]) {
+    cylinderBetween(rearStructure, [side * 0.19, 0.015, 0.40], [side * 0.19, 0.28, 0.57], 0.015, carbonEdge, 12);
+    cylinderBetween(rearStructure, [side * 0.19, 0.28, 0.57], [side * 0.31, 0.31, 0.67], 0.014, alloy, 10);
+    cylinderBetween(rearStructure, [side * 0.31, 0.31, 0.67], [side * 0.19, 0.015, 0.40], 0.012, blackPlastic, 10);
+  }
+  cylinderBetween(rearStructure, [-0.31, 0.31, 0.67], [0.31, 0.31, 0.67], 0.014, carbonEdge, 12);
+  cylinderBetween(rearStructure, [-0.19, 0.28, 0.57], [0.19, 0.28, 0.57], 0.014, alloy, 12);
+  roundedBox(rearStructure, [0.60, 0.035, 0.14], carbon, [0, 0.335, 0.66], [-0.10, 0, 0], 0.014);
+
+  const bodyPosts = makePart(
+    chassisGroup,
+    "body-mount-posts",
+    "Front and rear body-mount posts",
+    "Adjustable vertical posts support the removable polycarbonate shell. They remain visible even with the shell removed."
+  );
+  for (const z of [-0.47, 0.47]) {
+    for (const side of [-1, 1]) {
+      cylinderBetween(bodyPosts, [side * 0.17, -0.01, z], [side * 0.17, 0.26, z], 0.012, blackPlastic, 10);
+      cylinderBetween(bodyPosts, [side * 0.17, 0.20, z], [side * 0.17, 0.235, z], 0.017, red, 10);
+    }
+  }
+
+  // Four independent tire / rim assemblies. Wheel pivots are still returned
+  // in the same order and kept at the same suspension coordinates.
   const wheelPivots = [];
-  for (let i = 0; i < 4; i++) {
-    const pivot = new THREE.Group();
-    pivot.position.set(...wheelPositions[i]);
-    pivot.scale.setScalar(1.12);
-    root.add(pivot);
-
+  const wheelInfo = [
+    { x: -0.305, y: -0.018, z: -0.29, id: "front-left-wheel", label: "Front-left tire and wheel" },
+    { x: 0.305, y: -0.018, z: -0.29, id: "front-right-wheel", label: "Front-right tire and wheel" },
+    { x: -0.305, y: -0.018, z: 0.29, id: "rear-left-wheel", label: "Rear-left tire and wheel" },
+    { x: 0.305, y: -0.018, z: 0.29, id: "rear-right-wheel", label: "Rear-right tire and wheel" }
+  ];
+  for (const info of wheelInfo) {
+    const pivot = makePart(
+      root,
+      info.id,
+      info.label,
+      "Deep-tread all-terrain tire mounted on a red beadlock-style wheel with a silver multi-spoke center and metal hub hardware."
+    );
+    pivot.position.set(info.x, info.y, info.z);
     const tireRadius = 0.158;
     const tireWidth = 0.132;
+
     const tire = addMesh(
       pivot,
-      new THREE.CylinderGeometry(tireRadius, tireRadius, tireWidth, 40, 1, false),
-      tireMaterial
+      new THREE.CylinderGeometry(tireRadius, tireRadius, tireWidth, 44, 1, false),
+      rubber
     );
     tire.rotation.z = Math.PI / 2;
 
-    // Alternating center and shoulder lugs are instanced to keep draw calls low.
-    const treadInstances = new THREE.InstancedMesh(
-      new THREE.BoxGeometry(0.041, 0.026, 0.032),
-      tireMaterial,
-      84
+    const tread = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(0.039, 0.026, 0.031),
+      rubber,
+      96
     );
     const treadDummy = new THREE.Object3D();
     let treadIndex = 0;
-    for (let n = 0; n < 28; n++) {
-      const angle = (n / 28) * Math.PI * 2;
-      for (const lane of [-0.041, 0, 0.041]) {
+    for (let n = 0; n < 32; n++) {
+      const angle = (n / 32) * Math.PI * 2;
+      for (const lane of [-0.043, 0, 0.043]) {
         treadDummy.position.set(
           lane,
           Math.cos(angle) * (tireRadius + 0.006),
           Math.sin(angle) * (tireRadius + 0.006)
         );
-        treadDummy.rotation.set(-angle, 0, lane * 2.2);
+        treadDummy.rotation.set(-angle, 0, lane * 1.8);
         treadDummy.updateMatrix();
-        treadInstances.setMatrixAt(treadIndex++, treadDummy.matrix);
+        tread.setMatrixAt(treadIndex++, treadDummy.matrix);
       }
     }
-    treadInstances.instanceMatrix.needsUpdate = true;
-    treadInstances.castShadow = true;
-    treadInstances.receiveShadow = true;
-    pivot.add(treadInstances);
+    tread.instanceMatrix.needsUpdate = true;
+    tread.castShadow = true;
+    tread.receiveShadow = true;
+    pivot.add(tread);
 
     for (const side of [-1, 1]) {
       const faceX = side * (tireWidth * 0.5 + 0.002);
-      const sidewall = new THREE.Mesh(
-        new THREE.TorusGeometry(0.126, 0.006, 8, 40),
-        carbon
-      );
+      const sidewall = new THREE.Mesh(new THREE.TorusGeometry(0.128, 0.006, 8, 44), rubberSide);
       sidewall.rotation.y = Math.PI / 2;
       sidewall.position.x = faceX;
       sidewall.castShadow = true;
       pivot.add(sidewall);
 
-      const rotor = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.103, 0.103, 0.012, 32),
-        graphite
-      );
-      rotor.rotation.z = Math.PI / 2;
-      rotor.position.x = side * 0.043;
-      rotor.castShadow = true;
-      pivot.add(rotor);
+      const rimFace = new THREE.Mesh(new THREE.CylinderGeometry(0.098, 0.098, 0.026, 36), rimRed);
+      rimFace.rotation.z = Math.PI / 2;
+      rimFace.position.x = side * 0.057;
+      rimFace.castShadow = true;
+      pivot.add(rimFace);
 
-      const rim = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.096, 0.096, 0.026, 32),
-        rimMaterial
-      );
-      rim.rotation.z = Math.PI / 2;
-      rim.position.x = side * 0.059;
-      rim.castShadow = true;
-      pivot.add(rim);
+      const innerFace = new THREE.Mesh(new THREE.CylinderGeometry(0.076, 0.076, 0.012, 32), rimSilver);
+      innerFace.rotation.z = Math.PI / 2;
+      innerFace.position.x = side * 0.073;
+      innerFace.castShadow = true;
+      pivot.add(innerFace);
 
-      const beadlock = new THREE.Mesh(
-        new THREE.TorusGeometry(0.102, 0.007, 8, 40),
-        hubMaterial
-      );
-      beadlock.rotation.y = Math.PI / 2;
-      beadlock.position.x = side * 0.075;
-      beadlock.castShadow = true;
-      pivot.add(beadlock);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.101, 0.007, 8, 44), rimSilver);
+      ring.rotation.y = Math.PI / 2;
+      ring.position.x = side * 0.075;
+      ring.castShadow = true;
+      pivot.add(ring);
 
-      if (side === 1) {
-        const spokeInstances = new THREE.InstancedMesh(
-          new THREE.CylinderGeometry(0.0085, 0.0085, 1, 8),
-          hubMaterial,
-          16
+      for (let spoke = 0; spoke < 6; spoke++) {
+        const angle = spoke * Math.PI / 3;
+        cylinderBetween(
+          pivot,
+          [side * 0.078, Math.cos(angle) * 0.019, Math.sin(angle) * 0.019],
+          [side * 0.078, Math.cos(angle) * 0.073, Math.sin(angle) * 0.073],
+          0.007,
+          rimSilver,
+          8,
+          0.005
         );
-        const spokeDummy = new THREE.Object3D();
-        let spokeIndex = 0;
-        for (const faceSide of [-1, 1]) {
-          for (let spoke = 0; spoke < 8; spoke++) {
-            const angle = (spoke / 8) * Math.PI * 2 + 0.16;
-            const start = new THREE.Vector3(faceSide * 0.078, 0, 0);
-            const end = new THREE.Vector3(
-              faceSide * 0.078,
-              Math.cos(angle) * 0.075,
-              Math.sin(angle) * 0.075
-            );
-            const direction = end.clone().sub(start);
-            spokeDummy.position.copy(start).add(end).multiplyScalar(0.5);
-            spokeDummy.quaternion.setFromUnitVectors(
-              new THREE.Vector3(0, 1, 0),
-              direction.clone().normalize()
-            );
-            spokeDummy.scale.set(1, direction.length(), 1);
-            spokeDummy.updateMatrix();
-            spokeInstances.setMatrixAt(spokeIndex++, spokeDummy.matrix);
-          }
-        }
-        spokeInstances.instanceMatrix.needsUpdate = true;
-        spokeInstances.castShadow = true;
-        pivot.add(spokeInstances);
       }
 
-      const centerCap = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.035, 0.035, 0.03, 24),
-        hubMaterial
-      );
-      centerCap.rotation.z = Math.PI / 2;
-      centerCap.position.x = side * 0.085;
-      centerCap.castShadow = true;
-      pivot.add(centerCap);
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.033, 0.032, 24), darkMetal);
+      hub.rotation.z = Math.PI / 2;
+      hub.position.x = side * 0.087;
+      hub.castShadow = true;
+      pivot.add(hub);
+      const hubCap = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.034, 20), alloy);
+      hubCap.rotation.z = Math.PI / 2;
+      hubCap.position.x = side * 0.091;
+      hubCap.castShadow = true;
+      pivot.add(hubCap);
 
-      if (side === 1) {
-        const nutInstances = new THREE.InstancedMesh(
-          new THREE.CylinderGeometry(0.006, 0.006, 0.012, 8),
-          alloy,
-          12
-        );
-        const nutDummy = new THREE.Object3D();
-        let nutIndex = 0;
-        for (const faceSide of [-1, 1]) {
-          for (let bolt = 0; bolt < 6; bolt++) {
-            const angle = (bolt / 6) * Math.PI * 2;
-            nutDummy.position.set(
-              faceSide * 0.091,
-              Math.cos(angle) * 0.067,
-              Math.sin(angle) * 0.067
-            );
-            nutDummy.quaternion.setFromUnitVectors(
-              new THREE.Vector3(0, 1, 0),
-              new THREE.Vector3(faceSide, 0, 0)
-            );
-            nutDummy.scale.set(1, 1, 1);
-            nutDummy.updateMatrix();
-            nutInstances.setMatrixAt(nutIndex++, nutDummy.matrix);
-          }
-        }
-        nutInstances.instanceMatrix.needsUpdate = true;
-        pivot.add(nutInstances);
+      for (let bolt = 0; bolt < 6; bolt++) {
+        const angle = bolt * Math.PI / 3;
+        const nut = new THREE.Mesh(new THREE.CylinderGeometry(0.0055, 0.0055, 0.012, 8), alloy);
+        nut.rotation.z = Math.PI / 2;
+        nut.position.set(side * 0.093, Math.cos(angle) * 0.061, Math.sin(angle) * 0.061);
+        pivot.add(nut);
       }
     }
-
     wheelPivots.push(pivot);
   }
 
@@ -725,7 +853,7 @@ function makeCarVisual(color, playerName = "") {
     const tag = new THREE.Sprite(new THREE.SpriteMaterial({
       map: texture, transparent: true, depthWrite: false
     }));
-    tag.position.set(0, 1.02, 0);
+    tag.position.set(0, 0.95, 0);
     tag.scale.set(1.34, 0.34, 1);
     root.add(tag);
   }
@@ -736,7 +864,7 @@ function makeCarVisual(color, playerName = "") {
     wheelPivots,
     shellGroup,
     chassisGroup,
-    setShellVisible(visible) { shellGroup.visible = visible; }
+    setShellVisible(visible) { shellGroup.visible = false; }
   };
 }
 const localCar = makeCarVisual(0xffa33d);
@@ -783,6 +911,53 @@ garageGroup.visible = true;
 for (const item of arenaVisuals) item.visible = false;
 
 let viewMode = "menu";
+const garageRaycaster = new THREE.Raycaster();
+const garagePointer = new THREE.Vector2();
+let activeGaragePart = null;
+
+function clearGaragePartHover() {
+  activeGaragePart = null;
+  const title = $("partHoverTitle");
+  const description = $("partHoverDescription");
+  if (title) title.textContent = "HOVER OVER A COMPONENT";
+  if (description) description.textContent = "Move your pointer over the exposed chassis to identify each part.";
+}
+
+function updateGaragePartHover(event) {
+  if (viewMode !== "garage" || !localCar.root.visible) {
+    if (activeGaragePart) clearGaragePartHover();
+    return;
+  }
+  const rect = renderer.domElement.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  garagePointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  garagePointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  garageRaycaster.setFromCamera(garagePointer, camera);
+  const intersections = garageRaycaster.intersectObject(localCar.root, true);
+  let found = null;
+  for (const hit of intersections) {
+    let node = hit.object;
+    while (node && node !== localCar.root) {
+      if (node.userData && node.userData.partInfo) {
+        found = node.userData.partInfo;
+        break;
+      }
+      node = node.parent;
+    }
+    if (found) break;
+  }
+  if (!found) {
+    if (activeGaragePart) clearGaragePartHover();
+    return;
+  }
+  if (activeGaragePart && activeGaragePart.id === found.id) return;
+  activeGaragePart = found;
+  $("partHoverTitle").textContent = found.label;
+  $("partHoverDescription").textContent = found.description;
+}
+
+renderer.domElement.addEventListener("pointermove", updateGaragePartHover);
+renderer.domElement.addEventListener("pointerleave", clearGaragePartHover);
 function setArenaVisible(visible) {
   for (const item of arenaVisuals) item.visible = visible;
   garageGroup.visible = !visible;
@@ -803,7 +978,8 @@ function parkCarForShowroom() {
   updateLocalVisual();
 }
 function showMainMenu() {
-  setGarageShellVisible(true);
+  clearGaragePartHover();
+  localCar.setShellVisible(false);
   viewMode = "menu";
   mainMenuPanel.style.display = "block";
   garagePanel.style.display = "none";
@@ -814,7 +990,8 @@ function showMainMenu() {
   parkCarForShowroom();
 }
 function showGarage() {
-  setGarageShellVisible(true);
+  clearGaragePartHover();
+  localCar.setShellVisible(false);
   viewMode = "garage";
   mainMenuPanel.style.display = "none";
   garagePanel.style.display = "block";
@@ -824,13 +1001,6 @@ function showGarage() {
   setArenaVisible(false);
   parkCarForShowroom();
 }
-function setGarageShellVisible(visible) {
-  localCar.setShellVisible(visible);
-  $("shellToggleButton").textContent = visible ? "REMOVE BODY SHELL" : "REINSTALL BODY SHELL";
-}
-$("shellToggleButton").addEventListener("click", () => {
-  setGarageShellVisible(!localCar.shellGroup.visible);
-});
 function showDriveScreen() {
   viewMode = "drive";
   mainMenuPanel.style.display = "none";
@@ -1288,8 +1458,8 @@ function animate(now) {
 
   // The showroom camera presents the parked truck in menu and garage views.
   if (viewMode === "menu" || viewMode === "garage") {
-    const distance = viewMode === "garage" ? 4.4 : 5.1;
-    const height = viewMode === "garage" ? 1.75 : 2.15;
+    const distance = viewMode === "garage" ? 2.9 : 5.1;
+    const height = viewMode === "garage" ? 1.45 : 2.15;
     const orbitDirection = new THREE.Vector3(0, 0, 1)
       .applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraOrbitYaw + (viewMode === "menu" ? -0.18 : 0));
     const showroomCamera = localCar.root.position.clone()
