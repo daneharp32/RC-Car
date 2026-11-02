@@ -906,16 +906,16 @@ function makeCarVisual(color, playerName = "") {
       // Clean side windows: one front pane and one rear pane, with a narrow
       // body-colour B-pillar left between them.
       addSideQuad(mainShell, side, [
-        [-0.178, 0.119],
-        [-0.078, 0.151],
-        [-0.018, 0.151],
-        [-0.018, 0.119]
+        [-0.155, 0.116],
+        [-0.080, 0.150],
+        [0.000, 0.150],
+        [0.000, 0.116]
       ], glass, 0.014);
       addSideQuad(mainShell, side, [
-        [0.040, 0.151],
-        [0.157, 0.151],
-        [0.255, 0.119],
-        [0.040, 0.119]
+        [0.040, 0.148],
+        [0.155, 0.148],
+        [0.238, 0.123],
+        [0.040, 0.123]
       ], glass, 0.014);
 
       // Small black mirror; no extra side plates or layered racing shapes.
@@ -925,16 +925,16 @@ function makeCarVisual(color, playerName = "") {
 
     // Windshield and rear window lie on shallow, accurately placed planes.
     addQuad(mainShell, [
-      [-0.267, 0.116, -0.198],
-      [0.267, 0.116, -0.198],
-      [0.236, 0.153, -0.080],
-      [-0.236, 0.153, -0.080]
+      [-0.267, 0.109, -0.198],
+      [0.267, 0.109, -0.198],
+      [0.236, 0.150, -0.080],
+      [-0.236, 0.150, -0.080]
     ], glass);
     addQuad(mainShell, [
-      [-0.236, 0.153, 0.165],
-      [0.236, 0.153, 0.165],
-      [0.270, 0.112, 0.274],
-      [-0.270, 0.112, 0.274]
+      [-0.236, 0.150, 0.165],
+      [0.236, 0.150, 0.165],
+      [0.270, 0.109, 0.274],
+      [-0.270, 0.109, 0.274]
     ], glass);
 
     // The flat roof is only slightly above the windshield top. It stays
@@ -946,18 +946,18 @@ function makeCarVisual(color, playerName = "") {
 
     // Flat hood: one subtle dark centre stripe and two narrow orange edges.
     addBox(mainShell, [0.205, 0.003, 0.215],
-      [0, 0.132, -0.432], charcoal);
+      [0, 0.142, -0.432], charcoal);
     for (const side of [-1, 1]) {
       addBox(mainShell, [0.010, 0.003, 0.235],
-        [side * 0.142, 0.132, -0.430], orangeHighlight);
+        [side * 0.142, 0.142, -0.430], orangeHighlight);
     }
 
     // Short flat rear bed with only a shallow graphite insert.
     addBox(mainShell, [0.535, 0.004, 0.222],
-      [0, 0.124, 0.474], graphite);
+      [0, 0.143, 0.474], graphite);
     for (const side of [-1, 1]) {
       addBox(mainShell, [0.012, 0.009, 0.245],
-        [side * 0.309, 0.131, 0.474], charcoal);
+        [side * 0.309, 0.149, 0.474], charcoal);
     }
 
     // Simple number decal on each door.
