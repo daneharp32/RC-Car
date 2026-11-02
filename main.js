@@ -5,6 +5,7 @@ import { createCarVisualFactory } from "./car.js";
 import { createControlsSystem } from "./controls.js";
 import { createMultiplayerSystem } from "./multiplayer.js";
 import { createGarageSystem } from "./garage.js";
+import { createTrackSystem } from "./track.js";
 
 // Main application entry: renderer, track visuals, shared state, and frame loop.
 const $ = (id) => document.getElementById(id);
@@ -32,8 +33,8 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.08;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xb6c8cc);
-scene.fog = new THREE.Fog(0xb6c8cc, 65, 155);
+scene.background = new THREE.Color(0x493629);
+scene.fog = new THREE.Fog(0x493629, 95, 215);
 
 const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 180);
 camera.position.set(0, 3.1, 5.8);
@@ -44,11 +45,11 @@ scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffe2bd, 2.15);
 sun.position.set(-8, 15, 8);
 sun.castShadow = true;
-sun.shadow.mapSize.set(1536, 1536);
-sun.shadow.camera.left = -24;
-sun.shadow.camera.right = 24;
-sun.shadow.camera.top = 24;
-sun.shadow.camera.bottom = -24;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -76;
+sun.shadow.camera.right = 76;
+sun.shadow.camera.top = 76;
+sun.shadow.camera.bottom = -76;
 sun.shadow.bias = -0.00015;
 scene.add(sun);
 
@@ -56,71 +57,14 @@ const fill = new THREE.DirectionalLight(0xb8d8e9, 0.65);
 fill.position.set(8, 6, -10);
 scene.add(fill);
 
-// Single large ground surface for the open practice field.
-const groundMaterial = new THREE.MeshStandardMaterial({ color: 0xa18d70, roughness: 1 });
-const groundMesh = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), groundMaterial);
-groundMesh.rotation.x = -Math.PI / 2;
-groundMesh.position.y = -0.025;
-groundMesh.receiveShadow = true;
-scene.add(groundMesh);
-
-const grid = new THREE.GridHelper(100, 50, 0x786d5d, 0xa99a81);
-grid.position.y = 0.002;
-grid.material.transparent = true;
-grid.material.opacity = 0.09;
-scene.add(grid);
-
-const jumpLocations = [
-  // Main, taller short-course kicker. The gradual approach keeps it drivable.
-  { x: 0, z: -13, yaw: 0, width: 6.8, length: 6.2, height: 2.25 },
-  { x: -15, z: 7, yaw: 0, width: 4.8, length: 4.8, height: 0.95 },
-  { x: 16, z: 18, yaw: 0, width: 5.0, length: 5.0, height: 1.05 },
-  { x: 4, z: 34, yaw: 0, width: 4.6, length: 4.8, height: 0.9 }
-];
-const jumpMaterial = new THREE.MeshStandardMaterial({ color: 0x806b50, roughness: 0.96 });
-const arenaVisuals = [groundMesh, grid];
-const rampVisuals = [];
-
-function makeRampGeometry(width, length, height) {
-  const w = width / 2;
-  const l = length / 2;
-  const vertices = [
-    [-w, 0, l], [w, 0, l], [-w, 0, -l],
-    [w, 0, -l], [-w, height, -l], [w, height, -l]
-  ];
-  const faces = [
-    [0, 2, 3, 1], [0, 1, 5, 4], [0, 4, 2],
-    [1, 3, 5], [2, 4, 5, 3]
-  ];
-  const indices = [];
-  for (const face of faces) {
-    for (let i = 1; i < face.length - 1; i++) indices.push(face[0], face[i], face[i + 1]);
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices.flat(), 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
-for (const jump of jumpLocations) {
-  const ramp = new THREE.Mesh(
-    makeRampGeometry(jump.width, jump.length, jump.height),
-    jumpMaterial
-  );
-  ramp.position.set(jump.x, 0, jump.z);
-  ramp.rotation.y = jump.yaw;
-  ramp.castShadow = true;
-  ramp.receiveShadow = true;
-  scene.add(ramp);
-  rampVisuals.push(ramp);
-}
-arenaVisuals.push(...rampVisuals);
+// The track module owns the complete closed-course scenery and its shared layout.
+const trackSystem = createTrackSystem({ THREE, scene });
+const { arenaVisuals, trackLayout } = trackSystem;
 
 // Physics: Cannon's RaycastVehicle applies suspension and tire impulses only
 // when each wheel ray has actually found a surface to touch.
 
-const physicsSystem = createPhysicsSystem({ CANNON, jumpLocations });
+const physicsSystem = createPhysicsSystem({ CANNON, trackLayout });
 const {
   world,
   chassisBody,
@@ -128,7 +72,8 @@ const {
   wheelPositions,
   VISUAL_CHASSIS_LENGTH_SCALE,
   spawnX,
-  spawnZ
+  spawnZ,
+  spawnYaw
 } = physicsSystem;
 
 const makeCarVisual = createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer });
@@ -198,6 +143,7 @@ const game = {
   VISUAL_CHASSIS_LENGTH_SCALE,
   spawnX,
   spawnZ,
+  spawnYaw,
   arenaVisuals,
   localCar,
   makeCarVisual,
