@@ -232,7 +232,122 @@ export function createTrackSystem({ THREE, scene }) {
   ground.receiveShadow = true;
   trackGroup.add(ground);
 
-  const laneTexture = makeDirtTexture(
+  // Dense natural tree line around the perimeter of the 190 x 190 dirt field.
+  // Instancing keeps the forest to a handful of draw calls instead of one per tree.
+  const treeRandom = makeSeededRandom(44102);
+  const treeSpots = [];
+  const treeSpacing = 6.0;
+  const edgeRows = [86.5, 92.0];
+  const halfEdgeSpan = 82.0;
+
+  for (let row = 0; row < edgeRows.length; row++) {
+    const edge = edgeRows[row];
+    const stagger = row * treeSpacing * 0.5;
+    for (let sideIndex = 0; sideIndex < 4; sideIndex++) {
+      for (let position = -halfEdgeSpan + stagger; position <= halfEdgeSpan; position += treeSpacing) {
+        const jitter = (treeRandom() - 0.5) * 1.0;
+        const along = position + jitter;
+        let x = 0;
+        let z = 0;
+        if (sideIndex === 0) { x = along; z = -edge + (treeRandom() - 0.5) * 0.7; }
+        if (sideIndex === 1) { x = along; z = edge + (treeRandom() - 0.5) * 0.7; }
+        if (sideIndex === 2) { x = -edge + (treeRandom() - 0.5) * 0.7; z = along; }
+        if (sideIndex === 3) { x = edge + (treeRandom() - 0.5) * 0.7; z = along; }
+
+        const nearby = centerline.getPoints(160);
+        let closest = Infinity;
+        for (const point of nearby) {
+          const dx = x - point.x;
+          const dz = z - point.z;
+          closest = Math.min(closest, dx * dx + dz * dz);
+        }
+        // Keep a runoff gap between the curbs, roadside props, and tree trunks.
+        if (closest < (trackHalfWidth + 8.5) * (trackHalfWidth + 8.5)) continue;
+
+        treeSpots.push({
+          x,
+          z,
+          yaw: treeRandom() * Math.PI * 2,
+          scale: 0.82 + treeRandom() * 0.48
+        });
+      }
+    }
+  }
+
+  const treeGroup = new THREE.Group();
+  treeGroup.name = "perimeter-pine-tree-line";
+  const treeCount = treeSpots.length;
+  const treeDummy = new THREE.Object3D();
+
+  const trunkGeometry = new THREE.CylinderGeometry(0.11, 0.19, 1, 7, 1);
+  const trunkMaterial = new THREE.MeshStandardMaterial({
+    color: 0x59412d,
+    roughness: 1,
+    metalness: 0
+  });
+  const trunks = new THREE.InstancedMesh(trunkGeometry, trunkMaterial, treeCount);
+
+  const lowerCanopyGeometry = new THREE.ConeGeometry(1, 1, 8, 1);
+  const middleCanopyGeometry = new THREE.ConeGeometry(1, 1, 8, 1);
+  const upperCanopyGeometry = new THREE.ConeGeometry(1, 1, 8, 1);
+  const lowerCanopyMaterial = new THREE.MeshStandardMaterial({
+    color: 0x244a32,
+    roughness: 1,
+    metalness: 0
+  });
+  const middleCanopyMaterial = new THREE.MeshStandardMaterial({
+    color: 0x2e5a3b,
+    roughness: 1,
+    metalness: 0
+  });
+  const upperCanopyMaterial = new THREE.MeshStandardMaterial({
+    color: 0x3b6b46,
+    roughness: 1,
+    metalness: 0
+  });
+  const lowerCanopies = new THREE.InstancedMesh(lowerCanopyGeometry, lowerCanopyMaterial, treeCount);
+  const middleCanopies = new THREE.InstancedMesh(middleCanopyGeometry, middleCanopyMaterial, treeCount);
+  const upperCanopies = new THREE.InstancedMesh(upperCanopyGeometry, upperCanopyMaterial, treeCount);
+
+  for (let i = 0; i < treeCount; i++) {
+    const tree = treeSpots[i];
+    const s = tree.scale;
+
+    treeDummy.position.set(tree.x, 0.76 * s, tree.z);
+    treeDummy.rotation.set(0, tree.yaw, 0);
+    treeDummy.scale.set(s, 1.55 * s, s);
+    treeDummy.updateMatrix();
+    trunks.setMatrixAt(i, treeDummy.matrix);
+
+    treeDummy.position.set(tree.x, 1.95 * s, tree.z);
+    treeDummy.rotation.set(0, tree.yaw, 0);
+    treeDummy.scale.set(1.42 * s, 3.1 * s, 1.42 * s);
+    treeDummy.updateMatrix();
+    lowerCanopies.setMatrixAt(i, treeDummy.matrix);
+
+    treeDummy.position.set(tree.x, 3.02 * s, tree.z);
+    treeDummy.rotation.set(0, tree.yaw + 0.22, 0);
+    treeDummy.scale.set(1.10 * s, 2.75 * s, 1.10 * s);
+    treeDummy.updateMatrix();
+    middleCanopies.setMatrixAt(i, treeDummy.matrix);
+
+    treeDummy.position.set(tree.x, 4.02 * s, tree.z);
+    treeDummy.rotation.set(0, tree.yaw + 0.41, 0);
+    treeDummy.scale.set(0.80 * s, 2.25 * s, 0.80 * s);
+    treeDummy.updateMatrix();
+    upperCanopies.setMatrixAt(i, treeDummy.matrix);
+  }
+
+  for (const trees of [trunks, lowerCanopies, middleCanopies, upperCanopies]) {
+    trees.castShadow = true;
+    trees.receiveShadow = true;
+    trees.instanceMatrix.needsUpdate = true;
+    trees.computeBoundingSphere();
+    treeGroup.add(trees);
+  }
+  trackGroup.add(treeGroup);
+
+    const laneTexture = makeDirtTexture(
     THREE,
     "#98663f",
     ["#b27d4c", "#794d31", "#d0a06a", "#875633"],
