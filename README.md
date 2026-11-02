@@ -42,7 +42,7 @@ The project imports Three.js, Cannon-es, and Trystero from CDNs, so an internet 
 ## Code map
 
 1. **main.js** — creates the renderer and arena, connects the systems, and runs the frame loop.
-2. **track.js** — builds the closed dirt circuit, textured surfaces, red/white curbs, jumps, scenery, and start/finish gantry.
+2. **track.js** — builds the closed dirt circuit, blue-sky environment, perimeter tree line, textured surfaces, red/white curbs, jumps, scenery, and start/finish gantry.
 3. **car.js** — builds the detailed short-course truck, chassis components, wheels, body shell, and player name tags.
 4. **physics.js** — creates the Cannon-es world, ramp colliders, chassis body, raycast vehicle, and suspension.
 5. **garage.js** — creates the showroom, handles menu/garage transitions, component hover labels, and shell removal animation.
