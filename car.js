@@ -747,15 +747,33 @@ function makeCarVisual(color, playerName = "") {
       return { z: last[0], width: last[1], top: last[2] };
     }
 
-    function addBox(parent, size, position, material, rotation = null) {
-      const mesh = addMesh(
+    function addBox(parent, size, positionOrMaterial, materialOrPosition, rotation = null) {
+      // Accept both common call styles:
+      // addBox(parent, size, position, material, rotation)
+      // addBox(parent, size, material, position, rotation)
+      // This makes the helper resilient to the parameter order used by the
+      // older roundedBox helper elsewhere in the car model.
+      const position = Array.isArray(positionOrMaterial)
+        ? positionOrMaterial
+        : materialOrPosition;
+      const material = Array.isArray(positionOrMaterial)
+        ? materialOrPosition
+        : positionOrMaterial;
+
+      if (!Array.isArray(position) || position.length !== 3) {
+        throw new TypeError("addBox requires a three-number position array.");
+      }
+      if (!material || typeof material !== "object") {
+        throw new TypeError("addBox requires a Three.js material.");
+      }
+
+      return addMesh(
         parent,
         new THREE.BoxGeometry(size[0], size[1], size[2]),
         material,
         position,
         rotation
       );
-      return mesh;
     }
 
     function addQuad(parent, points, material) {
