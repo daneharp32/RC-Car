@@ -1623,6 +1623,10 @@ showroomLight.position.set(0, 4.8, 1.5);
 garageGroup.add(showroomLight);
 
 // Detailed RC workshop environment used behind the main menu and vehicle garage.
+const showroomLight = new THREE.PointLight(0x7dbfff, 24, 15, 2);
+showroomLight.position.set(0, 4.8, 1.5);
+garageGroup.add(showroomLight);
+
 const workshopGroup = new THREE.Group();
 workshopGroup.name = "detailed-rc-workshop";
 garageGroup.add(workshopGroup);
