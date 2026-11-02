@@ -64,6 +64,7 @@ function resetCar() {
   chassisBody.angularVelocity.set(0, 0, 0);
   throttleState = 0;
   steerState = 0;
+  steeringAngleState = 0;
   chassisBody.force.set(0, 0, 0);
   chassisBody.torque.set(0, 0, 0);
   chassisBody.wakeUp();
@@ -77,6 +78,7 @@ function resetCar() {
 
 let steerState = 0;
 let throttleState = 0;
+let steeringAngleState = 0;
 const localAirTorque = new CANNON.Vec3();
 const worldAirTorque = new CANNON.Vec3();
 
@@ -96,16 +98,21 @@ function updateDrivingControls(delta) {
     (keys.d || keys.arrowright ? 1 : 0);
 
   // Time-based smoothing keeps the handling stable across frame rates.
-  const steerResponse = 1 - Math.exp(-11 * delta);
-  const throttleResponse = 1 - Math.exp(-6.5 * delta);
+  // Heavier short-course trucks take a moment to settle into direction changes.
+  const steerResponse = 1 - Math.exp(-5.8 * delta);
+  const throttleResponse = 1 - Math.exp(-5.0 * delta);
   steerState += (steerTarget - steerState) * steerResponse;
   throttleState += (throttle - throttleState) * throttleResponse;
 
   const speed = chassisBody.velocity.length();
-  const speedSteerScale = THREE.MathUtils.clamp(1 - speed / 29, 0.48, 1);
-  const steeringAngle = steerState * 0.42 * speedSteerScale;
-  vehicle.setSteeringValue(steeringAngle, 0);
-  vehicle.setSteeringValue(steeringAngle, 1);
+  // Reduce steering as speed rises, then ease the steering rack toward the
+  // target angle rather than snapping the front wheels to it in one frame.
+  const speedSteerScale = THREE.MathUtils.clamp(1 - speed / 24, 0.42, 1);
+  const targetSteeringAngle = steerState * 0.34 * speedSteerScale;
+  const steeringResponse = 1 - Math.exp(-7.0 * delta);
+  steeringAngleState += (targetSteeringAngle - steeringAngleState) * steeringResponse;
+  vehicle.setSteeringValue(steeringAngleState, 0);
+  vehicle.setSteeringValue(steeringAngleState, 1);
 
   // Progressive four-wheel drive with a gradual top-speed fade.
   const speedLimitScale = THREE.MathUtils.clamp(1 - speed / 27, 0.24, 1);
@@ -117,7 +124,7 @@ function updateDrivingControls(delta) {
 
   // Smooth chassis drag braking, retained from the last working build.
   if (keys[" "] && delta > 0) {
-    const brakeFactor = Math.exp(-2.7 * delta);
+    const brakeFactor = Math.exp(-2.0 * delta);
     chassisBody.velocity.x *= brakeFactor;
     chassisBody.velocity.z *= brakeFactor;
   }
