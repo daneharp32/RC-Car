@@ -1,17 +1,22 @@
 import { RoundedBoxGeometry } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/geometries/RoundedBoxGeometry.js";
 
 // Builds the detailed chassis, wheels, and the separately removable shell.
-export function createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer }) {
+export function createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellGeometry = null }) {
 function makeCarVisual(color, playerName = "") {
   const root = new THREE.Group();
   const chassisGroup = new THREE.Group();
   const shellGroup = new THREE.Group();
   root.add(chassisGroup, shellGroup);
 
-  // The shell is a separate removable group, scaled to match the lengthened
-  // chassis. Physics attachment points remain unchanged.
-  chassisGroup.scale.set(1, 1, VISUAL_CHASSIS_LENGTH_SCALE);
-  shellGroup.scale.set(1, 1, VISUAL_CHASSIS_LENGTH_SCALE);
+  // The imported Ranger stays at its repaired uniform scale. Internal chassis
+  // visuals stretch only along the wheelbase to match its measured axle spacing.
+  const fittedWheelbase = Math.abs(
+    vehicle.wheelInfos[2].chassisConnectionPointLocal.z -
+    vehicle.wheelInfos[0].chassisConnectionPointLocal.z
+  );
+  const chassisLengthScale = shellGeometry ? fittedWheelbase / 0.58 : VISUAL_CHASSIS_LENGTH_SCALE;
+  chassisGroup.scale.set(1, 1, chassisLengthScale);
+  shellGroup.scale.set(1, 1, shellGeometry ? 1 : VISUAL_CHASSIS_LENGTH_SCALE);
   shellGroup.visible = true;
 
   const carbon = new THREE.MeshStandardMaterial({ color: 0x171e24, roughness: 0.78, metalness: 0.18 });
@@ -514,12 +519,19 @@ function makeCarVisual(color, playerName = "") {
   // Four independent tire / rim assemblies. Wheel pivots are still returned
   // in the same order and kept at the same suspension coordinates.
   const wheelPivots = [];
-  const wheelInfo = [
-    { x: -0.305, y: -0.018, z: -0.29, id: "front-left-wheel", label: "Front-left tire and wheel" },
-    { x: 0.305, y: -0.018, z: -0.29, id: "front-right-wheel", label: "Front-right tire and wheel" },
-    { x: -0.305, y: -0.018, z: 0.29, id: "rear-left-wheel", label: "Rear-left tire and wheel" },
-    { x: 0.305, y: -0.018, z: 0.29, id: "rear-right-wheel", label: "Rear-right tire and wheel" }
+  const wheelLabels = [
+    ["front-left-wheel", "Front-left tire and wheel"],
+    ["front-right-wheel", "Front-right tire and wheel"],
+    ["rear-left-wheel", "Rear-left tire and wheel"],
+    ["rear-right-wheel", "Rear-right tire and wheel"]
   ];
+  const wheelInfo = vehicle.wheelInfos.map((wheel, index) => ({
+    x: wheel.chassisConnectionPointLocal.x,
+    y: wheel.chassisConnectionPointLocal.y,
+    z: wheel.chassisConnectionPointLocal.z,
+    id: wheelLabels[index][0],
+    label: wheelLabels[index][1]
+  }));
   for (const info of wheelInfo) {
     const pivot = makePart(
       root,
@@ -1014,14 +1026,35 @@ function makeCarVisual(color, playerName = "") {
       [0, 0.035, 0.642], graphite);
   }
 
-  makeBodyShell();
+  if (shellGeometry) {
+    const importedShell = makePart(
+      shellGroup,
+      "scx30-single-cab-shell",
+      "SCX30 single-cab Ranger body shell",
+      "The repaired supplied Ranger shell. Its original proportions are preserved and the chassis wheelbase is fitted to its wheel openings."
+    );
+    const importedShellMaterial = new THREE.MeshStandardMaterial({
+      color: 0xff581a,
+      roughness: 0.58,
+      metalness: 0.01,
+      side: THREE.DoubleSide
+    });
+    const importedShellMesh = addMesh(importedShell, shellGeometry, importedShellMaterial);
+    importedShellMesh.name = "SCX30 Ranger test shell";
+    importedShellMesh.castShadow = false;
+    importedShellMesh.receiveShadow = false;
+  } else {
+    makeBodyShell();
+  }
 
   // All painted shell surfaces share one garage hover identity. The chassis
   // retains its own individual component labels when the shell is removed.
   shellGroup.userData.partInfo = {
     id: "short-course-body-shell",
-    label: "Short-course truck body shell",
-    description: "Complete orange, black and graphite-gray short-course body shell, including the hood, cab, windows, rear bed, fenders and exterior trim."
+    label: shellGeometry ? "SCX30 single-cab Ranger body shell" : "Short-course truck body shell",
+    description: shellGeometry
+      ? "Repaired imported SCX30 Ranger shell, kept at its original dimensions and fitted to the adjusted chassis."
+      : "Complete orange, black and graphite-gray short-course body shell, including the hood, cab, windows, rear bed, fenders and exterior trim."
   };
   shellGroup.traverse((object) => {
     if (object !== shellGroup && object.userData) {
