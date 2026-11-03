@@ -17,15 +17,20 @@ groundBody.addShape(new CANNON.Plane());
 groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
 world.addBody(groundBody);
 
-// Matching convex wedge colliders keep the approach edge flush with the ground.
+// Ramp collision extends slightly past the visible edges. This gives tires
+// room to overhang the rendered ramp without the chassis catching a hard side.
+const RAMP_EDGE_CLEARANCE = 0.6;
 for (const jump of trackLayout.jumps) {
-  const w = jump.width / 2;
-  const l = jump.length / 2;
-  const h = jump.height;
+  const halfWidth = jump.width / 2 + RAMP_EDGE_CLEARANCE;
+  const halfLength = jump.length / 2;
+  const height = jump.height;
   const vertices = [
-    new CANNON.Vec3(-w, 0, l), new CANNON.Vec3(w, 0, l),
-    new CANNON.Vec3(-w, 0, -l), new CANNON.Vec3(w, 0, -l),
-    new CANNON.Vec3(-w, h, -l), new CANNON.Vec3(w, h, -l)
+    new CANNON.Vec3(-halfWidth, 0, halfLength),
+    new CANNON.Vec3(halfWidth, 0, halfLength),
+    new CANNON.Vec3(-halfWidth, 0, -halfLength),
+    new CANNON.Vec3(halfWidth, 0, -halfLength),
+    new CANNON.Vec3(-halfWidth, height, -halfLength),
+    new CANNON.Vec3(halfWidth, height, -halfLength)
   ];
   const faces = [
     [0, 2, 3, 1], [0, 1, 5, 4], [0, 4, 2],
@@ -66,6 +71,81 @@ const chassisBody = new CANNON.Body({
 });
 chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), spawnYaw);
 chassisBody.addShape(new CANNON.Box(new CANNON.Vec3(0.30, 0.08, shellFit ? 0.53 : 0.43)));
+
+// The shell is a visual mesh, so give it a lightweight compound collision
+// profile made from thin panels instead of a costly triangle-by-triangle mesh.
+function addBodyShellColliders(body, geometry) {
+  const bounds = geometry?.boundingBox;
+  const min = bounds
+    ? bounds.min
+    : { x: -0.37, y: -0.075, z: -0.503 };
+  const max = bounds
+    ? bounds.max
+    : { x: 0.37, y: 0.164, z: 0.503 };
+
+  const centerX = (min.x + max.x) * 0.5;
+  const centerY = (min.y + max.y) * 0.5;
+  const centerZ = (min.z + max.z) * 0.5;
+  const halfWidth = Math.max(0.12, (max.x - min.x) * 0.5);
+  const shellHeight = Math.max(0.08, max.y - min.y);
+  const halfLength = Math.max(0.25, (max.z - min.z) * 0.5);
+
+  function addPanel(halfExtents, x, y, z) {
+    const shape = new CANNON.Box(new CANNON.Vec3(
+      halfExtents.x,
+      halfExtents.y,
+      halfExtents.z
+    ));
+    body.addShape(shape, new CANNON.Vec3(x, y, z));
+  }
+
+  // Long, thin side panels represent the visible shell walls and fenders.
+  const sideHalfWidth = Math.max(0.02, halfWidth * 0.09);
+  const sideHalfHeight = shellHeight * 0.46;
+  const sideHalfLength = halfLength * 0.84;
+  for (const side of [-1, 1]) {
+    addPanel(
+      { x: sideHalfWidth, y: sideHalfHeight, z: sideHalfLength },
+      centerX + side * (halfWidth - sideHalfWidth),
+      min.y + sideHalfHeight,
+      centerZ
+    );
+  }
+
+  // A thin upper skin lets the roof, hood, and bed contact the ground when
+  // the truck rolls over, while keeping the underside open around the tyres.
+  const topHalfThickness = Math.max(0.012, shellHeight * 0.055);
+  addPanel(
+    {
+      x: halfWidth * 0.86,
+      y: topHalfThickness,
+      z: halfLength * 0.91
+    },
+    centerX,
+    max.y - topHalfThickness,
+    centerZ
+  );
+
+  // Nose and tail panels protect the shell ends during steep landings.
+  const endHalfDepth = Math.max(0.025, halfLength * 0.055);
+  const endHalfHeight = Math.max(0.025, shellHeight * 0.24);
+  for (const end of [-1, 1]) {
+    addPanel(
+      {
+        x: halfWidth * 0.82,
+        y: endHalfHeight,
+        z: endHalfDepth
+      },
+      centerX,
+      min.y + endHalfHeight,
+      centerZ + end * (halfLength - endHalfDepth)
+    );
+  }
+
+  body.updateMassProperties();
+  body.updateBoundingRadius();
+}
+addBodyShellColliders(chassisBody, shellGeometry);
 chassisBody.allowSleep = false;
 
 const vehicle = new CANNON.RaycastVehicle({
