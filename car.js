@@ -1080,37 +1080,49 @@ function makeCarVisual(color, playerName = "") {
       playerNameSprite = null;
     }
 
+    // Draw at a much higher source resolution so the text stays sharp when
+    // the floating tag is reduced to its on-screen size.
     const labelCanvas = document.createElement("canvas");
-    labelCanvas.height = 128;
+    const canvasHeight = 256;
+    const font = "700 176px Arial, sans-serif";
+    const measureCanvas = document.createElement("canvas");
+    const measureContext = measureCanvas.getContext("2d");
+    if (!measureContext) return;
+    measureContext.font = font;
+    const measuredTextWidth = measureContext.measureText(safeName).width;
+    const horizontalPadding = 160;
+    labelCanvas.height = canvasHeight;
+    labelCanvas.width = Math.ceil(Math.max(1024, measuredTextWidth + horizontalPadding));
+
     const ctx = labelCanvas.getContext("2d");
     if (!ctx) return;
-
-    const font = "bold 46px system-ui, sans-serif";
+    ctx.imageSmoothingEnabled = true;
     ctx.font = font;
-    const measuredTextWidth = ctx.measureText(safeName).width;
-    const horizontalPadding = 56;
-    labelCanvas.width = Math.ceil(Math.max(176, measuredTextWidth + horizontalPadding));
-
-    // Keep the sprite's world-space aspect ratio identical to the canvas so
-    // names remain normally proportioned instead of being squeezed sideways.
-    ctx.font = font;
-    ctx.fillStyle = "rgba(13,20,29,.82)";
+    ctx.fillStyle = "rgba(13,20,29,.88)";
     ctx.beginPath();
-    ctx.roundRect(8, 14, labelCanvas.width - 16, 100, 28);
+    ctx.roundRect(12, 18, labelCanvas.width - 24, canvasHeight - 36, 58);
     ctx.fill();
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = "#ffffff";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(safeName, labelCanvas.width / 2, 64);
+    ctx.fillText(safeName, labelCanvas.width / 2, canvasHeight / 2);
 
     const texture = new THREE.CanvasTexture(labelCanvas);
     texture.colorSpace = THREE.SRGBColorSpace;
+    texture.generateMipmaps = true;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.anisotropy = Math.min(8, renderer?.capabilities?.getMaxAnisotropy?.() || 1);
     playerNameSprite = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: texture, transparent: true, depthWrite: false
+      map: texture, transparent: true, depthWrite: false, toneMapped: false
     }));
-    playerNameSprite.position.set(0, 0.95, 0);
-    const labelHeight = 0.34;
-    const labelWidth = labelHeight * (labelCanvas.width / labelCanvas.height);
+    playerNameSprite.position.set(0, 1.02, 0);
+
+    // Calculate width from the canvas aspect ratio, then cap the overall
+    // world width so long driver names do not become oversized billboards.
+    const aspect = labelCanvas.width / labelCanvas.height;
+    const labelWidth = Math.min(1.85, 0.36 * aspect);
+    const labelHeight = labelWidth / aspect;
     playerNameSprite.scale.set(labelWidth, labelHeight, 1);
     root.add(playerNameSprite);
   }
