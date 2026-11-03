@@ -302,6 +302,8 @@ export function createRaceSystem(game) {
     spectatingPeerId = null;
     spectatorRenderKey = "";
     updateOverlay("", false);
+    const startButton = $("startRaceButton");
+    if (startButton) startButton.style.display = "none";
     setStatus("ALL DRIVERS FINISHED");
     updateSpectatorUI();
     updatePostRaceUI();
