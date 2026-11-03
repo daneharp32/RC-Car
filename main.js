@@ -272,10 +272,10 @@ game.multiplayer = multiplayer;
 const garage = createGarageSystem(game);
 game.garage = garage;
 
-// Drive opens the mode selector. Only Race currently advances to the
-// existing multiplayer room screen; Time Trial and Sandbox remain disabled.
+// Drive opens the live lobby browser. Users can join an existing lobby
+// or open the separate Create Lobby panel.
 $("menuDriveButton").addEventListener("click", () => garage.showModeSelect());
-$("modeRaceButton").addEventListener("click", () => garage.showDriveScreen());
+$("openCreateLobbyButton").addEventListener("click", () => garage.showCreateLobby());
 $("modeBackButton").addEventListener("click", () => garage.showMainMenu());
 $("menuGarageButton").addEventListener("click", () => garage.showGarage());
 $("garageBackButton").addEventListener("click", () => garage.showMainMenu());
