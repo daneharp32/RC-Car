@@ -115,7 +115,7 @@ async function loadRangerShellGeometry() {
     throw new Error("The Ranger shell GLB JSON chunk is incomplete.");
   }
   const gltf = JSON.parse(
-    new TextDecoder().decode(bytes.subarray(jsonStart, jsonEnd)).replace(/\\u0000+$/g, "").trim()
+    new TextDecoder().decode(bytes.subarray(jsonStart, jsonEnd)).replaceAll(String.fromCharCode(0), "").trim()
   );
 
   const binaryLength = view.getUint32(jsonEnd, true);
