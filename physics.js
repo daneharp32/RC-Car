@@ -2,7 +2,7 @@ import { selfId } from "https://esm.sh/trystero@0.26.0";
 
 // Builds the Cannon-es world, terrain colliders, chassis, and four-wheel
 // raycast vehicle. The returned objects are shared by the driving systems.
-export function createPhysicsSystem({ CANNON, trackLayout, shellFit = false }) {
+export function createPhysicsSystem({ CANNON, trackLayout, shellFit = false, shellGeometry = null }) {
 const world = new CANNON.World({
   gravity: new CANNON.Vec3(0, -9.82, 0)
 });
