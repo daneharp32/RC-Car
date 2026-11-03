@@ -1,6 +1,7 @@
 // Race-session state, checkpoint validation, lap timing, and live standings.
 export function createRaceSystem(game) {
   const $ = game.$;
+  const showToast = game.showToast;
   const gates = game.trackLayout.raceGates || [];
   const trackHalfWidth = Math.max(1, (game.trackLayout.trackHalfWidth || 5.75) - 0.65);
   const remoteStates = new Map();
