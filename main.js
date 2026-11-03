@@ -369,5 +369,50 @@ $("loading").style.display = "none";
 garage.showMainMenu();
 requestAnimationFrame(animate);
 
-// Generate a local default nickname so each tab is easy to distinguish.
-$("driverName").value = "Driver" + String(Math.floor(100 + Math.random() * 900));
+// Keep one nickname shared between the main menu and multiplayer browser.
+const NICKNAME_STORAGE_KEY = "rc-car-driver-nickname";
+function cleanNickname(value) {
+  return String(value || "")
+    .replace(/[\u0000-\u001f\u007f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 18);
+}
+let initialNickname = "";
+try {
+  initialNickname = cleanNickname(window.localStorage.getItem(NICKNAME_STORAGE_KEY));
+} catch (error) {
+  console.warn("Nickname storage is unavailable in this browser:", error);
+}
+if (!initialNickname) {
+  initialNickname = "Driver" + String(Math.floor(100 + Math.random() * 900));
+}
+
+const mainNicknameInput = $("mainDriverName");
+const lobbyNicknameInput = $("driverName");
+mainNicknameInput.value = initialNickname;
+lobbyNicknameInput.value = initialNickname;
+multiplayer.setDriverName(initialNickname);
+
+function syncNickname(source) {
+  const nickname = cleanNickname(source.value);
+  if (source !== mainNicknameInput) mainNicknameInput.value = source.value.slice(0, 18);
+  if (source !== lobbyNicknameInput) lobbyNicknameInput.value = source.value.slice(0, 18);
+  if (!nickname) return;
+  multiplayer.setDriverName(nickname);
+  try {
+    window.localStorage.setItem(NICKNAME_STORAGE_KEY, nickname);
+  } catch (error) {
+    console.warn("Could not save nickname in this browser:", error);
+  }
+}
+function restoreNickname(source) {
+  const nickname = cleanNickname(source.value) || initialNickname;
+  mainNicknameInput.value = nickname;
+  lobbyNicknameInput.value = nickname;
+  multiplayer.setDriverName(nickname);
+}
+mainNicknameInput.addEventListener("input", () => syncNickname(mainNicknameInput));
+lobbyNicknameInput.addEventListener("input", () => syncNickname(lobbyNicknameInput));
+mainNicknameInput.addEventListener("blur", () => restoreNickname(mainNicknameInput));
+lobbyNicknameInput.addEventListener("blur", () => restoreNickname(lobbyNicknameInput));
