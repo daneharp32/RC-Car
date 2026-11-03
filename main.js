@@ -343,17 +343,23 @@ function animate(now) {
     camera.lookAt(localCar.root.position.clone().add(new THREE.Vector3(0, 0.12, 0)));
     garage.updateHoverBounds();
   } else {
+  // Finished drivers can spectate a live opponent; otherwise the camera
+  // follows the local truck as usual. Remote visuals are already interpolated.
+  const spectatedPlayer = race.getSpectateTarget();
+  const followedCar = spectatedPlayer?.visual || localCar;
+  const followedRoot = followedCar.root;
+
   // Follow horizontal heading only; ignore chassis pitch and roll.
-  const carForward = new THREE.Vector3(0, 0, -1).applyQuaternion(localCar.root.quaternion);
+  const carForward = new THREE.Vector3(0, 0, -1).applyQuaternion(followedRoot.quaternion);
   carForward.y = 0;
   if (carForward.lengthSq() < 0.0001) carForward.set(0, 0, -1);
   carForward.normalize();
   const cameraDirection = carForward.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), controls.cameraOrbitYaw);
-  const desiredCamera = localCar.root.position.clone()
+  const desiredCamera = followedRoot.position.clone()
     .addScaledVector(cameraDirection, -5.8)
     .add(new THREE.Vector3(0, 2.8, 0));
   camera.position.lerp(desiredCamera, 1 - Math.exp(-2.8 * delta));
-  const lookTarget = localCar.root.position.clone()
+  const lookTarget = followedRoot.position.clone()
     .add(new THREE.Vector3(0, 0.28, 0))
     .addScaledVector(carForward, 0.85);
   camera.up.set(0, 1, 0);
