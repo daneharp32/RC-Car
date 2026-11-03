@@ -116,7 +116,12 @@ function makeJumpSurfaceGeometry(THREE, profile) {
       // Heightfield rows run from the back of the jump toward the front.
       const z = length / 2 - lengthIndex * elementSize;
       positions.push(x, heights[xIndex][lengthIndex], z);
-      uvs.push(xIndex / widthSegments, lengthIndex / lengthSegments);
+      // Match the dirt lane's world-scale texture tiling instead of
+      // stretching one texture tile across the entire jump.
+      uvs.push(
+        (xIndex / widthSegments) * 2,
+        (lengthIndex / lengthSegments) * (length / 8)
+      );
 
       if (xIndex < widthSegments && lengthIndex < lengthSegments) {
         const a = xIndex * (lengthSegments + 1) + lengthIndex;
@@ -434,11 +439,11 @@ export function createTrackSystem({ THREE, scene }) {
   // Five transverse ridge jumps. Width spans across the track; length follows
   // the racing line, leaving two smooth approach faces in opposite directions.
   const jumpDefinitions = [
-    { t: 0.105, width: 11.2, length: 6.6, height: 0.52, label: "START STRAIGHT KICKER" },
-    { t: 0.285, width: 11.2, length: 6.8, height: 0.58, label: "TABLETOP" },
-    { t: 0.455, width: 10.8, length: 6.0, height: 0.44, label: "SHORT KICKER" },
-    { t: 0.655, width: 11.2, length: 6.6, height: 0.54, label: "BACK SECTION JUMP" },
-    { t: 0.855, width: 10.6, length: 5.4, height: 0.30, label: "ROLLER" }
+    { t: 0.105, width: 11.2, length: 10.4, height: 0.22, label: "START STRAIGHT KICKER" },
+    { t: 0.285, width: 11.2, length: 11.2, height: 0.25, label: "TABLETOP" },
+    { t: 0.455, width: 10.8, length: 9.6, height: 0.18, label: "SHORT KICKER" },
+    { t: 0.655, width: 11.2, length: 10.8, height: 0.23, label: "BACK SECTION JUMP" },
+    { t: 0.855, width: 10.6, length: 8.8, height: 0.13, label: "ROLLER" }
   ];
   const jumps = jumpDefinitions.map((definition) => {
     const point = centerline.getPointAt(definition.t);
@@ -464,7 +469,10 @@ export function createTrackSystem({ THREE, scene }) {
   });
 
   const jumpMaterial = new THREE.MeshStandardMaterial({
-    color: 0x98623c,
+    // Reuse the racing lane's dirt texture and repeat scale so the jumps
+    // blend naturally into the track instead of looking like separate ramps.
+    map: laneTexture,
+    color: 0xffffff,
     roughness: 1,
     metalness: 0
   });
