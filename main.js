@@ -6,6 +6,7 @@ import { createControlsSystem } from "./controls.js";
 import { createMultiplayerSystem } from "./multiplayer.js";
 import { createGarageSystem } from "./garage.js";
 import { createTrackSystem } from "./track.js";
+import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/loaders/GLTFLoader.js";
 
 // Main application entry: renderer, track visuals, shared state, and frame loop.
 const $ = (id) => document.getElementById(id);
@@ -77,7 +78,42 @@ const {
   spawnYaw
 } = physicsSystem;
 
-const makeCarVisual = createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer });
+// Load the optimized body asset once, then share its geometry with all cars.
+async function loadRangerShellGeometry() {
+  const paths = Array.from(
+    { length: 6 },
+    (_, index) => "./assets/scx30-shell-b64/part-" + String(index).padStart(2, "0") + ".txt"
+  );
+  const parts = await Promise.all(paths.map(async (path) => {
+    const response = await fetch(path);
+    if (!response.ok) throw new Error("Failed to load Ranger shell asset: " + path);
+    return (await response.text()).trim();
+  }));
+  const encoded = parts.join("");
+  if (!encoded || encoded.length % 4 !== 0) throw new Error("Ranger shell asset is incomplete.");
+  const compressed = Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0));
+  const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("gzip"));
+  const glb = await new Response(stream).arrayBuffer();
+  const parsed = await new GLTFLoader().parseAsync(glb, "");
+  let geometry = null;
+  parsed.scene.traverse((object) => {
+    if (!geometry && object.isMesh) geometry = object.geometry;
+  });
+  if (!geometry) throw new Error("Ranger shell GLB has no mesh geometry.");
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+const shellGeometry = await loadRangerShellGeometry();
+const makeCarVisual = createCarVisualFactory({
+  THREE,
+  scene,
+  VISUAL_CHASSIS_LENGTH_SCALE,
+  vehicle,
+  renderer,
+  shellGeometry
+});
 const localCar = makeCarVisual(0xffa33d);
 
 function updateLocalVisual() {

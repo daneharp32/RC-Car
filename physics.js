@@ -65,7 +65,8 @@ const chassisBody = new CANNON.Body({
   angularDamping: 0.90
 });
 chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), spawnYaw);
-chassisBody.addShape(new CANNON.Box(new CANNON.Vec3(0.30, 0.08, 0.43)));
+// Longer collision tub to follow the updated wheelbase.
+chassisBody.addShape(new CANNON.Box(new CANNON.Vec3(0.30, 0.08, 0.53)));
 chassisBody.allowSleep = false;
 
 const vehicle = new CANNON.RaycastVehicle({
@@ -75,15 +76,17 @@ const vehicle = new CANNON.RaycastVehicle({
   indexUpAxis: 1
 });
 
+// Match the measured Ranger wheel-arch spacing. The shell is uniformly
+// scaled to the existing tire width; the chassis wheelbase is lengthened to it.
+const SHELL_FIT_WHEELBASE = 0.9512820513;
+const AXLE_HALF_SPACING = SHELL_FIT_WHEELBASE / 2;
 const wheelPositions = [
-  [-0.305, -0.018, -0.29],
-  [ 0.305, -0.018, -0.29],
-  [-0.305, -0.018,  0.29],
-  [ 0.305, -0.018,  0.29]
+  [-0.305, -0.018, -AXLE_HALF_SPACING],
+  [ 0.305, -0.018, -AXLE_HALF_SPACING],
+  [-0.305, -0.018,  AXLE_HALF_SPACING],
+  [ 0.305, -0.018,  AXLE_HALF_SPACING]
 ];
-
-// Visual-only length increase. Physics wheel attachment points stay unchanged.
-const VISUAL_CHASSIS_LENGTH_SCALE = 1.26;
+const VISUAL_CHASSIS_LENGTH_SCALE = 1.0;
 
 for (let i = 0; i < 4; i++) {
   const [x, y, z] = wheelPositions[i];
