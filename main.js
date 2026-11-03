@@ -87,13 +87,40 @@ async function loadRangerShellGeometry() {
     atob(RANGER_SHELL_GZIP_BASE64),
     (character) => character.charCodeAt(0)
   );
+  // Strip the optional GZIP wrapper fields and pass the raw DEFLATE stream
+  // to the browser decompressor. This avoids browser-specific GZIP header handling.
+  if (compressed.length < 18 || compressed[0] !== 0x1f || compressed[1] !== 0x8b || compressed[2] !== 8) {
+    throw new Error("The embedded Ranger shell compression header is invalid.");
+  }
+  const flags = compressed[3];
+  if (flags & 0xe0) throw new Error("The embedded Ranger shell uses unsupported GZIP flags.");
+  let deflateStart = 10;
+  if (flags & 4) {
+    if (deflateStart + 2 > compressed.length) throw new Error("The Ranger shell GZIP extra field is incomplete.");
+    const extraLength = compressed[deflateStart] | (compressed[deflateStart + 1] << 8);
+    deflateStart += 2 + extraLength;
+  }
+  for (const flag of [8, 16]) {
+    if (flags & flag) {
+      while (deflateStart < compressed.length && compressed[deflateStart] !== 0) deflateStart++;
+      deflateStart++;
+    }
+  }
+  if (flags & 2) deflateStart += 2;
+  const deflateEnd = compressed.length - 8;
+  if (deflateStart >= deflateEnd) throw new Error("The embedded Ranger shell has no DEFLATE payload.");
+
   let glbBuffer;
   try {
-    const decompressed = new Blob([compressed]).stream()
-      .pipeThrough(new DecompressionStream("gzip"));
+    if (typeof DecompressionStream !== "function") {
+      throw new Error("This browser does not support the required DEFLATE decompressor.");
+    }
+    const rawDeflate = compressed.subarray(deflateStart, deflateEnd);
+    const decompressed = new Blob([rawDeflate]).stream()
+      .pipeThrough(new DecompressionStream("deflate-raw"));
     glbBuffer = await new Response(decompressed).arrayBuffer();
   } catch (error) {
-    throw new Error("Unable to decompress the embedded Ranger shell: " + (error?.message || error));
+    throw new Error("Unable to decode the embedded Ranger shell data: " + (error?.message || error));
   }
 
   const bytes = new Uint8Array(glbBuffer);
