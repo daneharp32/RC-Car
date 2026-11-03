@@ -1,5 +1,8 @@
 import { selfId } from "https://esm.sh/trystero@0.26.0";
 
+const DEFAULT_COLLISION_GROUP = 1;
+const JUMP_COLLISION_GROUP = 2;
+
 // Builds the Cannon-es world, terrain colliders, chassis, and four-wheel
 // raycast vehicle. The returned objects are shared by the driving systems.
 export function createPhysicsSystem({ CANNON, trackLayout, shellFit = false, shellGeometry = null }) {
@@ -28,7 +31,9 @@ for (const jump of trackLayout.jumps) {
   const { profile } = jump;
   const rampBody = new CANNON.Body({
     mass: 0,
-    material: groundBody.material
+    material: groundBody.material,
+    collisionFilterGroup: JUMP_COLLISION_GROUP,
+    collisionFilterMask: -1
   });
   rampBody.addShape(new CANNON.Heightfield(profile.heights, {
     elementSize: profile.elementSize
@@ -72,7 +77,11 @@ const chassisBody = new CANNON.Body({
   material: chassisMaterial,
   position: new CANNON.Vec3(spawnX, 0.24, spawnZ),
   linearDamping: 0.12,
-  angularDamping: 0.90
+  angularDamping: 0.90,
+  collisionFilterGroup: DEFAULT_COLLISION_GROUP,
+  // Chassis and shell must not snag on jump faces. Wheel rays still query the
+  // jump group, so suspension contact can launch the truck naturally.
+  collisionFilterMask: ~JUMP_COLLISION_GROUP
 });
 chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), spawnYaw);
 chassisBody.addShape(new CANNON.Box(new CANNON.Vec3(0.30, 0.08, shellFit ? 0.53 : 0.43)));
