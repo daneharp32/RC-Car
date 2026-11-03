@@ -324,7 +324,7 @@ function makeCarVisual(color, playerName = "") {
   cylinderBetween(steering, [-0.105, 0.15, frontSteeringZ], [-0.105, 0.188, frontSteeringZ], 0.013, alloy, 12);
   const servoHorn = addMesh(steering, new THREE.SphereGeometry(0.026, 12, 10), red, [-0.105, 0.19, frontSteeringZ]);
   servoHorn.scale.set(1.35, 0.5, 1.0);
-  roundedBox(steering, [0.31, 0.025, 0.035], darkMetal, [0.025, 0.075, -0.36], null, 0.009);
+  roundedBox(steering, [0.31, 0.025, 0.035], darkMetal, [0.025, 0.075, frontSteeringZ - 0.06], null, 0.009);
   for (const side of [-1, 1]) {
     cylinderBetween(steering, [0.02, 0.095, frontSteeringZ - 0.06], [side * 0.29, 0.045, frontAxleZ], 0.009, alloy, 10);
     addBolt(steering, side * 0.29, 0.07, frontAxleZ, 0.006);
