@@ -369,55 +369,44 @@ $("loading").style.display = "none";
 garage.showMainMenu();
 requestAnimationFrame(animate);
 
-// Keep one nickname shared between the main menu and multiplayer browser.
-const NICKNAME_STORAGE_KEY = "rc-car-driver-nickname";
-function cleanNickname(value) {
+// Keep the driver's name in the multiplayer lobby browser between visits.
+const DRIVER_NAME_STORAGE_KEY = "rc-car-driver-nickname";
+function cleanDriverName(value) {
   return String(value || "")
     .replace(/[\u0000-\u001f\u007f]/g, "")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 18);
 }
-let initialNickname = "";
+let savedDriverName = "";
 try {
-  initialNickname = cleanNickname(window.localStorage.getItem(NICKNAME_STORAGE_KEY));
+  savedDriverName = cleanDriverName(window.localStorage.getItem(DRIVER_NAME_STORAGE_KEY));
 } catch (error) {
-  console.warn("Nickname storage is unavailable in this browser:", error);
+  console.warn("Driver-name storage is unavailable in this browser:", error);
 }
-if (!initialNickname) {
-  initialNickname = "Driver" + String(Math.floor(100 + Math.random() * 900));
+if (!savedDriverName) {
+  savedDriverName = "Driver" + String(Math.floor(100 + Math.random() * 900));
 }
-let currentNickname = initialNickname;
 
-const mainNicknameInput = $("mainDriverName");
-const lobbyNicknameInput = $("driverName");
-mainNicknameInput.value = initialNickname;
-lobbyNicknameInput.value = initialNickname;
-multiplayer.setDriverName(initialNickname);
+const driverNameInput = $("driverName");
+driverNameInput.value = savedDriverName;
+multiplayer.setDriverName(savedDriverName);
 
-function syncNickname(source) {
-  const nickname = cleanNickname(source.value);
-  if (!nickname) {
-    mainNicknameInput.value = source.value;
-    lobbyNicknameInput.value = source.value;
-    return;
-  }
-  currentNickname = nickname;
-  mainNicknameInput.value = nickname;
-  lobbyNicknameInput.value = nickname;
-  multiplayer.setDriverName(nickname);
+function syncDriverName() {
+  const driverName = cleanDriverName(driverNameInput.value);
+  if (!driverName) return;
+  driverNameInput.value = driverName;
+  multiplayer.setDriverName(driverName);
+  savedDriverName = driverName;
   try {
-    window.localStorage.setItem(NICKNAME_STORAGE_KEY, nickname);
+    window.localStorage.setItem(DRIVER_NAME_STORAGE_KEY, driverName);
   } catch (error) {
-    console.warn("Could not save nickname in this browser:", error);
+    console.warn("Could not save the driver name in this browser:", error);
   }
 }
-function restoreNickname() {
-  mainNicknameInput.value = currentNickname;
-  lobbyNicknameInput.value = currentNickname;
-  multiplayer.setDriverName(currentNickname);
+function restoreDriverName() {
+  driverNameInput.value = savedDriverName;
+  multiplayer.setDriverName(savedDriverName);
 }
-mainNicknameInput.addEventListener("input", () => syncNickname(mainNicknameInput));
-lobbyNicknameInput.addEventListener("input", () => syncNickname(lobbyNicknameInput));
-mainNicknameInput.addEventListener("blur", restoreNickname);
-lobbyNicknameInput.addEventListener("blur", restoreNickname);
+driverNameInput.addEventListener("input", syncDriverName);
+driverNameInput.addEventListener("blur", restoreDriverName);
