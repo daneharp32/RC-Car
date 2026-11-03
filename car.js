@@ -653,8 +653,10 @@ function makeCarVisual(color, playerName = "") {
   });
   const shellMesh = addMesh(shellPart, shellGeometry, shellMaterial);
   shellMesh.name = "SCX30 Ranger shell mesh";
-  shellMesh.castShadow = true;
-  shellMesh.receiveShadow = true;
+  // The imported STL has dense, open surfaces. Keep it out of the shadow map
+  // to avoid large triangular shadow artifacts across the scene.
+  shellMesh.castShadow = false;
+  shellMesh.receiveShadow = false;
 
   shellGroup.userData.partInfo = {
     id: "short-course-body-shell",
