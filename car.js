@@ -17,6 +17,8 @@ function makeCarVisual(color, playerName = "") {
   const chassisLengthScale = shellGeometry ? fittedWheelbase / 0.58 : VISUAL_CHASSIS_LENGTH_SCALE;
   chassisGroup.scale.set(1, 1, chassisLengthScale);
   shellGroup.scale.set(1, 1, shellGeometry ? 1 : VISUAL_CHASSIS_LENGTH_SCALE);
+  // Raise the Ranger shell slightly so the lower body clears the chassis and tires.
+  shellGroup.position.y = shellGeometry ? 0.075 : 0;
   shellGroup.visible = true;
 
   const carbon = new THREE.MeshStandardMaterial({ color: 0x171e24, roughness: 0.78, metalness: 0.18 });
@@ -481,6 +483,8 @@ function makeCarVisual(color, playerName = "") {
     "Front impact bumper",
     "Flexible front bumper and two mounting braces protect the nose of the chassis during light bumps."
   );
+  // Keep bumpers close to the shell instead of stretching them with the longer wheelbase.
+  frontBumper.scale.z = shellGeometry ? 0.68 : 1;
   roundedBox(frontBumper, [0.68, 0.085, 0.09], blackPlastic, [0, -0.005, -0.55], null, 0.025);
   roundedBox(frontBumper, [0.48, 0.045, 0.06], carbonEdge, [0, 0.035, -0.535], null, 0.015);
   for (const side of [-1, 1]) {
@@ -493,6 +497,7 @@ function makeCarVisual(color, playerName = "") {
     "Rear impact bumper",
     "Compact rear impact bumper. The oversized wing, vertical supports, and upper wing plate have been removed."
   );
+  rearStructure.scale.z = shellGeometry ? 0.68 : 1;
   roundedBox(rearStructure, [0.64, 0.07, 0.085], blackPlastic, [0, -0.005, 0.54], null, 0.022);
 
   const bodyPosts = makePart(
@@ -1039,36 +1044,37 @@ function makeCarVisual(color, playerName = "") {
     makeBodyShell();
   }
 
-  // Hide components that occupy the Ranger shell's interior while the shell
-  // is installed. Lower suspension links and wheel carriers remain visible;
-  // removing the shell in the Garage restores all internal components.
-  const rangerOccludedPartIds = new Set([
-    "front-shock-tower",
-    "rear-shock-tower",
-    "front-left-oil-shock",
-    "front-right-oil-shock",
-    "rear-left-oil-shock",
-    "rear-right-oil-shock",
-    "steering-servo",
-    "lipo-battery",
-    "brushless-motor",
-    "spur-pinion-gears",
-    "electronic-speed-controller",
-    "radio-receiver",
-    "power-wiring",
-    "receiver-servo-wiring",
-    "body-mount-posts"
-  ]);
-  function updateRangerShellClearance(shellVisible) {
-    if (!shellGeometry) return;
+  // Fit chassis details inside the imported shell rather than hiding them.
+  // Components retain their own Garage selection and become accessible when
+  // the shell is removed; only their visual height/placement is adjusted.
+  if (shellGeometry) {
+    const rangerInteriorFit = new Map([
+      ["front-shock-tower",              [0.72, -0.055]],
+      ["rear-shock-tower",               [0.72, -0.055]],
+      ["front-left-oil-shock",           [0.72, -0.055]],
+      ["front-right-oil-shock",          [0.72, -0.055]],
+      ["rear-left-oil-shock",            [0.72, -0.055]],
+      ["rear-right-oil-shock",           [0.72, -0.055]],
+      ["steering-servo",                 [0.72, -0.075]],
+      ["lipo-battery",                   [0.66, -0.065]],
+      ["brushless-motor",                [0.70, -0.075]],
+      ["spur-pinion-gears",              [0.82, -0.020]],
+      ["electronic-speed-controller",    [0.72, -0.070]],
+      ["radio-receiver",                 [0.40, -0.060]],
+      ["power-wiring",                   [0.52, -0.085]],
+      ["receiver-servo-wiring",          [0.60, -0.070]],
+      ["body-mount-posts",               [0.48, -0.070]]
+    ]);
     chassisGroup.traverse((object) => {
       const partId = object.userData?.partInfo?.id;
-      if (partId && rangerOccludedPartIds.has(partId)) {
-        object.visible = !shellVisible;
+      const fit = partId ? rangerInteriorFit.get(partId) : null;
+      if (fit) {
+        object.scale.y *= fit[0];
+        object.position.y += fit[1];
+        object.visible = true;
       }
     });
   }
-  updateRangerShellClearance(true);
 
   // All painted shell surfaces share one garage hover identity. The chassis
   // retains its own individual component labels when the shell is removed.
@@ -1115,11 +1121,7 @@ function makeCarVisual(color, playerName = "") {
     wheelPivots,
     shellGroup,
     chassisGroup,
-    setShellVisible(visible) {
-      const shellIsVisible = !!visible;
-      shellGroup.visible = shellIsVisible;
-      updateRangerShellClearance(shellIsVisible);
-    }
+    setShellVisible(visible) { shellGroup.visible = !!visible; }
   };
 }
   return makeCarVisual;
