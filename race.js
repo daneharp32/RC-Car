@@ -25,6 +25,9 @@ export function createRaceSystem(game) {
   let previousPosition = null;
   let goOverlayUntil = 0;
   let checkpointCount = Math.max(0, gates.length - 1);
+  let spectatingPeerId = null;
+  let spectatorRenderKey = "";
+  let resultsAnnounced = false;
 
   function clampLapCount(value) {
     const number = Number(value);
@@ -85,6 +88,14 @@ export function createRaceSystem(game) {
     previousPosition = getPosition();
     goOverlayUntil = 0;
     remoteStates.clear();
+    spectatingPeerId = null;
+    spectatorRenderKey = "";
+    resultsAnnounced = false;
+
+    const spectatorPanel = $("raceSpectatorPanel");
+    const resultsPanel = $("racePostRacePanel");
+    if (spectatorPanel) spectatorPanel.style.display = "none";
+    if (resultsPanel) resultsPanel.style.display = "none";
 
     const startButton = $("startRaceButton");
     if (startButton) {
@@ -112,6 +123,13 @@ export function createRaceSystem(game) {
     finishTimeMs = 0;
     previousPosition = getPosition();
     progress = nearestTrackProgress(previousPosition);
+    spectatingPeerId = null;
+    spectatorRenderKey = "";
+    resultsAnnounced = false;
+    const spectatorPanel = $("raceSpectatorPanel");
+    const resultsPanel = $("racePostRacePanel");
+    if (spectatorPanel) spectatorPanel.style.display = "none";
+    if (resultsPanel) resultsPanel.style.display = "none";
     const button = $("startRaceButton");
     if (button) {
       button.disabled = true;
@@ -159,19 +177,20 @@ export function createRaceSystem(game) {
   }
 
   function getStandings() {
-    if (phase !== "racing" && phase !== "finished") return [];
+    if (!["racing", "finished", "results"].includes(phase)) return [];
+    const localFinished = phase === "finished" || phase === "results";
     const local = {
       id: "local",
       name: driverName,
       completedLaps,
       progress,
-      finished: phase === "finished",
+      finished: localFinished,
       finishTimeMs,
-      elapsedMs: phase === "finished" ? finishTimeMs : totalElapsedMs
+      elapsedMs: localFinished ? finishTimeMs : totalElapsedMs
     };
     const entrants = [local];
     for (const [peerId, state] of remoteStates) {
-      if (state.phase !== "racing" && state.phase !== "finished") continue;
+      if (state.phase !== "racing" && state.phase !== "finished" && state.phase !== "results") continue;
       entrants.push({ id: peerId, ...state });
     }
 
@@ -186,6 +205,123 @@ export function createRaceSystem(game) {
     return entrants;
   }
 
+  function getSpectatorOptions() {
+    const remotePlayers = game.multiplayer?.remotePlayers;
+    if (!remotePlayers) return [];
+    return [...remoteStates.entries()]
+      .filter(([peerId, state]) => state.phase === "racing" && remotePlayers.has(peerId))
+      .map(([id, state]) => ({
+        id,
+        name: state.name || "Driver",
+        completedLaps: state.completedLaps,
+        progress: state.progress
+      }))
+      .sort((a, b) => b.completedLaps - a.completedLaps || b.progress - a.progress);
+  }
+
+  function updateSpectatorUI() {
+    const panel = $("raceSpectatorPanel");
+    const list = $("raceSpectatorList");
+    const returnButton = $("returnToCarButton");
+    const visible = phase === "finished";
+    if (panel) panel.style.display = visible ? "block" : "none";
+    if (!visible || !list) {
+      spectatorRenderKey = "";
+      return;
+    }
+
+    const options = getSpectatorOptions();
+    if (!options.some(option => option.id === spectatingPeerId)) {
+      spectatingPeerId = null;
+    }
+    if (returnButton) returnButton.style.display = spectatingPeerId ? "inline-flex" : "none";
+
+    const renderKey = options.map(option => option.id + ":" + option.name).join("|") +
+      "::" + (spectatingPeerId || "");
+    if (renderKey === spectatorRenderKey) return;
+    spectatorRenderKey = renderKey;
+    list.replaceChildren();
+
+    if (!options.length) {
+      const empty = document.createElement("div");
+      empty.className = "race-spectator-empty";
+      empty.textContent = "No other drivers are currently racing.";
+      list.appendChild(empty);
+      return;
+    }
+
+    for (const option of options) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "race-spectator-button" +
+        (option.id === spectatingPeerId ? " selected" : "");
+      button.textContent = "SPECTATE " + option.name;
+      button.addEventListener("click", () => {
+        spectatingPeerId = option.id;
+        spectatorRenderKey = "";
+        updateSpectatorUI();
+      });
+      list.appendChild(button);
+    }
+  }
+
+  function updatePostRaceUI() {
+    const panel = $("racePostRacePanel");
+    if (!panel) return;
+    const visible = phase === "results";
+    panel.style.display = visible ? "block" : "none";
+    if (!visible) return;
+
+    const status = $("racePostRaceStatus");
+    const settings = $("raceRestartSettings");
+    const restartButton = $("restartRaceButton");
+    const lapSelect = $("raceRestartLapCount");
+    if (status) {
+      status.textContent = isHost
+        ? "EVERY DRIVER HAS FINISHED. CHOOSE THE NEXT RACE SETTINGS."
+        : "EVERY DRIVER HAS FINISHED. WAITING FOR THE HOST TO RESTART.";
+    }
+    if (settings) settings.style.display = isHost ? "flex" : "none";
+    if (restartButton) restartButton.style.display = isHost ? "inline-flex" : "none";
+    if (lapSelect && lapSelect.value !== String(lapLimit)) {
+      lapSelect.value = String(lapLimit);
+    }
+  }
+
+  function connectedPlayersHaveFinished() {
+    const peerIds = game.multiplayer?.connectedPeerIds || [];
+    return peerIds.every(peerId => {
+      const state = remoteStates.get(peerId);
+      return !!state && (state.phase === "finished" || state.phase === "results");
+    });
+  }
+
+  function enterResults() {
+    if (phase !== "finished" && phase !== "results") return false;
+    phase = "results";
+    spectatingPeerId = null;
+    spectatorRenderKey = "";
+    updateOverlay("", false);
+    setStatus("ALL DRIVERS FINISHED");
+    updateSpectatorUI();
+    updatePostRaceUI();
+    updateUI();
+    return true;
+  }
+
+  function prepareRestart(laps) {
+    if (phase !== "results") return false;
+    setWaiting(laps, isHost, driverName);
+    return true;
+  }
+
+  function getSpectateTarget() {
+    if (phase !== "finished" || !spectatingPeerId) return null;
+    const state = remoteStates.get(spectatingPeerId);
+    if (!state || state.phase !== "racing") return null;
+    return game.multiplayer?.remotePlayers.get(spectatingPeerId) || null;
+  }
+
   function updateUI() {
     const lapValue = $("raceLapValue");
     const timeValue = $("raceTimeValue");
@@ -195,7 +331,7 @@ export function createRaceSystem(game) {
     if (lapValue) lapValue.textContent = "LAP " + Math.min(completedLaps + 1, lapLimit) + " / " + lapLimit;
     if (lapCountValue) lapCountValue.textContent = completedLaps + " / " + lapLimit;
     if (timeValue) {
-      const shown = phase === "finished" ? lastLapMs : currentLapMs;
+      const shown = phase === "finished" || phase === "results" ? lastLapMs : currentLapMs;
       timeValue.textContent = formatTime(shown);
     }
     if (bestValue) bestValue.textContent = bestLapMs > 0 ? "BEST " + formatTime(bestLapMs) : "BEST --:--.---";
@@ -285,6 +421,17 @@ export function createRaceSystem(game) {
       updateOverlay("", false);
     }
     pruneRemoteStates();
+
+    // The host advances the room to results only after every connected racer
+    // has reported a finish. Clients receive the same transition via race-control.
+    if (phase === "finished" && isHost && !resultsAnnounced && connectedPlayersHaveFinished()) {
+      resultsAnnounced = true;
+      enterResults();
+      game.multiplayer?.announceRaceResults?.();
+    }
+
+    updateSpectatorUI();
+    updatePostRaceUI();
     updateUI();
   }
 
@@ -297,7 +444,7 @@ export function createRaceSystem(game) {
 
   function updateRemoteState(peerId, state) {
     if (!peerId || !state || typeof state !== "object") return;
-    const validPhases = ["waiting", "countdown", "racing", "finished"];
+    const validPhases = ["waiting", "countdown", "racing", "finished", "results"];
     if (!validPhases.includes(state.phase)) return;
     const numeric = [
       state.completedLaps, state.progress, state.elapsedMs,
@@ -310,7 +457,7 @@ export function createRaceSystem(game) {
       completedLaps: Math.max(0, Math.min(lapLimit, Math.floor(state.completedLaps))),
       progress: Math.max(0, Math.min(1, state.progress)),
       elapsedMs: Math.max(0, state.elapsedMs),
-      finished: !!state.finished || state.phase === "finished",
+      finished: !!state.finished || state.phase === "finished" || state.phase === "results",
       finishTimeMs: Math.max(0, state.finishTimeMs),
       bestLapMs: Math.max(0, state.bestLapMs),
       currentLapMs: Math.max(0, state.currentLapMs),
@@ -328,7 +475,7 @@ export function createRaceSystem(game) {
       phase,
       completedLaps,
       progress,
-      finished: phase === "finished",
+      finished: phase === "finished" || phase === "results",
       elapsedMs: totalElapsedMs,
       finishTimeMs,
       bestLapMs,
@@ -346,6 +493,12 @@ export function createRaceSystem(game) {
     phase = "idle";
     remoteStates.clear();
     updateOverlay("", false);
+    spectatingPeerId = null;
+    spectatorRenderKey = "";
+    const spectatorPanel = $("raceSpectatorPanel");
+    const resultsPanel = $("racePostRacePanel");
+    if (spectatorPanel) spectatorPanel.style.display = "none";
+    if (resultsPanel) resultsPanel.style.display = "none";
     const card = $("raceCard");
     if (card) card.style.display = "none";
   }
@@ -363,11 +516,24 @@ export function createRaceSystem(game) {
   }
 
   $("startRaceButton").addEventListener("click", startButtonPressed);
+  $("returnToCarButton").addEventListener("click", () => {
+    spectatingPeerId = null;
+    spectatorRenderKey = "";
+    updateSpectatorUI();
+  });
+  $("restartRaceButton").addEventListener("click", () => {
+    if (!isHost || phase !== "results") return;
+    const laps = clampLapCount($("raceRestartLapCount").value);
+    game.multiplayer?.restartRace?.(laps);
+  });
 
   return {
     update,
     enterLobby,
     beginCountdown,
+    enterResults,
+    prepareRestart,
+    getSpectateTarget,
     updateRemoteState,
     removeRemoteState,
     getNetworkState,
