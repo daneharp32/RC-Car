@@ -200,6 +200,22 @@ function showModeSelect() {
   $("topStatus").style.display = "none";
   setArenaVisible(false);
   parkCarForShowroom();
+  game.multiplayer?.openLobbyBrowser?.();
+}
+function showCreateLobby() {
+  clearGaragePartHover();
+  resetGarageShellState(true);
+  viewMode = "create-lobby";
+  mainMenuPanel.style.display = "none";
+  modeSelectPanel.style.display = "none";
+  garagePanel.style.display = "none";
+  joinPanel.style.display = "block";
+  hud.style.display = "none";
+  $("topStatus").style.display = "none";
+  setArenaVisible(false);
+  parkCarForShowroom();
+  $("joinError").style.display = "none";
+  $("lobbyName").focus();
 }
 function showGarage() {
   clearGaragePartHover();
@@ -242,8 +258,8 @@ function showDriveScreen() {
   mainMenuPanel.style.display = "none";
   modeSelectPanel.style.display = "none";
   garagePanel.style.display = "none";
-  joinPanel.style.display = "block";
-  hud.style.display = "none";
+  joinPanel.style.display = "none";
+  hud.style.display = "block";
   $("topStatus").style.display = "flex";
   setArenaVisible(true);
   game.controls.cameraOrbitYaw = 0;
@@ -261,6 +277,7 @@ function showDriveScreen() {
     parkCarForShowroom,
     showMainMenu,
     showModeSelect,
+    showCreateLobby,
     showGarage,
     showDriveScreen,
     setGarageShellVisible,
