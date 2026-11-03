@@ -104,15 +104,19 @@ function addBodyShellColliders(body, geometry) {
     body.addShape(shape, new CANNON.Vec3(x, y, z));
   }
 
-  // Long, thin side panels represent the visible shell walls and fenders.
+  // Keep shell collision on its upper side walls. The lower sill remains
+  // above the running surface so it does not scrape over raised jump faces.
+  const collisionLowerY = Math.max(min.y + shellHeight * 0.52, 0.035);
+  const collisionHeight = Math.max(0.025, max.y - collisionLowerY);
   const sideHalfWidth = Math.max(0.02, halfWidth * 0.09);
-  const sideHalfHeight = shellHeight * 0.46;
+  const sideHalfHeight = collisionHeight * 0.5;
+  const sideCenterY = collisionLowerY + sideHalfHeight;
   const sideHalfLength = halfLength * 0.84;
   for (const side of [-1, 1]) {
     addPanel(
       { x: sideHalfWidth, y: sideHalfHeight, z: sideHalfLength },
       centerX + side * (halfWidth - sideHalfWidth),
-      min.y + sideHalfHeight,
+      sideCenterY,
       centerZ
     );
   }
@@ -131,9 +135,10 @@ function addBodyShellColliders(body, geometry) {
     centerZ
   );
 
-  // Nose and tail panels protect the shell ends during steep landings.
+  // Upper nose and tail sections still collide during a rollover, but the
+  // lower edges are lifted clear of the jump surface to prevent drag.
   const endHalfDepth = Math.max(0.025, halfLength * 0.055);
-  const endHalfHeight = Math.max(0.025, shellHeight * 0.24);
+  const endHalfHeight = collisionHeight * 0.5;
   for (const end of [-1, 1]) {
     addPanel(
       {
@@ -142,7 +147,7 @@ function addBodyShellColliders(body, geometry) {
         z: endHalfDepth
       },
       centerX,
-      min.y + endHalfHeight,
+      sideCenterY,
       centerZ + end * (halfLength - endHalfDepth)
     );
   }
@@ -187,7 +192,8 @@ for (let i = 0; i < 4; i++) {
     maxSuspensionTravel: 0.17,
     maxSuspensionForce: 350,
     radius: 0.13,
-    frictionSlip: 4.8,
+    // Additional tire grip keeps drive force from fading on smooth jump faces.
+    frictionSlip: 6.5,
     rollInfluence: 0.08,
     isFrontWheel: i < 2,
     useCustomSlidingRotationalSpeed: true,
