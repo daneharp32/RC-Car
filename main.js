@@ -326,7 +326,7 @@ function animate(now) {
   $("wheelStatus").textContent = touching + " / 4 TIRES IN CONTACT";
 
   // The showroom camera presents the parked truck in menu and garage views.
-  if (garage.viewMode === "menu" || garage.viewMode === "mode-select" || garage.viewMode === "garage") {
+  if (garage.viewMode === "menu" || garage.viewMode === "mode-select" || garage.viewMode === "create-lobby" || garage.viewMode === "garage") {
     const distance = garage.viewMode === "garage" ? 2.35 : 5.1;
     const height = garage.viewMode === "garage" ? 1.18 : 2.15;
     const orbitDirection = new THREE.Vector3(0, 0, 1)
