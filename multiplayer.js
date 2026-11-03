@@ -1,202 +1,523 @@
 import { joinRoom, selfId } from "https://esm.sh/trystero@0.26.0";
 
-// Peer-to-peer room discovery, player snapshots, and remote-car interpolation.
+// Peer-to-peer lobby directory, player snapshots, and remote-car interpolation.
+// Hosts announce active lobbies over a shared directory room.
 export function createMultiplayerSystem(game) {
   const APP_ID = "io.daneharp32.rcpitlane";
-  const { THREE, scene, chassisBody, vehicle, wheelPositions, VISUAL_CHASSIS_LENGTH_SCALE, makeCarVisual } = game;
+  const DIRECTORY_ROOM_ID = "rc-car-public-lobby-directory-v1";
+  const DIRECTORY_ACTION = "lobby-directory";
+  const MAX_PLAYERS = 8;
+  const LOBBY_TTL_MS = 14000;
+  const HEARTBEAT_MS = 4000;
+
+  const {
+    THREE, scene, chassisBody, vehicle, wheelPositions,
+    VISUAL_CHASSIS_LENGTH_SCALE, makeCarVisual
+  } = game;
   const $ = game.$;
-  const { joinButton, joinError, joinPanel, hud } = game;
+  const { joinButton, joinError, joinPanel, modeSelectPanel, hud } = game;
   const showToast = game.showToast;
-const remotePlayers = new Map();
-const remotePalette = [0x42c7c2, 0x76a8ff, 0xe879b2, 0xa2d66d, 0xb18aff, 0xff795e];
-function colorForPeer(peerId) {
-  let hash = 0;
-  for (let i = 0; i < peerId.length; i++) hash = (hash * 31 + peerId.charCodeAt(i)) | 0;
-  return remotePalette[Math.abs(hash) % remotePalette.length];
-}
 
-function makeSnapshot() {
-  return {
-    name: driverName,
-    x: chassisBody.position.x,
-    y: chassisBody.position.y,
-    z: chassisBody.position.z,
-    qx: chassisBody.quaternion.x,
-    qy: chassisBody.quaternion.y,
-    qz: chassisBody.quaternion.z,
-    qw: chassisBody.quaternion.w,
-    wheels: vehicle.wheelInfos.map((wheel) => wheel.rotation),
-    steer: vehicle.wheelInfos[0].steering,
-    mph: chassisBody.velocity.length() * 2.236936
-  };
-}
+  const remotePlayers = new Map();
+  const remotePalette = [0x42c7c2, 0x76a8ff, 0xe879b2, 0xa2d66d, 0xb18aff, 0xff795e];
+  const roomPeerIds = new Set();
+  const pendingRoomPeers = new Set();
+  const directoryPeers = new Set();
+  const discoveredLobbies = new Map();
 
-function validSnapshot(data) {
-  return data && [data.x, data.y, data.z, data.qx, data.qy, data.qz, data.qw]
-    .every((value) => Number.isFinite(value));
-}
-
-let room = null;
-let stateAction = null;
-let driverName = "Driver";
-let joinedRoomCode = "";
-let joined = false;
-let peersConnected = false;
-
-function updatePlayerCount() {
-  const count = remotePlayers.size + 1;
-  $("playersValue").textContent = count === 1 ? "1 DRIVER" : count + " DRIVERS";
-  $("topStatus").textContent = peersConnected ? "MULTIPLAYER CONNECTED" : "WAITING FOR DRIVERS";
-  $("statusDot").classList.toggle("live", peersConnected);
-}
-
-function addRemotePlayer(peerId, data) {
-  let remote = remotePlayers.get(peerId);
-  if (!remote) {
-    const name = typeof data.name === "string" ? data.name.slice(0, 18) : "Driver";
-    const visual = makeCarVisual(colorForPeer(peerId), name);
-    remote = {
-      visual,
-      target: null,
-      lastSeen: performance.now(),
-      wheelRotations: [0, 0, 0, 0],
-      steering: 0,
-      name
-    };
-    remotePlayers.set(peerId, remote);
-    updatePlayerCount();
+  function colorForPeer(peerId) {
+    let hash = 0;
+    for (let i = 0; i < peerId.length; i++) hash = (hash * 31 + peerId.charCodeAt(i)) | 0;
+    return remotePalette[Math.abs(hash) % remotePalette.length];
   }
-  if (validSnapshot(data)) {
-    remote.target = {
-      position: new THREE.Vector3(data.x, data.y, data.z),
-      quaternion: new THREE.Quaternion(data.qx, data.qy, data.qz, data.qw).normalize()
-    };
-    remote.wheelRotations = Array.isArray(data.wheels)
-      ? data.wheels.slice(0, 4).map((value) => Number.isFinite(value) ? value : 0)
-      : remote.wheelRotations;
-    remote.steering = Number.isFinite(data.steer) ? data.steer : 0;
-    remote.lastSeen = performance.now();
-  }
-}
 
-function updateRemoteVisuals(delta) {
-  const alpha = 1 - Math.exp(-12 * delta);
-  for (const [peerId, remote] of remotePlayers) {
-    if (performance.now() - remote.lastSeen > 12000) {
-      scene.remove(remote.visual.root);
-      remotePlayers.delete(peerId);
-      peersConnected = remotePlayers.size > 0;
-      continue;
+  function makeSnapshot() {
+    return {
+      name: driverName,
+      x: chassisBody.position.x,
+      y: chassisBody.position.y,
+      z: chassisBody.position.z,
+      qx: chassisBody.quaternion.x,
+      qy: chassisBody.quaternion.y,
+      qz: chassisBody.quaternion.z,
+      qw: chassisBody.quaternion.w,
+      wheels: vehicle.wheelInfos.map((wheel) => wheel.rotation),
+      steer: vehicle.wheelInfos[0].steering,
+      mph: chassisBody.velocity.length() * 2.236936
+    };
+  }
+
+  function validSnapshot(data) {
+    return data && [data.x, data.y, data.z, data.qx, data.qy, data.qz, data.qw]
+      .every((value) => Number.isFinite(value));
+  }
+
+  let room = null;
+  let stateAction = null;
+  let directoryRoom = null;
+  let directoryAction = null;
+  let directoryTimer = null;
+  let driverName = "Driver";
+  let currentLobby = null;
+  let hostingLobby = false;
+  let joined = false;
+  let peersConnected = false;
+  let networkTimer = 0;
+  let selectedLobbyMode = "race";
+
+  function currentPlayerCount() {
+    return Math.min(MAX_PLAYERS, 1 + roomPeerIds.size);
+  }
+
+  function updatePlayerCount() {
+    const count = currentPlayerCount();
+    $("playersValue").textContent = count + " / " + MAX_PLAYERS + " PLAYERS";
+    $("topStatus").textContent = peersConnected ? "MULTIPLAYER CONNECTED" : "WAITING FOR DRIVERS";
+    $("statusDot").classList.toggle("live", peersConnected);
+  }
+
+  function updateDirectoryStatus(message) {
+    const status = $("lobbyDirectoryStatus");
+    if (!status) return;
+    if (message) {
+      status.textContent = message;
+      return;
     }
-    if (!remote.target) continue;
-    remote.visual.root.position.lerp(remote.target.position, alpha);
-    remote.visual.root.quaternion.slerp(remote.target.quaternion, alpha);
-    for (let i = 0; i < 4; i++) {
-      const [x, , z] = wheelPositions[i];
-      const pivot = remote.visual.wheelPivots[i];
-      pivot.position.set(x, -0.095, z * VISUAL_CHASSIS_LENGTH_SCALE);
-      const steerQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), i < 2 ? remote.steering : 0);
-      const spinQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), remote.wheelRotations[i]);
-      pivot.quaternion.copy(steerQ).multiply(spinQ);
-    }
-  }
-  updatePlayerCount();
-}
-
-// Multiplayer is peer-to-peer. Trystero uses public Nostr relays for discovery,
-// while the actual car snapshots travel directly between browsers over WebRTC.
-async function joinArena() {
-  if (joined || room) return;
-  const typedName = $("driverName").value.trim().slice(0, 18);
-  const typedRoom = $("roomCode").value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 24);
-  if (!typedRoom) {
-    joinError.textContent = "Enter a room code to join.";
-    joinError.style.display = "block";
-    return;
+    status.textContent = directoryPeers.size
+      ? "LOBBY DIRECTORY CONNECTED"
+      : "SEARCHING FOR AVAILABLE LOBBIES";
   }
 
-  driverName = typedName || "Driver";
-  joinedRoomCode = typedRoom;
-  joinButton.disabled = true;
-  joinButton.textContent = "CONNECTING...";
-  joinError.style.display = "none";
-
-  try {
-    room = joinRoom({ appId: APP_ID }, joinedRoomCode);
-    stateAction = room.makeAction("vehicle-state");
-
-    stateAction.onMessage = (data, meta) => {
-      const peerId = meta?.peerId;
-      if (!peerId || peerId === selfId || !validSnapshot(data)) return;
-      addRemotePlayer(peerId, data);
-    };
-
-    room.onPeerJoin = (peerId) => {
-      peersConnected = true;
+  function addRemotePlayer(peerId, data) {
+    let remote = remotePlayers.get(peerId);
+    if (!remote) {
+      const name = typeof data.name === "string" ? data.name.slice(0, 18) : "Driver";
+      const visual = makeCarVisual(colorForPeer(peerId), name);
+      remote = {
+        visual,
+        target: null,
+        lastSeen: performance.now(),
+        wheelRotations: [0, 0, 0, 0],
+        steering: 0,
+        name
+      };
+      remotePlayers.set(peerId, remote);
       updatePlayerCount();
-      if (stateAction) stateAction.send(makeSnapshot());
-      showToast("Another driver joined");
+    }
+    if (validSnapshot(data)) {
+      remote.target = {
+        position: new THREE.Vector3(data.x, data.y, data.z),
+        quaternion: new THREE.Quaternion(data.qx, data.qy, data.qz, data.qw).normalize()
+      };
+      remote.wheelRotations = Array.isArray(data.wheels)
+        ? data.wheels.slice(0, 4).map((value) => Number.isFinite(value) ? value : 0)
+        : remote.wheelRotations;
+      remote.steering = Number.isFinite(data.steer) ? data.steer : 0;
+      remote.lastSeen = performance.now();
+    }
+  }
+
+  function renderLobbyList() {
+    const list = $("lobbyList");
+    if (!list) return;
+
+    const now = Date.now();
+    const lobbies = [...discoveredLobbies.values()]
+      .filter((lobby) => now - lobby.lastSeen < LOBBY_TTL_MS)
+      .sort((a, b) => b.playerCount - a.playerCount || a.name.localeCompare(b.name));
+
+    list.replaceChildren();
+    if (!lobbies.length) {
+      const empty = document.createElement("div");
+      empty.className = "lobby-empty";
+      empty.textContent = "No active lobbies found. Create one to get started.";
+      list.appendChild(empty);
+      return;
+    }
+
+    for (const lobby of lobbies) {
+      const row = document.createElement("div");
+      row.className = "lobby-row";
+
+      const main = document.createElement("div");
+      main.className = "lobby-row-main";
+      const name = document.createElement("div");
+      name.className = "lobby-row-name";
+      name.textContent = lobby.name;
+      const mode = document.createElement("div");
+      mode.className = "lobby-row-mode";
+      mode.textContent = lobby.mode.toUpperCase();
+      main.append(name, mode);
+
+      const count = document.createElement("div");
+      count.className = "lobby-row-count";
+      count.textContent = lobby.playerCount + " / " + MAX_PLAYERS + " PLAYERS";
+
+      const join = document.createElement("button");
+      join.type = "button";
+      join.className = "menu-button lobby-join-button";
+      join.dataset.joinLobby = lobby.id;
+      join.textContent = lobby.playerCount >= MAX_PLAYERS ? "FULL" : "JOIN";
+      join.disabled = lobby.playerCount >= MAX_PLAYERS;
+
+      row.append(main, count, join);
+      list.appendChild(row);
+    }
+  }
+
+  function cleanLobbyName(value) {
+    return typeof value === "string"
+      ? value.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 28)
+      : "";
+  }
+
+  function validLobbyId(value) {
+    return typeof value === "string" && /^[a-z0-9_-]{5,40}$/i.test(value);
+  }
+
+  function publishLobby() {
+    if (!hostingLobby || !currentLobby || !directoryAction) return;
+
+    const announcement = {
+      type: "upsert",
+      id: currentLobby.id,
+      name: currentLobby.name,
+      mode: currentLobby.mode,
+      playerCount: currentPlayerCount(),
+      maxPlayers: MAX_PLAYERS
     };
 
-    room.onPeerLeave = (peerId) => {
-      const remote = remotePlayers.get(peerId);
-      if (remote) {
+    discoveredLobbies.set(currentLobby.id, {
+      ...announcement,
+      peerId: selfId,
+      lastSeen: Date.now()
+    });
+    directoryAction.send(announcement);
+    renderLobbyList();
+  }
+
+  function removePublishedLobby() {
+    if (!currentLobby) return;
+    const id = currentLobby.id;
+    const old = discoveredLobbies.get(id);
+    if (old && old.peerId === selfId) discoveredLobbies.delete(id);
+    if (directoryAction) directoryAction.send({ type: "remove", id });
+    renderLobbyList();
+  }
+
+  function pruneLobbyListings() {
+    const now = Date.now();
+    let changed = false;
+    for (const [id, lobby] of discoveredLobbies) {
+      if (now - lobby.lastSeen > LOBBY_TTL_MS) {
+        discoveredLobbies.delete(id);
+        changed = true;
+      }
+    }
+    if (changed) renderLobbyList();
+  }
+
+  function startDirectory() {
+    if (directoryRoom) return;
+
+    try {
+      directoryRoom = joinRoom({ appId: APP_ID }, DIRECTORY_ROOM_ID);
+      directoryAction = directoryRoom.makeAction(DIRECTORY_ACTION);
+
+      directoryAction.onMessage = (message, meta) => {
+        const peerId = meta?.peerId;
+        if (!peerId || peerId === selfId || !message || typeof message !== "object") return;
+
+        if (message.type === "request") {
+          if (hostingLobby) publishLobby();
+          return;
+        }
+
+        if (message.type === "remove") {
+          if (!validLobbyId(message.id)) return;
+          const existing = discoveredLobbies.get(message.id);
+          if (existing && existing.peerId === peerId) {
+            discoveredLobbies.delete(message.id);
+            renderLobbyList();
+          }
+          return;
+        }
+
+        if (message.type !== "upsert" || !validLobbyId(message.id)) return;
+        const name = cleanLobbyName(message.name);
+        const mode = ["race", "time-trial", "sandbox"].includes(message.mode)
+          ? message.mode
+          : "race";
+        const playerCount = Number.isFinite(message.playerCount)
+          ? Math.max(1, Math.min(MAX_PLAYERS, Math.floor(message.playerCount)))
+          : 1;
+
+        const previous = discoveredLobbies.get(message.id);
+        if (previous && previous.peerId !== peerId && Date.now() - previous.lastSeen < LOBBY_TTL_MS) {
+          return;
+        }
+
+        discoveredLobbies.set(message.id, {
+          id: message.id,
+          name: name || "Untitled Lobby",
+          mode,
+          playerCount,
+          maxPlayers: MAX_PLAYERS,
+          peerId,
+          lastSeen: Date.now()
+        });
+        renderLobbyList();
+      };
+
+      directoryRoom.onPeerJoin = (peerId) => {
+        directoryPeers.add(peerId);
+        updateDirectoryStatus();
+        if (hostingLobby) publishLobby();
+      };
+      directoryRoom.onPeerLeave = (peerId) => {
+        directoryPeers.delete(peerId);
+        updateDirectoryStatus();
+      };
+
+      if (!directoryTimer) {
+        directoryTimer = setInterval(() => {
+          pruneLobbyListings();
+          if (hostingLobby && joined) publishLobby();
+        }, HEARTBEAT_MS);
+      }
+      updateDirectoryStatus("CONNECTING TO LOBBY DIRECTORY...");
+    } catch (error) {
+      console.error("Unable to start lobby directory:", error);
+      updateDirectoryStatus("LOBBY DIRECTORY UNAVAILABLE");
+    }
+  }
+
+  function openLobbyBrowser() {
+    startDirectory();
+    refreshLobbyList();
+  }
+
+  function refreshLobbyList() {
+    startDirectory();
+    pruneLobbyListings();
+    renderLobbyList();
+    updateDirectoryStatus("REFRESHING LOBBY LIST...");
+    if (directoryAction) {
+      directoryAction.send({ type: "request", requestedAt: Date.now() });
+    }
+  }
+
+  function createRoomId() {
+    const bytes = new Uint8Array(8);
+    if (globalThis.crypto?.getRandomValues) {
+      globalThis.crypto.getRandomValues(bytes);
+    } else {
+      for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+    }
+    return "race-" + [...bytes].map((value) => value.toString(16).padStart(2, "0")).join("");
+  }
+
+  function enterRaceLobby(lobby, isHost) {
+    if (joined || room) return;
+    startDirectory();
+
+    const typedName = $("driverName").value.trim().slice(0, 18);
+    driverName = typedName || "Driver";
+    currentLobby = {
+      id: lobby.id,
+      name: cleanLobbyName(lobby.name) || "Race Lobby",
+      mode: lobby.mode || "race"
+    };
+    hostingLobby = !!isHost;
+    roomPeerIds.clear();
+    pendingRoomPeers.clear();
+
+    if (!isHost && Number.isFinite(lobby.playerCount) && lobby.playerCount >= MAX_PLAYERS) {
+      showToast("That lobby is full");
+      return;
+    }
+
+    if (isHost) {
+      joinButton.disabled = true;
+      joinButton.textContent = "CREATING LOBBY...";
+      joinError.style.display = "none";
+    }
+
+    try {
+      room = joinRoom({ appId: APP_ID }, currentLobby.id, {
+        onPeerHandshake: async (peerId) => {
+          if (roomPeerIds.has(peerId) || pendingRoomPeers.has(peerId)) return;
+          if (1 + roomPeerIds.size + pendingRoomPeers.size >= MAX_PLAYERS) {
+            throw new Error("LOBBY_FULL");
+          }
+          pendingRoomPeers.add(peerId);
+        },
+        onJoinError: ({ peerId, error }) => {
+          pendingRoomPeers.delete(peerId);
+          if (String(error?.message || error).toLowerCase().includes("full")) {
+            showToast("Lobby is full (8/8 players)");
+          } else {
+            console.warn("Lobby peer connection failed:", peerId, error);
+          }
+        }
+      });
+
+      stateAction = room.makeAction("vehicle-state");
+      stateAction.onMessage = (data, meta) => {
+        const peerId = meta?.peerId;
+        if (!peerId || peerId === selfId || !validSnapshot(data)) return;
+        addRemotePlayer(peerId, data);
+      };
+
+      room.onPeerJoin = (peerId) => {
+        pendingRoomPeers.delete(peerId);
+        roomPeerIds.add(peerId);
+        peersConnected = roomPeerIds.size > 0;
+        updatePlayerCount();
+        if (stateAction) stateAction.send(makeSnapshot());
+        if (hostingLobby) publishLobby();
+        showToast("Another driver joined");
+      };
+
+      room.onPeerLeave = (peerId) => {
+        pendingRoomPeers.delete(peerId);
+        roomPeerIds.delete(peerId);
+        const remote = remotePlayers.get(peerId);
+        if (remote) {
+          scene.remove(remote.visual.root);
+          remotePlayers.delete(peerId);
+        }
+        peersConnected = roomPeerIds.size > 0;
+        updatePlayerCount();
+        if (hostingLobby) publishLobby();
+        showToast("A driver left the lobby");
+      };
+
+      joined = true;
+      $("roomValue").textContent = currentLobby.name.toUpperCase();
+      joinPanel.style.display = "none";
+      modeSelectPanel.style.display = "none";
+      hud.style.display = "block";
+      game.garage.viewMode = "drive";
+      game.garage.setArenaVisible(true);
+      game.controls.cameraOrbitYaw = 0;
+      $("statusDot").classList.remove("live");
+      $("topStatus").textContent = "WAITING FOR DRIVERS";
+      updatePlayerCount();
+      game.controls.resetCar();
+      if (hostingLobby) publishLobby();
+      showToast(isHost ? "Race lobby created" : "Joined " + currentLobby.name);
+    } catch (error) {
+      console.error("Unable to join multiplayer lobby:", error);
+      room = null;
+      stateAction = null;
+      joined = false;
+      hostingLobby = false;
+      currentLobby = null;
+      if (isHost) {
+        joinError.textContent = "Couldn't create the lobby. Check your connection and try again.";
+        joinError.style.display = "block";
+      } else {
+        game.garage.showModeSelect();
+        updateDirectoryStatus("COULDN'T JOIN THAT LOBBY — TRY AGAIN");
+        showToast("Couldn't join that lobby");
+      }
+    } finally {
+      joinButton.disabled = false;
+      joinButton.textContent = "CREATE RACE LOBBY";
+    }
+  }
+
+  function createLobby() {
+    const name = cleanLobbyName($("lobbyName").value) || "Race Lobby";
+    const selectedButton = document.querySelector(".lobby-mode-choice.selected");
+    const mode = selectedButton?.dataset.lobbyMode || selectedLobbyMode;
+    if (mode !== "race") {
+      joinError.textContent = "That lobby mode isn't available yet.";
+      joinError.style.display = "block";
+      return;
+    }
+    selectedLobbyMode = mode;
+    enterRaceLobby({
+      id: createRoomId(),
+      name,
+      mode,
+      playerCount: 1
+    }, true);
+  }
+
+  function joinLobby(lobby) {
+    if (!lobby || !validLobbyId(lobby.id)) return;
+    const latest = discoveredLobbies.get(lobby.id) || lobby;
+    if (Date.now() - (latest.lastSeen || 0) > LOBBY_TTL_MS) {
+      refreshLobbyList();
+      showToast("That lobby is no longer listed");
+      return;
+    }
+    if (latest.playerCount >= MAX_PLAYERS) {
+      showToast("That lobby is full");
+      return;
+    }
+    enterRaceLobby(latest, false);
+  }
+
+  function updateRemoteVisuals(delta) {
+    const alpha = 1 - Math.exp(-12 * delta);
+    for (const [peerId, remote] of remotePlayers) {
+      if (performance.now() - remote.lastSeen > 12000) {
         scene.remove(remote.visual.root);
         remotePlayers.delete(peerId);
+        continue;
       }
-      peersConnected = remotePlayers.size > 0;
-      updatePlayerCount();
-      showToast("A driver left the room");
-    };
-
-    joined = true;
-    $("roomValue").textContent = joinedRoomCode.toUpperCase();
-    joinPanel.style.display = "none";
-    hud.style.display = "block";
-    game.garage.viewMode = "drive";
-    $("statusDot").classList.remove("live");
-    $("topStatus").textContent = "WAITING FOR DRIVERS";
+      if (!remote.target) continue;
+      remote.visual.root.position.lerp(remote.target.position, alpha);
+      remote.visual.root.quaternion.slerp(remote.target.quaternion, alpha);
+      for (let i = 0; i < 4; i++) {
+        const [x, , z] = wheelPositions[i];
+        const pivot = remote.visual.wheelPivots[i];
+        pivot.position.set(x, -0.095, z * VISUAL_CHASSIS_LENGTH_SCALE);
+        const steerQ = new THREE.Quaternion().setFromAxisAngle(
+          new THREE.Vector3(0, 1, 0), i < 2 ? remote.steering : 0
+        );
+        const spinQ = new THREE.Quaternion().setFromAxisAngle(
+          new THREE.Vector3(1, 0, 0), remote.wheelRotations[i]
+        );
+        pivot.quaternion.copy(steerQ).multiply(spinQ);
+      }
+    }
     updatePlayerCount();
-    showToast("You're in the arena");
-  } catch (error) {
-    console.error("Unable to join multiplayer room:", error);
+  }
+
+  async function leaveArena() {
+    if (hostingLobby) removePublishedLobby();
+    hostingLobby = false;
+
+    if (room) {
+      try {
+        await room.leave();
+      } catch (error) {
+        console.warn("Room cleanup failed:", error);
+      }
+    }
     room = null;
     stateAction = null;
-    joinError.textContent = "Couldn't start multiplayer. Check your connection and try again.";
-    joinError.style.display = "block";
-  } finally {
-    joinButton.disabled = false;
-    joinButton.textContent = "JOIN THE ARENA";
-  }
-}
+    joined = false;
+    currentLobby = null;
+    roomPeerIds.clear();
+    pendingRoomPeers.clear();
+    peersConnected = false;
 
-async function leaveArena() {
-  if (room) {
-    try {
-      await room.leave();
-    } catch (error) {
-      console.warn("Room cleanup failed:", error);
-    }
+    for (const remote of remotePlayers.values()) scene.remove(remote.visual.root);
+    remotePlayers.clear();
+    for (const key of Object.keys(game.controls.keys)) game.controls.keys[key] = false;
+    updatePlayerCount();
+    hud.style.display = "none";
+    game.garage.showModeSelect();
+    $("topStatus").style.display = "none";
+    $("statusDot").classList.remove("live");
+    game.controls.resetCar();
   }
-  room = null;
-  stateAction = null;
-  joined = false;
-  peersConnected = false;
-  for (const remote of remotePlayers.values()) scene.remove(remote.visual.root);
-  remotePlayers.clear();
-  for (const key of Object.keys(game.controls.keys)) game.controls.keys[key] = false;
-  updatePlayerCount();
-  hud.style.display = "none";
-  joinPanel.style.display = "block";
-  game.garage.viewMode = "drive";
-  game.garage.setArenaVisible(true);
-  $("topStatus").style.display = "flex";
-  $("topStatus").textContent = "READY TO DRIVE";
-  $("statusDot").classList.remove("live");
-  game.controls.resetCar();
-}
 
-  let networkTimer = 0;
   function sendSnapshotIfReady(delta) {
     networkTimer += delta;
     if (joined && stateAction && networkTimer >= 1 / 15) {
@@ -205,24 +526,41 @@ async function leaveArena() {
     }
   }
 
-  joinButton.addEventListener("click", joinArena);
+  joinButton.addEventListener("click", createLobby);
   $("leaveButton").addEventListener("click", leaveArena);
-  $("roomCode").addEventListener("keydown", (event) => {
-    if (event.key === "Enter") joinArena();
-  });
-  $("driverName").addEventListener("keydown", (event) => {
-    if (event.key === "Enter") $("roomCode").focus();
+
+  $("lobbyList").addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-join-lobby]");
+    if (!button || button.disabled) return;
+    const lobby = discoveredLobbies.get(button.dataset.joinLobby);
+    if (lobby) joinLobby(lobby);
   });
 
+  $("refreshLobbiesButton").addEventListener("click", refreshLobbyList);
+  for (const button of document.querySelectorAll(".lobby-mode-choice[data-lobby-mode]")) {
+    button.addEventListener("click", () => {
+      if (button.disabled) return;
+      selectedLobbyMode = button.dataset.lobbyMode || "race";
+      document.querySelectorAll(".lobby-mode-choice").forEach((item) => {
+        item.classList.toggle("selected", item === button);
+      });
+      joinButton.textContent = "CREATE " + selectedLobbyMode.toUpperCase() + " LOBBY";
+    });
+  }
+
   return {
-    joinArena,
-    leaveArena,
+    createLobby,
+    joinLobby,
+    openLobbyBrowser,
+    refreshLobbyList,
     updateRemoteVisuals,
     updatePlayerCount,
     sendSnapshotIfReady,
     get joined() { return joined; },
     get stateAction() { return stateAction; },
     get remotePlayers() { return remotePlayers; },
-    get driverName() { return driverName; }
+    get driverName() { return driverName; },
+    get currentLobby() { return currentLobby; },
+    get discoveredLobbies() { return discoveredLobbies; }
   };
 }

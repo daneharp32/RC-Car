@@ -6,12 +6,19 @@ import { createControlsSystem } from "./controls.js";
 import { createMultiplayerSystem } from "./multiplayer.js";
 import { createGarageSystem } from "./garage.js";
 import { createTrackSystem } from "./track.js";
+import rangerShellPart0 from "./ranger-shell-data-00.js";
+import rangerShellPart1 from "./ranger-shell-data-01.js";
+import rangerShellPart2 from "./ranger-shell-data-02.js";
+import rangerShellPart3 from "./ranger-shell-data-03.js";
+import rangerShellPart4 from "./ranger-shell-data-04.js";
+import rangerShellPart5 from "./ranger-shell-data-05.js";
 
 // Main application entry: renderer, track visuals, shared state, and frame loop.
 const $ = (id) => document.getElementById(id);
 const canvas = $("gameCanvas");
 const joinPanel = $("joinPanel");
 const mainMenuPanel = $("mainMenuPanel");
+const modeSelectPanel = $("modeSelectPanel");
 const garagePanel = $("garagePanel");
 const joinButton = $("joinButton");
 const joinError = $("joinError");
@@ -62,10 +69,115 @@ scene.add(fill);
 const trackSystem = createTrackSystem({ THREE, scene });
 const { arenaVisuals, trackLayout } = trackSystem;
 
+// Decode the optional Ranger body before creating physics. If the model cannot
+// be decoded, the game automatically uses the original procedural truck instead.
+async function loadRangerShellGeometry() {
+  const encoded = [
+    rangerShellPart0, rangerShellPart1, rangerShellPart2,
+    rangerShellPart3, rangerShellPart4, rangerShellPart5
+  ].join("");
+  if (!encoded || encoded.length % 4 !== 0) {
+    throw new Error("The Ranger test mesh data is incomplete.");
+  }
+
+  const compressed = Uint8Array.from(
+    atob(encoded),
+    (character) => character.charCodeAt(0)
+  );
+  if (typeof DecompressionStream !== "function") {
+    throw new Error("This browser does not support the Ranger mesh decompressor.");
+  }
+  const rawStream = new Blob([compressed]).stream()
+    .pipeThrough(new DecompressionStream("deflate-raw"));
+  const buffer = await new Response(rawStream).arrayBuffer();
+  const view = new DataView(buffer);
+  const byteLength = buffer.byteLength;
+
+  if (byteLength < 40 ||
+      view.getUint32(0, false) !== 0x52435351 ||
+      view.getUint32(4, true) !== 1) {
+    throw new Error("The Ranger test mesh has an invalid header.");
+  }
+
+  const vertexCount = view.getUint32(8, true);
+  const faceCount = view.getUint32(12, true);
+  if (!vertexCount || !faceCount || vertexCount > 100000 || faceCount > 200000) {
+    throw new Error("The Ranger test mesh has invalid dimensions.");
+  }
+
+  const minimum = [
+    view.getFloat32(16, true),
+    view.getFloat32(20, true),
+    view.getFloat32(24, true)
+  ];
+  const maximum = [
+    view.getFloat32(28, true),
+    view.getFloat32(32, true),
+    view.getFloat32(36, true)
+  ];
+  const positionOffset = 40;
+  const normalOffset = positionOffset + vertexCount * 6;
+  const indexOffset = normalOffset + vertexCount * 3 +
+    ((normalOffset + vertexCount * 3) % 2);
+  const indexCount = faceCount * 3;
+  if (indexOffset + indexCount * 2 !== byteLength) {
+    throw new Error("The Ranger test mesh data length does not match its header.");
+  }
+
+  // Positions are compactly quantized to 16 bits per axis.
+  const positions = new Float32Array(vertexCount * 3);
+  for (let i = 0; i < vertexCount; i++) {
+    for (let axis = 0; axis < 3; axis++) {
+      const quantized = view.getUint16(positionOffset + (i * 3 + axis) * 2, true);
+      positions[i * 3 + axis] =
+        minimum[axis] + (quantized / 65535) * (maximum[axis] - minimum[axis]);
+    }
+    // Physically seat the body higher by editing the shell's Y vertices.
+    positions[i * 3 + 1] += 0.15;
+  }
+
+  // Preserve the repaired, split-edge normals rather than averaging across
+  // sharp body seams, which was a source of the earlier shading artifacts.
+  const normalBytes = new Int8Array(buffer, normalOffset, vertexCount * 3);
+  const normals = new Float32Array(vertexCount * 3);
+  for (let i = 0; i < vertexCount; i++) {
+    const nx = normalBytes[i * 3] / 127;
+    const ny = normalBytes[i * 3 + 1] / 127;
+    const nz = normalBytes[i * 3 + 2] / 127;
+    const magnitude = Math.hypot(nx, ny, nz) || 1;
+    normals[i * 3] = nx / magnitude;
+    normals[i * 3 + 1] = ny / magnitude;
+    normals[i * 3 + 2] = nz / magnitude;
+  }
+
+  const indices = new Uint16Array(buffer, indexOffset, indexCount);
+  for (let i = 0; i < indices.length; i++) {
+    if (indices[i] >= vertexCount) {
+      throw new Error("The Ranger test mesh contains an invalid triangle index.");
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
+  geometry.setIndex(new THREE.BufferAttribute(indices, 1));
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+let shellGeometry = null;
+try {
+  shellGeometry = await loadRangerShellGeometry();
+  console.info("Ranger test shell loaded:", shellGeometry.getAttribute("position").count, "vertices");
+} catch (error) {
+  console.warn("Ranger test shell unavailable; using the stable procedural body:", error);
+}
+
 // Physics: Cannon's RaycastVehicle applies suspension and tire impulses only
 // when each wheel ray has actually found a surface to touch.
 
-const physicsSystem = createPhysicsSystem({ CANNON, trackLayout });
+const physicsSystem = createPhysicsSystem({ CANNON, trackLayout, shellFit: !!shellGeometry });
 const {
   world,
   chassisBody,
@@ -77,7 +189,7 @@ const {
   spawnYaw
 } = physicsSystem;
 
-const makeCarVisual = createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer });
+const makeCarVisual = createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellGeometry });
 const localCar = makeCarVisual(0xffa33d);
 
 function updateLocalVisual() {
@@ -131,6 +243,7 @@ const game = {
   scene,
   camera,
   mainMenuPanel,
+  modeSelectPanel,
   garagePanel,
   joinPanel,
   joinButton,
@@ -159,10 +272,14 @@ game.multiplayer = multiplayer;
 const garage = createGarageSystem(game);
 game.garage = garage;
 
-$("menuDriveButton").addEventListener("click", () => garage.showDriveScreen());
+// Drive opens the live lobby browser. Users can join an existing lobby
+// or open the separate Create Lobby panel.
+$("menuDriveButton").addEventListener("click", () => garage.showModeSelect());
+$("openCreateLobbyButton").addEventListener("click", () => garage.showCreateLobby());
+$("modeBackButton").addEventListener("click", () => garage.showMainMenu());
 $("menuGarageButton").addEventListener("click", () => garage.showGarage());
 $("garageBackButton").addEventListener("click", () => garage.showMainMenu());
-$("driveBackButton").addEventListener("click", () => garage.showMainMenu());
+$("driveBackButton").addEventListener("click", () => garage.showModeSelect());
 
 function resize() {
   const width = window.innerWidth;
@@ -209,7 +326,7 @@ function animate(now) {
   $("wheelStatus").textContent = touching + " / 4 TIRES IN CONTACT";
 
   // The showroom camera presents the parked truck in menu and garage views.
-  if (garage.viewMode === "menu" || garage.viewMode === "garage") {
+  if (garage.viewMode === "menu" || garage.viewMode === "mode-select" || garage.viewMode === "create-lobby" || garage.viewMode === "garage") {
     const distance = garage.viewMode === "garage" ? 2.35 : 5.1;
     const height = garage.viewMode === "garage" ? 1.18 : 2.15;
     const orbitDirection = new THREE.Vector3(0, 0, 1)

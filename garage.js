@@ -2,7 +2,7 @@
 export function createGarageSystem(game) {
   const { THREE, scene, localCar, arenaVisuals, renderer, camera, chassisBody, vehicle, updateLocalVisual } = game;
   const $ = game.$;
-  const { mainMenuPanel, garagePanel, joinPanel, hud } = game;
+  const { mainMenuPanel, modeSelectPanel, garagePanel, joinPanel, hud } = game;
 // Illuminated showroom used by the main menu and garage.
 const garageGroup = new THREE.Group();
 scene.add(garageGroup);
@@ -180,6 +180,7 @@ function showMainMenu() {
   resetGarageShellState(true);
   viewMode = "menu";
   mainMenuPanel.style.display = "block";
+  modeSelectPanel.style.display = "none";
   garagePanel.style.display = "none";
   joinPanel.style.display = "none";
   hud.style.display = "none";
@@ -187,11 +188,41 @@ function showMainMenu() {
   setArenaVisible(false);
   parkCarForShowroom();
 }
+function showModeSelect() {
+  clearGaragePartHover();
+  resetGarageShellState(true);
+  viewMode = "mode-select";
+  mainMenuPanel.style.display = "none";
+  modeSelectPanel.style.display = "block";
+  garagePanel.style.display = "none";
+  joinPanel.style.display = "none";
+  hud.style.display = "none";
+  $("topStatus").style.display = "none";
+  setArenaVisible(false);
+  parkCarForShowroom();
+  game.multiplayer?.openLobbyBrowser?.();
+}
+function showCreateLobby() {
+  clearGaragePartHover();
+  resetGarageShellState(true);
+  viewMode = "create-lobby";
+  mainMenuPanel.style.display = "none";
+  modeSelectPanel.style.display = "none";
+  garagePanel.style.display = "none";
+  joinPanel.style.display = "block";
+  hud.style.display = "none";
+  $("topStatus").style.display = "none";
+  setArenaVisible(false);
+  parkCarForShowroom();
+  $("joinError").style.display = "none";
+  $("lobbyName").focus();
+}
 function showGarage() {
   clearGaragePartHover();
   resetGarageShellState(true);
   viewMode = "garage";
   mainMenuPanel.style.display = "none";
+  modeSelectPanel.style.display = "none";
   garagePanel.style.display = "block";
   joinPanel.style.display = "none";
   hud.style.display = "none";
@@ -225,9 +256,10 @@ $("shellToggleButton").addEventListener("click", () => {
 function showDriveScreen() {
   viewMode = "drive";
   mainMenuPanel.style.display = "none";
+  modeSelectPanel.style.display = "none";
   garagePanel.style.display = "none";
-  joinPanel.style.display = "block";
-  hud.style.display = "none";
+  joinPanel.style.display = "none";
+  hud.style.display = "block";
   $("topStatus").style.display = "flex";
   setArenaVisible(true);
   game.controls.cameraOrbitYaw = 0;
@@ -244,6 +276,8 @@ function showDriveScreen() {
     setArenaVisible,
     parkCarForShowroom,
     showMainMenu,
+    showModeSelect,
+    showCreateLobby,
     showGarage,
     showDriveScreen,
     setGarageShellVisible,

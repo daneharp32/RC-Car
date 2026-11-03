@@ -112,13 +112,119 @@
       background: linear-gradient(110deg, rgba(255,91,25,.85), rgba(45,54,62,.9));
       font-size: 10px; letter-spacing: .07em;
     }
-    #garageBackButton, #driveBackButton {
+    #garageBackButton, #driveBackButton, #modeBackButton {
       min-height: 42px; padding: 0 14px; color: #e5f3ff;
       border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.08);
       font-size: 10px;
     }
-    #garageBackButton { width: 100%; }
+    #garageBackButton, #modeBackButton { width: 100%; }
     #driveBackButton { width: 100%; margin-top: 11px; }
+    .mode-actions { display: grid; grid-template-columns: 1fr; gap: 10px; margin: 18px 0 13px; }
+    .mode-option {
+      min-height: 64px; width: 100%; padding: 11px 14px; display: flex;
+      align-items: center; justify-content: space-between; gap: 14px; text-align: left;
+      border: 1px solid rgba(115,190,255,.34);
+      background: linear-gradient(145deg, #258fe9, #1456bd);
+      box-shadow: 0 8px 22px rgba(16,102,202,.2); color: #f5faff;
+    }
+    .mode-option-copy { display: grid; gap: 5px; }
+    .mode-option-copy strong {
+      font: 800 13px "Orbitron", ui-sans-serif, sans-serif; letter-spacing: .06em;
+    }
+    .mode-option-copy small { color: rgba(240,247,255,.76); font-size: 10px; font-weight: 500; letter-spacing: .02em; }
+    .mode-tag {
+      flex: 0 0 auto; padding: 5px 7px; border-radius: 6px;
+      background: rgba(255,255,255,.15); color: #eaf5ff;
+      font-size: 8px; font-weight: 900; letter-spacing: .09em;
+    }
+    .mode-option.unavailable {
+      cursor: not-allowed; opacity: .48; filter: grayscale(.5);
+      background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.14);
+      box-shadow: none;
+    }
+    .mode-option.unavailable:hover { transform: none; filter: grayscale(.5); }
+    .mode-option.unavailable .mode-option-copy small { color: #aebfce; }
+
+    .lobby-menu-content {
+      top: 5%; width: min(720px, calc(100vw - 28px));
+      max-height: 90vh; overflow-y: auto; padding: 23px 25px;
+    }
+    .lobby-menu-content .menu-title { font-size: clamp(28px, 5vw, 42px); }
+    .lobby-driver-field { text-align: left; margin: 0 0 12px; }
+    .lobby-driver-field input { height: 40px; }
+    .lobby-toolbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      margin: 4px 0 9px; color: #8ecbff; font-size: 9px; font-weight: 900;
+      letter-spacing: .11em; text-align: left;
+    }
+    #refreshLobbiesButton { min-height: 34px; padding: 0 12px; font-size: 9px; }
+    .lobby-list {
+      display: grid; gap: 8px; max-height: min(34vh, 290px); min-height: 88px;
+      overflow-y: auto; padding: 2px 2px 5px;
+    }
+    .lobby-empty {
+      display: grid; place-items: center; min-height: 82px; padding: 14px;
+      border: 1px dashed rgba(165,196,220,.22); border-radius: 12px;
+      background: rgba(255,255,255,.035); color: #aebfce; font-size: 11px;
+    }
+    .lobby-row {
+      display: grid; grid-template-columns: minmax(0,1fr) auto auto;
+      align-items: center; gap: 13px; padding: 11px 12px;
+      border: 1px solid rgba(155,205,255,.18); border-radius: 12px;
+      background: rgba(6,15,26,.62); text-align: left;
+    }
+    .lobby-row-main { min-width: 0; display: grid; gap: 5px; }
+    .lobby-row-name {
+      overflow: hidden; color: #f5f9ff; font: 800 12px "Orbitron",ui-sans-serif,sans-serif;
+      text-overflow: ellipsis; white-space: nowrap;
+    }
+    .lobby-row-mode { color: #98adc0; font-size: 10px; letter-spacing: .04em; }
+    .lobby-row-count { color: #dceeff; font-size: 10px; font-weight: 800; white-space: nowrap; }
+    .lobby-join-button { min-width: 70px; min-height: 34px; padding: 0 11px; font-size: 9px; }
+    .lobby-join-button:disabled { cursor: not-allowed; }
+    .lobby-footer-actions { display: grid; grid-template-columns: 1fr; gap: 9px; margin-top: 12px; }
+    .lobby-footer-actions #modeBackButton { width: 100%; }
+    .create-lobby-content {
+      top: 10%; width: min(500px, calc(100vw - 30px)); padding: 25px 25px 22px;
+    }
+    .create-lobby-content .field { text-align: left; }
+    .lobby-mode-heading {
+      margin: 4px 0 8px; color: #8ecbff; font-size: 9px; font-weight: 900;
+      letter-spacing: .16em; text-align: left;
+    }
+    .lobby-mode-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin-bottom: 15px; }
+    .lobby-mode-choice {
+      min-height: 68px; padding: 9px 6px; display: grid; align-content: center; gap: 6px;
+      color: #eef7ff; border: 1px solid rgba(155,205,255,.23);
+      background: rgba(255,255,255,.06); box-shadow: none;
+    }
+    .lobby-mode-choice strong { font: 800 10px "Orbitron",ui-sans-serif,sans-serif; }
+    .lobby-mode-choice small { color: #aebfce; font-size: 8px; letter-spacing: .07em; }
+    .lobby-mode-choice.selected {
+      border-color: rgba(89,180,255,.75);
+      background: linear-gradient(145deg, rgba(37,143,233,.48), rgba(20,86,189,.44));
+      box-shadow: inset 0 0 0 1px rgba(89,180,255,.15);
+    }
+    .lobby-mode-choice.unavailable {
+      opacity: .43; cursor: not-allowed; filter: grayscale(.45);
+    }
+    #joinError { display: none; margin-top: 11px; color: #ff9c91; font-size: 12px; line-height: 1.4; }
+    #joinButton {
+      width: 100%; min-height: 46px; margin-top: 2px; color: #f5faff;
+      background: linear-gradient(145deg, #258fe9, #1456bd);
+      box-shadow: 0 8px 22px rgba(16,102,202,.24);
+      font-family: "Orbitron",ui-sans-serif,sans-serif; font-size: 10px;
+    }
+    #driveBackButton { margin-top: 9px; }
+    @media (max-width: 600px) {
+      .lobby-menu-content { top: 3%; padding: 18px 14px; max-height: 94vh; }
+      .lobby-menu-content .menu-description { margin-bottom: 13px; }
+      .lobby-list { max-height: 30vh; }
+      .lobby-row { grid-template-columns: minmax(0,1fr) auto; gap: 8px; }
+      .lobby-row-count { grid-column: 1; grid-row: 2; }
+      .lobby-join-button { grid-column: 2; grid-row: 1 / span 2; }
+      .create-lobby-content { top: 6%; padding: 20px 16px; }
+    }
     .eyebrow { color: var(--accent); font-size: 10px; font-weight: 900; letter-spacing: .2em; }
     h1 { margin: 9px 0 7px; font-size: clamp(27px, 6vw, 36px); line-height: 1.02; letter-spacing: -.04em; }
     .intro { margin: 0 0 22px; color: #b5c2cb; font-size: 13px; line-height: 1.55; }
@@ -229,6 +335,32 @@
     </div>
   </section>
 
+  <section id="modeSelectPanel" class="menu-screen" style="display:none">
+    <div class="menu-content lobby-menu-content">
+      <div class="menu-kicker">ONLINE MULTIPLAYER</div>
+      <h1 class="menu-title">MULTIPLAYER<br>LOBBIES</h1>
+      <p class="menu-description">Join an open lobby or create your own race.</p>
+
+      <label class="field lobby-driver-field">
+        <span>Driver name</span>
+        <input id="driverName" maxlength="18" autocomplete="nickname" value="" placeholder="Enter your driver name">
+      </label>
+
+      <div class="lobby-toolbar">
+        <span id="lobbyDirectoryStatus">CONNECTING TO LOBBY DIRECTORY...</span>
+        <button id="refreshLobbiesButton" class="menu-button secondary" type="button">REFRESH</button>
+      </div>
+      <div id="lobbyList" class="lobby-list" aria-live="polite">
+        <div class="lobby-empty">Looking for available lobbies...</div>
+      </div>
+
+      <div class="lobby-footer-actions">
+        <button id="openCreateLobbyButton" class="menu-button" type="button">CREATE LOBBY</button>
+        <button id="modeBackButton" type="button">BACK TO MAIN MENU</button>
+      </div>
+    </div>
+  </section>
+
   <section id="garagePanel" style="display:none">
     <div class="eyebrow">SHORT-COURSE TRUCK</div>
     <h2 class="garage-title">BODY & CHASSIS GARAGE</h2>
@@ -243,22 +375,35 @@
     <button id="garageBackButton" type="button">BACK TO MAIN MENU</button>
   </section>
 
-  <section id="joinPanel" class="panel" style="display:none">
-    <div class="eyebrow">ONLINE PRACTICE ARENA</div>
-    <h1>Start your<br>engines.</h1>
-    <p class="intro">Join a room and drive with other players. Share the same room code to meet up in the arena.</p>
-    <label class="field">
-      <span>Driver name</span>
-      <input id="driverName" maxlength="18" autocomplete="nickname" value="">
-    </label>
-    <label class="field">
-      <span>Room code</span>
-      <input id="roomCode" maxlength="24" autocomplete="off" spellcheck="false" value="pit-lane">
-    </label>
-    <button id="joinButton" type="button">JOIN THE ARENA</button>
-    <button id="driveBackButton" type="button">BACK TO MAIN MENU</button>
-    <div id="joinError"></div>
-    <div class="fine-print">Peer-to-peer multiplayer · No account required<br>WASD to drive · Space to brake · R to reset</div>
+  <section id="joinPanel" class="menu-screen" style="display:none">
+    <div class="menu-content create-lobby-content">
+      <div class="menu-kicker">NEW MULTIPLAYER ROOM</div>
+      <h1 class="menu-title">CREATE LOBBY</h1>
+      <p class="menu-description">Choose a lobby name and game mode.</p>
+
+      <label class="field">
+        <span>Lobby name</span>
+        <input id="lobbyName" maxlength="28" autocomplete="off" value="" placeholder="Example: Friday Night Race">
+      </label>
+
+      <div class="lobby-mode-heading">LOBBY MODE</div>
+      <div class="lobby-mode-grid">
+        <button id="lobbyModeRace" class="lobby-mode-choice selected" data-lobby-mode="race" type="button">
+          <strong>RACE</strong><small>AVAILABLE</small>
+        </button>
+        <button class="lobby-mode-choice unavailable" data-lobby-mode="time-trial" type="button" disabled>
+          <strong>TIME TRIAL</strong><small>COMING SOON</small>
+        </button>
+        <button class="lobby-mode-choice unavailable" data-lobby-mode="sandbox" type="button" disabled>
+          <strong>SANDBOX</strong><small>COMING SOON</small>
+        </button>
+      </div>
+
+      <button id="joinButton" class="menu-button" type="button">CREATE RACE LOBBY</button>
+      <button id="driveBackButton" type="button">BACK TO LOBBIES</button>
+      <div id="joinError"></div>
+      <div class="fine-print">Up to 8 drivers · Peer-to-peer multiplayer</div>
+    </div>
   </section>
 
   <section id="hud" aria-live="polite">
