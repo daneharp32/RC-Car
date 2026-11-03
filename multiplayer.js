@@ -67,6 +67,22 @@ export function createMultiplayerSystem(game) {
   let networkTimer = 0;
   let selectedLobbyMode = "race";
 
+  function cleanPlayerName(value) {
+    return typeof value === "string"
+      ? value.replace(/[\u0000-\u001f\u007f]/g, "").replace(/\s+/g, " ").trim().slice(0, 18)
+      : "";
+  }
+
+  function setDriverName(value) {
+    driverName = cleanPlayerName(value) || "Driver";
+    const input = $("driverName");
+    if (input && input.value !== driverName) input.value = driverName;
+    if (joined && game.localCar?.setPlayerName) {
+      game.localCar.setPlayerName(driverName, true);
+    }
+    return driverName;
+  }
+
   function currentPlayerCount() {
     return Math.min(MAX_PLAYERS, 1 + roomPeerIds.size);
   }
@@ -93,7 +109,7 @@ export function createMultiplayerSystem(game) {
   function addRemotePlayer(peerId, data) {
     let remote = remotePlayers.get(peerId);
     if (!remote) {
-      const name = typeof data.name === "string" ? data.name.slice(0, 18) : "Driver";
+      const name = cleanPlayerName(data.name) || "Driver";
       const visual = makeCarVisual(colorForPeer(peerId), name);
       remote = {
         visual,
@@ -105,6 +121,11 @@ export function createMultiplayerSystem(game) {
       };
       remotePlayers.set(peerId, remote);
       updatePlayerCount();
+    }
+    const incomingName = cleanPlayerName(data.name) || remote.name || "Driver";
+    if (incomingName !== remote.name) {
+      remote.name = incomingName;
+      remote.visual.setPlayerName?.(incomingName, true);
     }
     if (validSnapshot(data)) {
       remote.target = {
@@ -329,8 +350,8 @@ export function createMultiplayerSystem(game) {
     if (joined || room) return;
     startDirectory();
 
-    const typedName = $("driverName").value.trim().slice(0, 18);
-    driverName = typedName || "Driver";
+    const typedName = $("driverName").value;
+    setDriverName(typedName);
     currentLobby = {
       id: lobby.id,
       name: cleanLobbyName(lobby.name) || "Race Lobby",
@@ -438,6 +459,7 @@ export function createMultiplayerSystem(game) {
       $("topStatus").textContent = "WAITING FOR DRIVERS";
       updatePlayerCount();
       game.controls.resetCar();
+      game.localCar.setPlayerName?.(driverName, true);
       game.race?.enterLobby(currentLobby, hostingLobby, driverName);
       if (hostingLobby) publishLobby();
       showToast(isHost ? "Race lobby created — start when everyone is ready" : "Joined " + currentLobby.name);
@@ -568,6 +590,7 @@ export function createMultiplayerSystem(game) {
 
     for (const remote of remotePlayers.values()) scene.remove(remote.visual.root);
     remotePlayers.clear();
+    game.localCar.setPlayerName?.("", false);
     game.race?.leaveLobby();
     for (const key of Object.keys(game.controls.keys)) game.controls.keys[key] = false;
     updatePlayerCount();
@@ -617,6 +640,7 @@ export function createMultiplayerSystem(game) {
     updatePlayerCount,
     sendSnapshotIfReady,
     startRace,
+    setDriverName,
     get joined() { return joined; },
     get stateAction() { return stateAction; },
     get remotePlayers() { return remotePlayers; },
