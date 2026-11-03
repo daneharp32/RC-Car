@@ -1,4 +1,4 @@
-// Shared two-way ridge profile used by the rendered jump and Cannon heightfield.
+// Shared low-profile ridge used by the rendered track and Cannon heightfield.
 export const JUMP_GRID_SPACING = 0.1;
 
 function smoothStep(value) {
@@ -13,10 +13,10 @@ export function createJumpProfile(width, length, height, spacing = JUMP_GRID_SPA
   const actualWidth = widthSegments * safeSpacing;
   const actualLength = lengthSegments * safeSpacing;
 
-  // The jump is a transverse ridge: its crest stays broad across the lane,
-  // while the approach and departure slopes run only along the driving line.
-  const crestHalfLength = 0.2;
-  const sideShoulderStart = 0.88;
+  // A wide, shallow crest runs across the track. Only the two ends along
+  // the racing line rise and fall, with a gradual zero-slope edge transition.
+  const crestHalfLength = 0.24;
+  const sideShoulderStart = 0.94;
 
   const heights = Array.from({ length: widthSegments + 1 }, (_, xIndex) => {
     const normalizedAcross = Math.abs((xIndex / widthSegments) * 2 - 1);
@@ -26,7 +26,6 @@ export function createJumpProfile(width, length, height, spacing = JUMP_GRID_SPA
       : 1 - smoothStep(shoulderProgress);
 
     return Array.from({ length: lengthSegments + 1 }, (_, lengthIndex) => {
-      // Symmetry makes both ends of the ridge usable as takeoff faces.
       const normalizedAlong = Math.abs((lengthIndex / lengthSegments) * 2 - 1);
       const rampProgress = (normalizedAlong - crestHalfLength) / (1 - crestHalfLength);
       const along = normalizedAlong <= crestHalfLength
