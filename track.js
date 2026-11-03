@@ -248,8 +248,8 @@ export function createTrackSystem({ THREE, scene }) {
   // Instancing keeps the forest to a handful of draw calls instead of one per tree.
   const treeRandom = makeSeededRandom(44102);
   const treeSpots = [];
-  const treeSpacing = 6.0;
-  const edgeRows = [86.5, 92.0];
+  const treeSpacing = 4.1;
+  const edgeRows = [78.0, 84.0, 90.0];
   const halfEdgeSpan = 82.0;
   const treeSafetySamples = centerline.getPoints(160);
 
@@ -280,7 +280,7 @@ export function createTrackSystem({ THREE, scene }) {
           x,
           z,
           yaw: treeRandom() * Math.PI * 2,
-          scale: 0.82 + treeRandom() * 0.48
+          scale: 2.6 + treeRandom() * 0.9
         });
       }
     }
@@ -294,7 +294,7 @@ export function createTrackSystem({ THREE, scene }) {
         x: xSide * 89.0 + (treeRandom() - 0.5) * 1.2,
         z: zSide * 89.0 + (treeRandom() - 0.5) * 1.2,
         yaw: treeRandom() * Math.PI * 2,
-        scale: 1.0 + treeRandom() * 0.28
+        scale: 3.2 + treeRandom() * 0.45
       });
     }
   }
@@ -431,14 +431,14 @@ export function createTrackSystem({ THREE, scene }) {
     trackGroup.add(rut);
   }
 
-  // Five jumps at different points around the loop. Their exact positions are
-  // shared with physics.js so the visible ramps and collision ramps coincide.
+  // Five transverse ridge jumps. Width spans across the track; length follows
+  // the racing line, leaving two smooth approach faces in opposite directions.
   const jumpDefinitions = [
-    { t: 0.105, width: 6.7, length: 7.2, height: 0.72, label: "START STRAIGHT KICKER" },
-    { t: 0.285, width: 6.5, length: 6.4, height: 0.88, label: "TABLETOP" },
-    { t: 0.455, width: 5.7, length: 5.4, height: 0.56, label: "SHORT KICKER" },
-    { t: 0.655, width: 6.4, length: 6.6, height: 0.82, label: "BACK SECTION JUMP" },
-    { t: 0.855, width: 5.4, length: 4.4, height: 0.34, label: "ROLLER" }
+    { t: 0.105, width: 11.2, length: 6.6, height: 0.52, label: "START STRAIGHT KICKER" },
+    { t: 0.285, width: 11.2, length: 6.8, height: 0.58, label: "TABLETOP" },
+    { t: 0.455, width: 10.8, length: 6.0, height: 0.44, label: "SHORT KICKER" },
+    { t: 0.655, width: 11.2, length: 6.6, height: 0.54, label: "BACK SECTION JUMP" },
+    { t: 0.855, width: 10.6, length: 5.4, height: 0.30, label: "ROLLER" }
   ];
   const jumps = jumpDefinitions.map((definition) => {
     const point = centerline.getPointAt(definition.t);
@@ -469,7 +469,7 @@ export function createTrackSystem({ THREE, scene }) {
     metalness: 0
   });
   for (const jump of jumps) {
-    // The shared bell-shaped surface is equally smooth from either approach.
+    // The shared ridge profile has broad sides and symmetric takeoff faces.
     const ramp = new THREE.Mesh(
       makeJumpSurfaceGeometry(THREE, jump.profile),
       jumpMaterial
