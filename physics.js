@@ -2,7 +2,7 @@ import { selfId } from "https://esm.sh/trystero@0.26.0";
 
 // Builds the Cannon-es world, terrain colliders, chassis, and four-wheel
 // raycast vehicle. The returned objects are shared by the driving systems.
-export function createPhysicsSystem({ CANNON, trackLayout }) {
+export function createPhysicsSystem({ CANNON, trackLayout, shellFit = false }) {
 const world = new CANNON.World({
   gravity: new CANNON.Vec3(0, -9.82, 0)
 });
@@ -65,7 +65,7 @@ const chassisBody = new CANNON.Body({
   angularDamping: 0.90
 });
 chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), spawnYaw);
-chassisBody.addShape(new CANNON.Box(new CANNON.Vec3(0.30, 0.08, 0.43)));
+chassisBody.addShape(new CANNON.Box(new CANNON.Vec3(0.30, 0.08, shellFit ? 0.53 : 0.43)));
 chassisBody.allowSleep = false;
 
 const vehicle = new CANNON.RaycastVehicle({
@@ -75,15 +75,19 @@ const vehicle = new CANNON.RaycastVehicle({
   indexUpAxis: 1
 });
 
+// The Ranger's measured wheel-arch spacing is used only when its mesh loads.
+const SHELL_FIT_WHEELBASE = 0.9512820513;
+const ACTIVE_WHEELBASE = shellFit ? SHELL_FIT_WHEELBASE : 0.58;
+const AXLE_HALF_SPACING = ACTIVE_WHEELBASE / 2;
 const wheelPositions = [
-  [-0.305, -0.018, -0.29],
-  [ 0.305, -0.018, -0.29],
-  [-0.305, -0.018,  0.29],
-  [ 0.305, -0.018,  0.29]
+  [-0.305, -0.018, -AXLE_HALF_SPACING],
+  [ 0.305, -0.018, -AXLE_HALF_SPACING],
+  [-0.305, -0.018,  AXLE_HALF_SPACING],
+  [ 0.305, -0.018,  AXLE_HALF_SPACING]
 ];
 
-// Visual-only length increase. Physics wheel attachment points stay unchanged.
-const VISUAL_CHASSIS_LENGTH_SCALE = 1.26;
+// The original body keeps its visual-only scale when the Ranger is unavailable.
+const VISUAL_CHASSIS_LENGTH_SCALE = shellFit ? 1.0 : 1.26;
 
 for (let i = 0; i < 4; i++) {
   const [x, y, z] = wheelPositions[i];
