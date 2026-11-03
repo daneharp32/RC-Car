@@ -43,7 +43,8 @@ export function createMultiplayerSystem(game) {
       qw: chassisBody.quaternion.w,
       wheels: vehicle.wheelInfos.map((wheel) => wheel.rotation),
       steer: vehicle.wheelInfos[0].steering,
-      mph: chassisBody.velocity.length() * 2.236936
+      mph: chassisBody.velocity.length() * 2.236936,
+      race: game.race ? game.race.getNetworkState() : null
     };
   }
 
@@ -54,6 +55,7 @@ export function createMultiplayerSystem(game) {
 
   let room = null;
   let stateAction = null;
+  let raceControlAction = null;
   let directoryRoom = null;
   let directoryAction = null;
   let directoryTimer = null;
@@ -146,7 +148,7 @@ export function createMultiplayerSystem(game) {
       name.textContent = lobby.name;
       const mode = document.createElement("div");
       mode.className = "lobby-row-mode";
-      mode.textContent = lobby.mode.toUpperCase();
+      mode.textContent = lobby.mode.toUpperCase() + " · " + lobby.laps + (lobby.laps === 1 ? " LAP" : " LAPS");
       main.append(name, mode);
 
       const count = document.createElement("div");
@@ -157,8 +159,9 @@ export function createMultiplayerSystem(game) {
       join.type = "button";
       join.className = "menu-button lobby-join-button";
       join.dataset.joinLobby = lobby.id;
-      join.textContent = lobby.playerCount >= MAX_PLAYERS ? "FULL" : "JOIN";
-      join.disabled = lobby.playerCount >= MAX_PLAYERS;
+      const lobbyLocked = lobby.phase && lobby.phase !== "waiting";
+      join.textContent = lobby.playerCount >= MAX_PLAYERS ? "FULL" : lobbyLocked ? "IN RACE" : "JOIN";
+      join.disabled = lobby.playerCount >= MAX_PLAYERS || lobbyLocked;
 
       row.append(main, count, join);
       list.appendChild(row);
@@ -183,6 +186,8 @@ export function createMultiplayerSystem(game) {
       id: currentLobby.id,
       name: currentLobby.name,
       mode: currentLobby.mode,
+      laps: currentLobby.laps,
+      phase: game.race?.phase || "waiting",
       playerCount: currentPlayerCount(),
       maxPlayers: MAX_PLAYERS
     };
@@ -261,6 +266,8 @@ export function createMultiplayerSystem(game) {
           id: message.id,
           name: name || "Untitled Lobby",
           mode,
+          laps: Number.isFinite(message.laps) ? Math.max(1, Math.min(20, Math.floor(message.laps))) : 3,
+          phase: ["waiting", "countdown", "racing", "finished"].includes(message.phase) ? message.phase : "waiting",
           playerCount,
           maxPlayers: MAX_PLAYERS,
           peerId,
@@ -282,7 +289,7 @@ export function createMultiplayerSystem(game) {
       if (!directoryTimer) {
         directoryTimer = setInterval(() => {
           pruneLobbyListings();
-          if (hostingLobby && joined) publishLobby();
+          if (hostingLobby && joined && game.race?.phase === "waiting") publishLobby();
         }, HEARTBEAT_MS);
       }
       updateDirectoryStatus("CONNECTING TO LOBBY DIRECTORY...");
@@ -326,7 +333,9 @@ export function createMultiplayerSystem(game) {
     currentLobby = {
       id: lobby.id,
       name: cleanLobbyName(lobby.name) || "Race Lobby",
-      mode: lobby.mode || "race"
+      mode: lobby.mode || "race",
+      laps: Number.isFinite(lobby.laps) ? Math.max(1, Math.min(20, Math.floor(lobby.laps))) : 3,
+      hostPeerId: isHost ? selfId : lobby.peerId
     };
     hostingLobby = !!isHost;
     roomPeerIds.clear();
@@ -346,6 +355,9 @@ export function createMultiplayerSystem(game) {
     try {
       room = joinRoom({ appId: APP_ID }, currentLobby.id, {
         onPeerHandshake: async (peerId) => {
+          if (hostingLobby && game.race?.phase !== "waiting") {
+            throw new Error("RACE_IN_PROGRESS");
+          }
           if (roomPeerIds.has(peerId) || pendingRoomPeers.has(peerId)) return;
           if (1 + roomPeerIds.size + pendingRoomPeers.size >= MAX_PLAYERS) {
             throw new Error("LOBBY_FULL");
@@ -367,15 +379,31 @@ export function createMultiplayerSystem(game) {
         const peerId = meta?.peerId;
         if (!peerId || peerId === selfId || !validSnapshot(data)) return;
         addRemotePlayer(peerId, data);
+        if (data.race) game.race?.updateRemoteState(peerId, {
+          ...data.race,
+          name: data.name || data.race.name
+        });
+      };
+
+      raceControlAction = room.makeAction("race-control");
+      raceControlAction.onMessage = (message, meta) => {
+        const peerId = meta?.peerId;
+        if (hostingLobby || !peerId || !message || message.type !== "start-race") return;
+        if (currentLobby.hostPeerId && peerId !== currentLobby.hostPeerId) return;
+        game.race?.beginCountdown({
+          laps: message.laps,
+          countdownMs: message.countdownMs
+        });
       };
 
       room.onPeerJoin = (peerId) => {
         pendingRoomPeers.delete(peerId);
         roomPeerIds.add(peerId);
+        if (!hostingLobby && !currentLobby.hostPeerId) currentLobby.hostPeerId = peerId;
         peersConnected = roomPeerIds.size > 0;
         updatePlayerCount();
         if (stateAction) stateAction.send(makeSnapshot());
-        if (hostingLobby) publishLobby();
+        if (hostingLobby && game.race?.phase === "waiting") publishLobby();
         showToast("Another driver joined");
       };
 
@@ -387,6 +415,7 @@ export function createMultiplayerSystem(game) {
           scene.remove(remote.visual.root);
           remotePlayers.delete(peerId);
         }
+        game.race?.removeRemoteState(peerId);
         peersConnected = roomPeerIds.size > 0;
         updatePlayerCount();
         if (hostingLobby) publishLobby();
@@ -405,12 +434,14 @@ export function createMultiplayerSystem(game) {
       $("topStatus").textContent = "WAITING FOR DRIVERS";
       updatePlayerCount();
       game.controls.resetCar();
+      game.race?.enterLobby(currentLobby, hostingLobby, driverName);
       if (hostingLobby) publishLobby();
-      showToast(isHost ? "Race lobby created" : "Joined " + currentLobby.name);
+      showToast(isHost ? "Race lobby created — start when everyone is ready" : "Joined " + currentLobby.name);
     } catch (error) {
       console.error("Unable to join multiplayer lobby:", error);
       room = null;
       stateAction = null;
+      raceControlAction = null;
       joined = false;
       hostingLobby = false;
       currentLobby = null;
@@ -432,6 +463,7 @@ export function createMultiplayerSystem(game) {
     const name = cleanLobbyName($("lobbyName").value) || "Race Lobby";
     const selectedButton = document.querySelector(".lobby-mode-choice.selected");
     const mode = selectedButton?.dataset.lobbyMode || selectedLobbyMode;
+    const laps = Math.max(1, Math.min(20, Number($("raceLapCount").value) || 3));
     if (mode !== "race") {
       joinError.textContent = "That lobby mode isn't available yet.";
       joinError.style.display = "block";
@@ -442,8 +474,24 @@ export function createMultiplayerSystem(game) {
       id: createRoomId(),
       name,
       mode,
+      laps,
+      phase: "waiting",
       playerCount: 1
     }, true);
+  }
+
+  function startRace() {
+    if (!hostingLobby || !joined || game.race?.phase !== "waiting" || !raceControlAction) return false;
+    const message = {
+      type: "start-race",
+      laps: currentLobby.laps,
+      countdownMs: 6000
+    };
+    if (!game.race.beginCountdown(message)) return false;
+    removePublishedLobby();
+    raceControlAction.send(message);
+    showToast("Race start announced to all drivers");
+    return true;
   }
 
   function joinLobby(lobby) {
@@ -467,6 +515,7 @@ export function createMultiplayerSystem(game) {
       if (performance.now() - remote.lastSeen > 12000) {
         scene.remove(remote.visual.root);
         remotePlayers.delete(peerId);
+        game.race?.removeRemoteState(peerId);
         continue;
       }
       if (!remote.target) continue;
@@ -501,6 +550,7 @@ export function createMultiplayerSystem(game) {
     }
     room = null;
     stateAction = null;
+    raceControlAction = null;
     joined = false;
     currentLobby = null;
     roomPeerIds.clear();
@@ -509,6 +559,7 @@ export function createMultiplayerSystem(game) {
 
     for (const remote of remotePlayers.values()) scene.remove(remote.visual.root);
     remotePlayers.clear();
+    game.race?.leaveLobby();
     for (const key of Object.keys(game.controls.keys)) game.controls.keys[key] = false;
     updatePlayerCount();
     hud.style.display = "none";
@@ -556,6 +607,7 @@ export function createMultiplayerSystem(game) {
     updateRemoteVisuals,
     updatePlayerCount,
     sendSnapshotIfReady,
+    startRace,
     get joined() { return joined; },
     get stateAction() { return stateAction; },
     get remotePlayers() { return remotePlayers; },
