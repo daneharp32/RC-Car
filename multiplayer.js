@@ -367,8 +367,11 @@ export function createMultiplayerSystem(game) {
         },
         onJoinError: ({ peerId, error }) => {
           pendingRoomPeers.delete(peerId);
-          if (String(error?.message || error).toLowerCase().includes("full")) {
+          const message = String(error?.message || error).toLowerCase();
+          if (message.includes("full")) {
             showToast("Lobby is full (8/8 players)");
+          } else if (message.includes("race_in_progress")) {
+            showToast("That race has already started");
           } else {
             console.warn("Lobby peer connection failed:", peerId, error);
           }
@@ -498,6 +501,11 @@ export function createMultiplayerSystem(game) {
   function joinLobby(lobby) {
     if (!lobby || !validLobbyId(lobby.id)) return;
     const latest = discoveredLobbies.get(lobby.id) || lobby;
+    if (latest.phase && latest.phase !== "waiting") {
+      refreshLobbyList();
+      showToast("That race has already started");
+      return;
+    }
     if (Date.now() - (latest.lastSeen || 0) > LOBBY_TTL_MS) {
       refreshLobbyList();
       showToast("That lobby is no longer listed");
