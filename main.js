@@ -178,7 +178,7 @@ try {
 // Physics: Cannon's RaycastVehicle applies suspension and tire impulses only
 // when each wheel ray has actually found a surface to touch.
 
-const physicsSystem = createPhysicsSystem({ CANNON, trackLayout, shellFit: !!shellGeometry });
+const physicsSystem = createPhysicsSystem({ CANNON, trackLayout, shellFit: !!shellGeometry, shellGeometry });
 const {
   world,
   chassisBody,
