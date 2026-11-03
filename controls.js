@@ -47,7 +47,10 @@ window.addEventListener("keydown", (event) => {
     event.preventDefault();
     keys[key] = true;
   }
-  if (key === "r" && !event.repeat && game.multiplayer?.joined) resetCar();
+  if (key === "r" && !event.repeat && game.multiplayer?.joined) {
+    resetCar();
+    game.race?.onCarReset();
+  }
 });
 
 window.addEventListener("keyup", (event) => {
@@ -83,11 +86,17 @@ const localAirTorque = new CANNON.Vec3();
 const worldAirTorque = new CANNON.Vec3();
 
 function updateDrivingControls(delta) {
-  if (!game.multiplayer?.joined) {
+  const raceAllowsDriving = !game.race || game.race.phase === "racing";
+  if (!game.multiplayer?.joined || !raceAllowsDriving) {
+    // Cars stay parked in the grid while the host is preparing the race and
+    // during the countdown. Inputs are only enabled after the shared GO state.
     for (let i = 0; i < 4; i++) {
       vehicle.applyEngineForce(0, i);
-      vehicle.setBrake(0, i);
+      vehicle.setBrake(game.multiplayer?.joined ? 12 : 0, i);
     }
+    throttleState = 0;
+    steerState = 0;
+    steeringAngleState = 0;
     return;
   }
 
