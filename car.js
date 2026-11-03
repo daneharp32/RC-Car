@@ -646,7 +646,7 @@ function makeCarVisual(color, playerName = "") {
     "The supplied single-cab Ranger shell. Its proportions are preserved; the chassis and axle spacing were adjusted to fit its wheel openings."
   );
   const shellMaterial = new THREE.MeshStandardMaterial({
-    color: 0xffffff,
+    color: 0xff581a,
     roughness: 0.54,
     metalness: 0.015,
     side: THREE.DoubleSide
