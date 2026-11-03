@@ -230,6 +230,12 @@
     .intro { margin: 0 0 22px; color: #b5c2cb; font-size: 13px; line-height: 1.55; }
     .field { display: block; margin: 0 0 13px; }
     .field span { display: block; margin: 0 0 7px; color: #c8d2d9; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .main-nickname-field {
+      width: min(320px, 100%); margin: 18px auto 14px; text-align: left;
+    }
+    .main-nickname-field span { color: #cfe1ef; font-size: 10px; letter-spacing: .12em; }
+    .main-nickname-field input { height: 43px; background: rgba(10,20,32,.76); border-color: rgba(123,183,225,.28); }
+    .main-nickname-field input::placeholder { color: #7f92a2; }
     input {
       display: block; width: 100%; height: 45px; padding: 0 13px; border: 1px solid rgba(255,255,255,.15);
       border-radius: 10px; outline: none; background: rgba(255,255,255,.07); color: white;
@@ -392,6 +398,10 @@
       <div class="menu-kicker">RADIO CONTROL • MULTIPLAYER</div>
       <h1 class="menu-title">RC CAR<br>SIMULATOR</h1>
       <p class="menu-description">Build your line. Hit the jumps. Drive together.</p>
+      <label class="field main-nickname-field">
+        <span>Your nickname</span>
+        <input id="mainDriverName" maxlength="18" autocomplete="nickname" value="" placeholder="Choose a driver name">
+      </label>
       <div class="menu-actions">
         <button id="menuDriveButton" class="menu-button" type="button">DRIVE</button>
         <button id="menuGarageButton" class="menu-button secondary" type="button">GARAGE</button>
