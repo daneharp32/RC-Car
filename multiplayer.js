@@ -179,7 +179,8 @@ export function createMultiplayerSystem(game) {
   }
 
   function publishLobby() {
-    if (!hostingLobby || !currentLobby || !directoryAction) return;
+    // Once the host starts the race, keep the room out of the public browser.
+    if (!hostingLobby || !currentLobby || !directoryAction || game.race?.phase !== "waiting") return;
 
     const announcement = {
       type: "upsert",
