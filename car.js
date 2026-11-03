@@ -489,19 +489,11 @@ function makeCarVisual(color, playerName = "") {
 
   const rearStructure = makePart(
     chassisGroup,
-    "rear-bumper-wing-support",
-    "Rear bumper and wing support frame",
-    "The rear bumper protects the back of the chassis. The open tubular frame supports the rear wing when the body shell is removed."
+    "rear-bumper",
+    "Rear impact bumper",
+    "Compact rear impact bumper. The oversized wing, vertical supports, and upper wing plate have been removed."
   );
   roundedBox(rearStructure, [0.64, 0.07, 0.085], blackPlastic, [0, -0.005, 0.54], null, 0.022);
-  for (const side of [-1, 1]) {
-    cylinderBetween(rearStructure, [side * 0.19, 0.015, 0.40], [side * 0.19, 0.28, 0.57], 0.015, carbonEdge, 12);
-    cylinderBetween(rearStructure, [side * 0.19, 0.28, 0.57], [side * 0.31, 0.31, 0.67], 0.014, alloy, 10);
-    cylinderBetween(rearStructure, [side * 0.31, 0.31, 0.67], [side * 0.19, 0.015, 0.40], 0.012, blackPlastic, 10);
-  }
-  cylinderBetween(rearStructure, [-0.31, 0.31, 0.67], [0.31, 0.31, 0.67], 0.014, carbonEdge, 12);
-  cylinderBetween(rearStructure, [-0.19, 0.28, 0.57], [0.19, 0.28, 0.57], 0.014, alloy, 12);
-  roundedBox(rearStructure, [0.60, 0.035, 0.14], carbon, [0, 0.335, 0.66], [-0.10, 0, 0], 0.014);
 
   const bodyPosts = makePart(
     chassisGroup,
@@ -1047,6 +1039,37 @@ function makeCarVisual(color, playerName = "") {
     makeBodyShell();
   }
 
+  // Hide components that occupy the Ranger shell's interior while the shell
+  // is installed. Lower suspension links and wheel carriers remain visible;
+  // removing the shell in the Garage restores all internal components.
+  const rangerOccludedPartIds = new Set([
+    "front-shock-tower",
+    "rear-shock-tower",
+    "front-left-oil-shock",
+    "front-right-oil-shock",
+    "rear-left-oil-shock",
+    "rear-right-oil-shock",
+    "steering-servo",
+    "lipo-battery",
+    "brushless-motor",
+    "spur-pinion-gears",
+    "electronic-speed-controller",
+    "radio-receiver",
+    "power-wiring",
+    "receiver-servo-wiring",
+    "body-mount-posts"
+  ]);
+  function updateRangerShellClearance(shellVisible) {
+    if (!shellGeometry) return;
+    chassisGroup.traverse((object) => {
+      const partId = object.userData?.partInfo?.id;
+      if (partId && rangerOccludedPartIds.has(partId)) {
+        object.visible = !shellVisible;
+      }
+    });
+  }
+  updateRangerShellClearance(true);
+
   // All painted shell surfaces share one garage hover identity. The chassis
   // retains its own individual component labels when the shell is removed.
   shellGroup.userData.partInfo = {
@@ -1092,7 +1115,11 @@ function makeCarVisual(color, playerName = "") {
     wheelPivots,
     shellGroup,
     chassisGroup,
-    setShellVisible(visible) { shellGroup.visible = !!visible; }
+    setShellVisible(visible) {
+      const shellIsVisible = !!visible;
+      shellGroup.visible = shellIsVisible;
+      updateRangerShellClearance(shellIsVisible);
+    }
   };
 }
   return makeCarVisual;
