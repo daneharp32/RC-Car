@@ -220,7 +220,24 @@ async function loadRangerShellGeometry() {
     }
     geometry.setIndex(new THREE.BufferAttribute(indices.array, 1));
   }
-  if (!geometry.getAttribute("normal")) geometry.computeVertexNormals();
+  // The source STL's main shell surface is wound inward. Reverse each
+  // triangle so Three.js generates outward-facing lighting normals.
+  const indexAttribute = geometry.getIndex();
+  if (indexAttribute) {
+    const indexArray = indexAttribute.array;
+    if (indexArray.length % 3 !== 0) {
+      throw new Error("The Ranger shell contains an incomplete triangle.");
+    }
+    for (let i = 0; i < indexArray.length; i += 3) {
+      const second = indexArray[i + 1];
+      indexArray[i + 1] = indexArray[i + 2];
+      indexArray[i + 2] = second;
+    }
+    indexAttribute.needsUpdate = true;
+  }
+  // Rebuild the vertex normals from the corrected triangle winding.
+  geometry.deleteAttribute("normal");
+  geometry.computeVertexNormals();
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
   return geometry;
