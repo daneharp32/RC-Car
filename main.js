@@ -387,6 +387,7 @@ try {
 if (!initialNickname) {
   initialNickname = "Driver" + String(Math.floor(100 + Math.random() * 900));
 }
+let currentNickname = initialNickname;
 
 const mainNicknameInput = $("mainDriverName");
 const lobbyNicknameInput = $("driverName");
@@ -396,9 +397,14 @@ multiplayer.setDriverName(initialNickname);
 
 function syncNickname(source) {
   const nickname = cleanNickname(source.value);
-  if (source !== mainNicknameInput) mainNicknameInput.value = source.value.slice(0, 18);
-  if (source !== lobbyNicknameInput) lobbyNicknameInput.value = source.value.slice(0, 18);
-  if (!nickname) return;
+  if (!nickname) {
+    mainNicknameInput.value = source.value;
+    lobbyNicknameInput.value = source.value;
+    return;
+  }
+  currentNickname = nickname;
+  mainNicknameInput.value = nickname;
+  lobbyNicknameInput.value = nickname;
   multiplayer.setDriverName(nickname);
   try {
     window.localStorage.setItem(NICKNAME_STORAGE_KEY, nickname);
@@ -406,13 +412,12 @@ function syncNickname(source) {
     console.warn("Could not save nickname in this browser:", error);
   }
 }
-function restoreNickname(source) {
-  const nickname = cleanNickname(source.value) || initialNickname;
-  mainNicknameInput.value = nickname;
-  lobbyNicknameInput.value = nickname;
-  multiplayer.setDriverName(nickname);
+function restoreNickname() {
+  mainNicknameInput.value = currentNickname;
+  lobbyNicknameInput.value = currentNickname;
+  multiplayer.setDriverName(currentNickname);
 }
 mainNicknameInput.addEventListener("input", () => syncNickname(mainNicknameInput));
 lobbyNicknameInput.addEventListener("input", () => syncNickname(lobbyNicknameInput));
-mainNicknameInput.addEventListener("blur", () => restoreNickname(mainNicknameInput));
-lobbyNicknameInput.addEventListener("blur", () => restoreNickname(lobbyNicknameInput));
+mainNicknameInput.addEventListener("blur", restoreNickname);
+lobbyNicknameInput.addEventListener("blur", restoreNickname);
