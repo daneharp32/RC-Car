@@ -439,13 +439,13 @@ export function createTrackSystem({ THREE, scene }) {
   // Five transverse ridge jumps. Width spans across the track; length follows
   // the racing line, leaving two smooth approach faces in opposite directions.
   const jumpDefinitions = [
-    // Keep the ridges broad across the lane; size increases are mainly in
-    // their run-up length, with only a restrained height increase.
-    { t: 0.105, width: 11.4, length: 11.6, height: 0.28, label: "START STRAIGHT KICKER" },
-    { t: 0.285, width: 11.4, length: 12.6, height: 0.31, label: "TABLETOP" },
-    { t: 0.455, width: 11.2, length: 10.8, height: 0.23, label: "SHORT KICKER" },
-    { t: 0.655, width: 11.4, length: 12.2, height: 0.29, label: "BACK SECTION JUMP" },
-    { t: 0.855, width: 10.9, length: 10.0, height: 0.17, label: "ROLLER" }
+    // Slightly taller peaks give the jumps a clearer takeoff face while the
+    // long footprint keeps the approach and landing transitions progressive.
+    { t: 0.105, width: 11.4, length: 11.6, height: 0.38, label: "START STRAIGHT KICKER" },
+    { t: 0.285, width: 11.4, length: 12.6, height: 0.42, label: "TABLETOP" },
+    { t: 0.455, width: 11.2, length: 10.8, height: 0.32, label: "SHORT KICKER" },
+    { t: 0.655, width: 11.4, length: 12.2, height: 0.40, label: "BACK SECTION JUMP" },
+    { t: 0.855, width: 10.9, length: 10.0, height: 0.22, label: "ROLLER" }
   ];
   const jumps = jumpDefinitions.map((definition) => {
     const point = centerline.getPointAt(definition.t);
