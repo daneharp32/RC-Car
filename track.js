@@ -1,4 +1,5 @@
 // Procedural closed-course RC dirt track.
+import { createJumpProfile } from "./jump-profile.js";
 // All scenery is grouped under one object so the garage can hide/show the arena
 // without having to track individual decorative meshes.
 
@@ -101,25 +102,36 @@ function makeTrackStripGeometry(THREE, curve, halfWidth, sampleCount, y, totalLe
   return geometry;
 }
 
-function makeRampGeometry(THREE, width, length, height) {
-  const w = width / 2;
-  const l = length / 2;
-  const vertices = [
-    [-w, 0, l], [w, 0, l], [-w, 0, -l],
-    [w, 0, -l], [-w, height, -l], [w, height, -l]
-  ];
-  const faces = [
-    [0, 2, 3, 1], [0, 1, 5, 4], [0, 4, 2],
-    [1, 3, 5], [2, 4, 5, 3]
-  ];
+function makeJumpSurfaceGeometry(THREE, profile) {
+  const { heights, width, length, elementSize } = profile;
+  const widthSegments = heights.length - 1;
+  const lengthSegments = heights[0].length - 1;
+  const positions = [];
+  const uvs = [];
   const indices = [];
-  for (const face of faces) {
-    for (let i = 1; i < face.length - 1; i++) {
-      indices.push(face[0], face[i], face[i + 1]);
+
+  for (let xIndex = 0; xIndex <= widthSegments; xIndex++) {
+    const x = -width / 2 + xIndex * elementSize;
+    for (let lengthIndex = 0; lengthIndex <= lengthSegments; lengthIndex++) {
+      // Heightfield rows run from the back of the jump toward the front.
+      const z = length / 2 - lengthIndex * elementSize;
+      positions.push(x, heights[xIndex][lengthIndex], z);
+      uvs.push(xIndex / widthSegments, lengthIndex / lengthSegments);
+
+      if (xIndex < widthSegments && lengthIndex < lengthSegments) {
+        const a = xIndex * (lengthSegments + 1) + lengthIndex;
+        const b = a + lengthSegments + 1;
+        const c = a + 1;
+        const d = b + 1;
+        // Winding faces upward while the local Z axis points along the ramp.
+        indices.push(a, b, c, b, d, c);
+      }
     }
   }
+
   const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices.flat(), 3));
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
@@ -431,10 +443,22 @@ export function createTrackSystem({ THREE, scene }) {
   const jumps = jumpDefinitions.map((definition) => {
     const point = centerline.getPointAt(definition.t);
     const tangent = centerline.getTangentAt(definition.t).normalize();
+    const profile = createJumpProfile(
+      definition.width,
+      definition.length,
+      definition.height
+    );
     return {
       ...definition,
+      width: profile.width,
+      length: profile.length,
+      profile,
       x: point.x,
       z: point.z,
+      tangentX: tangent.x,
+      tangentZ: tangent.z,
+      normalX: -tangent.z,
+      normalZ: tangent.x,
       yaw: Math.atan2(-tangent.x, -tangent.z)
     };
   });
@@ -445,8 +469,9 @@ export function createTrackSystem({ THREE, scene }) {
     metalness: 0
   });
   for (const jump of jumps) {
+    // The shared bell-shaped surface is equally smooth from either approach.
     const ramp = new THREE.Mesh(
-      makeRampGeometry(THREE, jump.width, jump.length, jump.height),
+      makeJumpSurfaceGeometry(THREE, jump.profile),
       jumpMaterial
     );
     ramp.position.set(jump.x, 0.01, jump.z);
@@ -455,23 +480,6 @@ export function createTrackSystem({ THREE, scene }) {
     ramp.receiveShadow = true;
     ramp.name = jump.label;
     trackGroup.add(ramp);
-
-    // Side markers make the takeoff edges easier to read at speed.
-    const markerMaterial = new THREE.MeshStandardMaterial({
-      color: 0xe8dfcb,
-      roughness: 0.72
-    });
-    const markerGeometry = new THREE.BoxGeometry(0.14, 0.045, 0.52);
-    for (const side of [-1, 1]) {
-      const marker = new THREE.Mesh(markerGeometry, markerMaterial);
-      marker.position.set(side * (jump.width * 0.5 + 0.18), 0.05, 0);
-      marker.castShadow = true;
-      const markerGroup = new THREE.Group();
-      markerGroup.position.set(jump.x, 0, jump.z);
-      markerGroup.rotation.y = jump.yaw;
-      markerGroup.add(marker);
-      trackGroup.add(markerGroup);
-    }
   }
 
   // Alternating red/white safety curbs run around both edges of the entire
