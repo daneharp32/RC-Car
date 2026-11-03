@@ -1060,11 +1060,31 @@ function makeCarVisual(color, playerName = "") {
     }
   });
 
-  if (playerName) {
+  let playerNameSprite = null;
+  function setPlayerName(name, visible = true) {
+    const safeName = String(name || "").replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 18);
+    if (!visible || !safeName) {
+      if (playerNameSprite) {
+        root.remove(playerNameSprite);
+        playerNameSprite.material.map?.dispose();
+        playerNameSprite.material.dispose();
+        playerNameSprite = null;
+      }
+      return;
+    }
+
+    if (playerNameSprite) {
+      root.remove(playerNameSprite);
+      playerNameSprite.material.map?.dispose();
+      playerNameSprite.material.dispose();
+      playerNameSprite = null;
+    }
+
     const labelCanvas = document.createElement("canvas");
     labelCanvas.width = 512;
     labelCanvas.height = 128;
     const ctx = labelCanvas.getContext("2d");
+    if (!ctx) return;
     ctx.fillStyle = "rgba(13,20,29,.82)";
     ctx.beginPath();
     ctx.roundRect(8, 14, 496, 100, 28);
@@ -1073,16 +1093,18 @@ function makeCarVisual(color, playerName = "") {
     ctx.font = "bold 46px system-ui";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(playerName.slice(0, 18), 256, 64);
+    ctx.fillText(safeName, 256, 64);
     const texture = new THREE.CanvasTexture(labelCanvas);
     texture.colorSpace = THREE.SRGBColorSpace;
-    const tag = new THREE.Sprite(new THREE.SpriteMaterial({
+    playerNameSprite = new THREE.Sprite(new THREE.SpriteMaterial({
       map: texture, transparent: true, depthWrite: false
     }));
-    tag.position.set(0, 0.95, 0);
-    tag.scale.set(1.34, 0.34, 1);
-    root.add(tag);
+    playerNameSprite.position.set(0, 0.95, 0);
+    const width = THREE.MathUtils.clamp(0.72 + safeName.length * 0.035, 0.95, 1.55);
+    playerNameSprite.scale.set(width, 0.34, 1);
+    root.add(playerNameSprite);
   }
+  setPlayerName(playerName, !!playerName);
 
   scene.add(root);
   return {
@@ -1090,7 +1112,8 @@ function makeCarVisual(color, playerName = "") {
     wheelPivots,
     shellGroup,
     chassisGroup,
-    setShellVisible(visible) { shellGroup.visible = !!visible; }
+    setShellVisible(visible) { shellGroup.visible = !!visible; },
+    setPlayerName
   };
 }
   return makeCarVisual;
