@@ -9,9 +9,7 @@ RC-Car/
 ├── index.html      # Menus, HUD, page structure, and CSS
 ├── main.js         # App startup, renderer, and animation loop
 ├── track.js        # Closed dirt course, scenery, curbs, jumps, and start/finish
-├── assets/
-│   └── scx30-shell-b64/  # Compressed, optimized Ranger body asset fragments
-├── car.js          # Chassis, wheels, and imported removable body shell
+├── car.js          # Detailed RC truck, chassis, wheels, and removable body shell
 ├── physics.js      # Cannon-es world, ramp colliders, suspension, and vehicle physics
 ├── garage.js       # Showroom, component hover inspection, and shell animation
 ├── controls.js     # Keyboard input, camera orbit, reset, and driving controls
@@ -19,7 +17,7 @@ RC-Car/
 └── README.md       # Setup notes and project map
 ```
 
-The game uses native JavaScript ES modules. `index.html` still loads only `main.js`, which imports the other files. The optimized Ranger shell is fetched as six compressed text fragments, joined and decoded at startup, then shared by all player cars. No build command or bundler is required.
+The game uses native JavaScript ES modules. `index.html` still loads only `main.js`, which imports the other files. No build command or bundler is required.
 
 ## Run and deploy
 
@@ -45,7 +43,7 @@ The project imports Three.js, Cannon-es, and Trystero from CDNs, so an internet 
 
 1. **main.js** — creates the renderer and arena, connects the systems, and runs the frame loop.
 2. **track.js** — builds the closed dirt circuit, blue-sky environment, perimeter tree line, textured surfaces, red/white curbs, jumps, scenery, and start/finish gantry.
-3. **car.js** — builds the chassis and wheels, then attaches the optimized imported Ranger body shell and player name tags.
+3. **car.js** — builds the detailed short-course truck, chassis components, wheels, body shell, and player name tags.
 4. **physics.js** — creates the Cannon-es world, ramp colliders, chassis body, raycast vehicle, and suspension.
 5. **garage.js** — creates the showroom, handles menu/garage transitions, component hover labels, and shell removal animation.
 6. **controls.js** — handles keyboard input, camera dragging, vehicle reset, steering, throttle, braking, and airborne control.
