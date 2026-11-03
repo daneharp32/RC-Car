@@ -312,6 +312,50 @@
       margin-top: 7px; color: #9eafbd; font-size: 9px;
       font-weight: 800; letter-spacing: .08em;
     }
+    .race-action-panel {
+      margin-top: 10px; padding: 10px;
+      border: 1px solid rgba(112,183,240,.2); border-radius: 9px;
+      background: rgba(7,17,29,.76);
+    }
+    .race-action-heading {
+      margin-bottom: 8px; color: #a9d7ff;
+      font-size: 8px; font-weight: 900; letter-spacing: .13em;
+    }
+    .race-spectator-list { display: flex; flex-wrap: wrap; gap: 7px; }
+    .race-spectator-empty {
+      color: #aab8c2; font-size: 10px; line-height: 1.45;
+    }
+    .race-spectator-button, .race-action-button {
+      min-height: 31px; padding: 0 10px; pointer-events: auto;
+      border: 1px solid rgba(105,180,255,.32); border-radius: 7px;
+      background: rgba(37,143,233,.22); color: #eaf5ff;
+      font: 800 8px "Orbitron",ui-sans-serif,sans-serif; letter-spacing: .04em;
+    }
+    .race-spectator-button.selected {
+      border-color: rgba(123,224,165,.65);
+      background: rgba(55,147,105,.25);
+    }
+    .race-action-row {
+      display: flex; align-items: end; flex-wrap: wrap; gap: 8px;
+    }
+    .race-restart-field {
+      display: grid; gap: 5px; min-width: 130px; flex: 1;
+    }
+    .race-restart-field span {
+      color: #9eafbd; font-size: 8px; font-weight: 900; letter-spacing: .1em;
+    }
+    #raceRestartLapCount {
+      height: 34px; pointer-events: auto; font-size: 10px;
+    }
+    #restartRaceButton {
+      min-height: 34px; padding: 0 13px; pointer-events: auto;
+      background: linear-gradient(145deg,#258fe9,#1456bd); color: #f7fbff;
+      font: 900 8px "Orbitron",ui-sans-serif,sans-serif; letter-spacing: .05em;
+    }
+    #racePostRaceStatus {
+      margin-bottom: 8px; color: #eaf4fc; font-size: 9px;
+      font-weight: 800; line-height: 1.45; letter-spacing: .04em;
+    }
     #raceCountdownOverlay {
       display: none; position: fixed; z-index: 6; inset: 0;
       place-items: center; pointer-events: none;
@@ -329,6 +373,9 @@
       .race-stat span { font-size: 7px; }
       .race-stat strong { font-size: 13px; }
       #raceTimeValue { font-size: 12px; }
+      .race-action-panel { margin-top: 8px; padding: 8px; }
+      .race-spectator-list { gap: 5px; }
+      .race-spectator-button, .race-action-button { min-height: 29px; font-size: 7px; }
     }
     #leaveButton {
       position: absolute; top: 72px; left: 18px; pointer-events: auto; padding: 9px 12px;
@@ -513,6 +560,28 @@
       <div class="race-card-bottom">
         <span id="raceLapValue">LAP 1 / 3</span>
         <span id="raceBestValue">BEST --:--.---</span>
+      </div>
+      <div id="raceSpectatorPanel" class="race-action-panel" style="display:none">
+        <div class="race-action-heading">YOU'RE FINISHED — SPECTATE OTHER DRIVERS</div>
+        <div id="raceSpectatorList" class="race-spectator-list" aria-live="polite"></div>
+        <button id="returnToCarButton" class="race-action-button" type="button" style="display:none;margin-top:8px">RETURN TO YOUR FINISH LINE</button>
+      </div>
+      <div id="racePostRacePanel" class="race-action-panel" style="display:none">
+        <div class="race-action-heading">RACE RESULTS</div>
+        <div id="racePostRaceStatus">ALL DRIVERS HAVE FINISHED</div>
+        <div id="raceRestartSettings" class="race-action-row">
+          <label class="race-restart-field">
+            <span>NEXT RACE LAPS</span>
+            <select id="raceRestartLapCount" aria-label="Laps for the next race">
+              <option value="1">1 LAP — SPRINT</option>
+              <option value="3" selected>3 LAPS</option>
+              <option value="5">5 LAPS</option>
+              <option value="10">10 LAPS</option>
+              <option value="20">20 LAPS — ENDURANCE</option>
+            </select>
+          </label>
+          <button id="restartRaceButton" type="button">RESTART RACE</button>
+        </div>
       </div>
     </div>
     <div id="raceCountdownOverlay" aria-live="assertive"></div>
