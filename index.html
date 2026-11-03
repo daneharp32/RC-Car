@@ -112,13 +112,38 @@
       background: linear-gradient(110deg, rgba(255,91,25,.85), rgba(45,54,62,.9));
       font-size: 10px; letter-spacing: .07em;
     }
-    #garageBackButton, #driveBackButton {
+    #garageBackButton, #driveBackButton, #modeBackButton {
       min-height: 42px; padding: 0 14px; color: #e5f3ff;
       border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.08);
       font-size: 10px;
     }
-    #garageBackButton { width: 100%; }
+    #garageBackButton, #modeBackButton { width: 100%; }
     #driveBackButton { width: 100%; margin-top: 11px; }
+    .mode-actions { display: grid; grid-template-columns: 1fr; gap: 10px; margin: 18px 0 13px; }
+    .mode-option {
+      min-height: 64px; width: 100%; padding: 11px 14px; display: flex;
+      align-items: center; justify-content: space-between; gap: 14px; text-align: left;
+      border: 1px solid rgba(115,190,255,.34);
+      background: linear-gradient(145deg, #258fe9, #1456bd);
+      box-shadow: 0 8px 22px rgba(16,102,202,.2); color: #f5faff;
+    }
+    .mode-option-copy { display: grid; gap: 5px; }
+    .mode-option-copy strong {
+      font: 800 13px "Orbitron", ui-sans-serif, sans-serif; letter-spacing: .06em;
+    }
+    .mode-option-copy small { color: rgba(240,247,255,.76); font-size: 10px; font-weight: 500; letter-spacing: .02em; }
+    .mode-tag {
+      flex: 0 0 auto; padding: 5px 7px; border-radius: 6px;
+      background: rgba(255,255,255,.15); color: #eaf5ff;
+      font-size: 8px; font-weight: 900; letter-spacing: .09em;
+    }
+    .mode-option.unavailable {
+      cursor: not-allowed; opacity: .48; filter: grayscale(.5);
+      background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.14);
+      box-shadow: none;
+    }
+    .mode-option.unavailable:hover { transform: none; filter: grayscale(.5); }
+    .mode-option.unavailable .mode-option-copy small { color: #aebfce; }
     .eyebrow { color: var(--accent); font-size: 10px; font-weight: 900; letter-spacing: .2em; }
     h1 { margin: 9px 0 7px; font-size: clamp(27px, 6vw, 36px); line-height: 1.02; letter-spacing: -.04em; }
     .intro { margin: 0 0 22px; color: #b5c2cb; font-size: 13px; line-height: 1.55; }
@@ -229,6 +254,38 @@
     </div>
   </section>
 
+  <section id="modeSelectPanel" class="menu-screen" style="display:none">
+    <div class="menu-content">
+      <div class="menu-kicker">DRIVING MODES</div>
+      <h1 class="menu-title">CHOOSE YOUR<br>MODE</h1>
+      <p class="menu-description">Choose how you want to hit the track.</p>
+      <div class="mode-actions">
+        <button id="modeRaceButton" class="mode-option" type="button">
+          <span class="mode-option-copy">
+            <strong>RACE</strong>
+            <small>Join the multiplayer race arena.</small>
+          </span>
+          <span class="mode-tag">PLAY</span>
+        </button>
+        <button id="modeTimeTrialButton" class="mode-option unavailable" type="button" disabled>
+          <span class="mode-option-copy">
+            <strong>TIME TRIAL</strong>
+            <small>Race against the clock.</small>
+          </span>
+          <span class="mode-tag">COMING SOON</span>
+        </button>
+        <button id="modeSandboxButton" class="mode-option unavailable" type="button" disabled>
+          <span class="mode-option-copy">
+            <strong>SANDBOX</strong>
+            <small>Explore and drive freely.</small>
+          </span>
+          <span class="mode-tag">COMING SOON</span>
+        </button>
+      </div>
+      <button id="modeBackButton" type="button">BACK TO MAIN MENU</button>
+    </div>
+  </section>
+
   <section id="garagePanel" style="display:none">
     <div class="eyebrow">SHORT-COURSE TRUCK</div>
     <h2 class="garage-title">BODY & CHASSIS GARAGE</h2>
@@ -256,7 +313,7 @@
       <input id="roomCode" maxlength="24" autocomplete="off" spellcheck="false" value="pit-lane">
     </label>
     <button id="joinButton" type="button">JOIN THE ARENA</button>
-    <button id="driveBackButton" type="button">BACK TO MAIN MENU</button>
+    <button id="driveBackButton" type="button">BACK TO MODE SELECT</button>
     <div id="joinError"></div>
     <div class="fine-print">Peer-to-peer multiplayer · No account required<br>WASD to drive · Space to brake · R to reset</div>
   </section>
