@@ -439,11 +439,13 @@ export function createTrackSystem({ THREE, scene }) {
   // Five transverse ridge jumps. Width spans across the track; length follows
   // the racing line, leaving two smooth approach faces in opposite directions.
   const jumpDefinitions = [
-    { t: 0.105, width: 11.2, length: 10.4, height: 0.22, label: "START STRAIGHT KICKER" },
-    { t: 0.285, width: 11.2, length: 11.2, height: 0.25, label: "TABLETOP" },
-    { t: 0.455, width: 10.8, length: 9.6, height: 0.18, label: "SHORT KICKER" },
-    { t: 0.655, width: 11.2, length: 10.8, height: 0.23, label: "BACK SECTION JUMP" },
-    { t: 0.855, width: 10.6, length: 8.8, height: 0.13, label: "ROLLER" }
+    // Keep the ridges broad across the lane; size increases are mainly in
+    // their run-up length, with only a restrained height increase.
+    { t: 0.105, width: 11.4, length: 11.6, height: 0.28, label: "START STRAIGHT KICKER" },
+    { t: 0.285, width: 11.4, length: 12.6, height: 0.31, label: "TABLETOP" },
+    { t: 0.455, width: 11.2, length: 10.8, height: 0.23, label: "SHORT KICKER" },
+    { t: 0.655, width: 11.4, length: 12.2, height: 0.29, label: "BACK SECTION JUMP" },
+    { t: 0.855, width: 10.9, length: 10.0, height: 0.17, label: "ROLLER" }
   ];
   const jumps = jumpDefinitions.map((definition) => {
     const point = centerline.getPointAt(definition.t);
@@ -472,7 +474,9 @@ export function createTrackSystem({ THREE, scene }) {
     // Reuse the racing lane's dirt texture and repeat scale so the jumps
     // blend naturally into the track instead of looking like separate ramps.
     map: laneTexture,
-    color: 0xffffff,
+    // A warm brown tint darkens the shared lane dirt without changing
+    // its texture detail or repeating scale.
+    color: 0xd8c2a8,
     roughness: 1,
     metalness: 0
   });
