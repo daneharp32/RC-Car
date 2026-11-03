@@ -413,12 +413,33 @@ export function createMultiplayerSystem(game) {
       raceControlAction = room.makeAction("race-control");
       raceControlAction.onMessage = (message, meta) => {
         const peerId = meta?.peerId;
-        if (hostingLobby || !peerId || !message || message.type !== "start-race") return;
+        if (hostingLobby || !peerId || !message) return;
         if (currentLobby.hostPeerId && peerId !== currentLobby.hostPeerId) return;
-        game.race?.beginCountdown({
-          laps: message.laps,
-          countdownMs: message.countdownMs
-        });
+
+        if (message.type === "start-race") {
+          game.race?.beginCountdown({
+            laps: message.laps,
+            countdownMs: message.countdownMs
+          });
+          return;
+        }
+
+        if (message.type === "race-results") {
+          game.race?.enterResults();
+          return;
+        }
+
+        if (message.type === "restart-race") {
+          const laps = Math.max(1, Math.min(20, Math.floor(Number(message.laps) || currentLobby.laps || 3)));
+          if (!game.race?.prepareRestart(laps)) return;
+          currentLobby.laps = laps;
+          game.controls.resetCar();
+          game.race.onCarReset();
+          game.race.beginCountdown({
+            laps,
+            countdownMs: message.countdownMs
+          });
+        }
       };
 
       room.onPeerJoin = (peerId) => {
@@ -517,6 +538,36 @@ export function createMultiplayerSystem(game) {
     removePublishedLobby();
     raceControlAction.send(message);
     showToast("Race start announced to all drivers");
+    return true;
+  }
+
+  function announceRaceResults() {
+    if (!hostingLobby || !joined || !raceControlAction || game.race?.phase !== "results") return false;
+    raceControlAction.send({ type: "race-results" });
+    showToast("All drivers have finished");
+    return true;
+  }
+
+  function restartRace(laps) {
+    if (!hostingLobby || !joined || !currentLobby || !raceControlAction || game.race?.phase !== "results") {
+      return false;
+    }
+    const nextLapCount = Math.max(1, Math.min(20, Math.floor(Number(laps) || currentLobby.laps || 3)));
+    const message = {
+      type: "restart-race",
+      laps: nextLapCount,
+      countdownMs: 6000
+    };
+
+    currentLobby.laps = nextLapCount;
+    if (!game.race.prepareRestart(nextLapCount)) return false;
+    game.controls.resetCar();
+    game.race.onCarReset();
+    if (!game.race.beginCountdown(message)) return false;
+
+    removePublishedLobby();
+    raceControlAction.send(message);
+    showToast("Next race starting with " + nextLapCount + (nextLapCount === 1 ? " lap" : " laps"));
     return true;
   }
 
@@ -640,8 +691,11 @@ export function createMultiplayerSystem(game) {
     updatePlayerCount,
     sendSnapshotIfReady,
     startRace,
+    announceRaceResults,
+    restartRace,
     setDriverName,
     get joined() { return joined; },
+    get connectedPeerIds() { return [...roomPeerIds]; },
     get stateAction() { return stateAction; },
     get remotePlayers() { return remotePlayers; },
     get driverName() { return driverName; },
