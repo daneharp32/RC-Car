@@ -783,6 +783,30 @@ export function createTrackSystem({ THREE, scene }) {
     yaw: Math.atan2(-spawnTangent.x, -spawnTangent.z)
   };
 
+  // Race checkpoints follow the centerline in driving order. A lap is only
+  // accepted after gates 0-3 and then the checkered finish gate are crossed.
+  const raceGateTs = [0.22, 0.42, 0.62, 0.82, startLineT];
+  const raceGates = raceGateTs.map((t, index) => {
+    const point = centerline.getPointAt(t);
+    const tangent = centerline.getTangentAt(t).normalize();
+    return {
+      index,
+      t,
+      x: point.x,
+      z: point.z,
+      tangentX: tangent.x,
+      tangentZ: tangent.z,
+      normalX: -tangent.z,
+      normalZ: tangent.x,
+      finish: index === raceGateTs.length - 1
+    };
+  });
+  const centerlineSamples = Array.from({ length: 256 }, (_, index) => {
+    const t = index / 256;
+    const point = centerline.getPointAt(t);
+    return { t, x: point.x, z: point.z };
+  });
+
   return {
     arenaVisuals,
     trackLayout: {
@@ -791,7 +815,9 @@ export function createTrackSystem({ THREE, scene }) {
       trackLength,
       jumps,
       barriers,
-      spawn
+      spawn,
+      raceGates,
+      centerlineSamples
     }
   };
 }
