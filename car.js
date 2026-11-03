@@ -8,17 +8,13 @@ function makeCarVisual(color, playerName = "") {
   const shellGroup = new THREE.Group();
   root.add(chassisGroup, shellGroup);
 
-  // The imported Ranger stays at its repaired uniform scale. Internal chassis
-  // visuals stretch only along the wheelbase to match its measured axle spacing.
-  const fittedWheelbase = Math.abs(
-    vehicle.wheelInfos[2].chassisConnectionPointLocal.z -
-    vehicle.wheelInfos[0].chassisConnectionPointLocal.z
-  );
-  const chassisLengthScale = shellGeometry ? fittedWheelbase / 0.58 : VISUAL_CHASSIS_LENGTH_SCALE;
+  // Fit axle-mounted components at the actual physics attachment points.
+  // Keep the imported Ranger chassis at native proportions: no whole-group stretching.
+  const frontAxleZ = vehicle.wheelInfos[0].chassisConnectionPointLocal.z;
+  const rearAxleZ = vehicle.wheelInfos[2].chassisConnectionPointLocal.z;
+  const chassisLengthScale = shellGeometry ? 1 : VISUAL_CHASSIS_LENGTH_SCALE;
   chassisGroup.scale.set(1, 1, chassisLengthScale);
   shellGroup.scale.set(1, 1, shellGeometry ? 1 : VISUAL_CHASSIS_LENGTH_SCALE);
-  // Raise the Ranger shell slightly so the lower body clears the chassis and tires.
-  shellGroup.position.y = shellGeometry ? 0.075 : 0;
   shellGroup.visible = true;
 
   const carbon = new THREE.MeshStandardMaterial({ color: 0x171e24, roughness: 0.78, metalness: 0.18 });
@@ -174,14 +170,14 @@ function makeCarVisual(color, playerName = "") {
     "Main chassis plate",
     "The long structural tub that holds the drivetrain, battery, steering gear and electronics. The dark composite finish and raised side rails protect the components."
   );
-  roundedBox(chassis, [0.49, 0.068, 0.94], carbon, [0, -0.045, 0], null, 0.035);
-  roundedBox(chassis, [0.405, 0.015, 0.77], carbonEdge, [0, -0.005, 0.015], null, 0.014);
-  roundedBox(chassis, [0.026, 0.035, 0.88], blackPlastic, [-0.218, 0.012, 0], null, 0.009);
-  roundedBox(chassis, [0.026, 0.035, 0.88], blackPlastic, [0.218, 0.012, 0], null, 0.009);
+  roundedBox(chassis, [0.49, 0.068, 1.04], carbon, [0, -0.045, 0], null, 0.035);
+  roundedBox(chassis, [0.405, 0.015, 0.88], carbonEdge, [0, -0.005, 0.015], null, 0.014);
+  roundedBox(chassis, [0.026, 0.035, 1.00], blackPlastic, [-0.218, 0.012, 0], null, 0.009);
+  roundedBox(chassis, [0.026, 0.035, 1.00], blackPlastic, [0.218, 0.012, 0], null, 0.009);
   for (const x of [-0.16, 0.16]) {
     roundedBox(chassis, [0.018, 0.013, 0.76], alloy, [x, 0.008, 0.005], null, 0.005);
   }
-  for (const z of [-0.39, -0.29, -0.19, 0.19, 0.29, 0.39]) {
+  for (const z of [frontAxleZ * 0.92, frontAxleZ * 0.72, -0.19, 0.19, rearAxleZ * 0.72, rearAxleZ * 0.92]) {
     for (const x of [-0.17, 0.17]) addBolt(chassis, x, 0.026, z, 0.0065);
   }
   for (let i = 0; i < 7; i++) {
@@ -191,8 +187,8 @@ function makeCarVisual(color, playerName = "") {
 
   // Front and rear bulkheads / differential cases.
   for (const end of [
-    { z: -0.355, id: "front-differential", label: "Front differential housing", desc: "Sealed front gearcase transfers drive to the left and right front half-shafts." },
-    { z: 0.355, id: "rear-differential", label: "Rear differential housing", desc: "Rear gearcase distributes motor power to the rear half-shafts." }
+    { z: frontAxleZ, id: "front-differential", label: "Front differential housing", desc: "Sealed front gearcase transfers drive to the left and right front half-shafts." },
+    { z: rearAxleZ, id: "rear-differential", label: "Rear differential housing", desc: "Rear gearcase distributes motor power to the rear half-shafts." }
   ]) {
     const diff = makePart(chassisGroup, end.id, end.label, end.desc);
     roundedBox(diff, [0.31, 0.115, 0.16], darkMetal, [0, 0.018, end.z], null, 0.035);
@@ -211,8 +207,8 @@ function makeCarVisual(color, playerName = "") {
     "Center driveshaft",
     "The rotating shaft links the front and rear gearboxes. The silver shaft and dark couplers are visible along the center tunnel."
   );
-  cylinderBetween(driveshaft, [0, 0.095, -0.275], [0, 0.095, 0.275], 0.014, alloy, 16);
-  for (const z of [-0.245, 0.245]) {
+  cylinderBetween(driveshaft, [0, 0.095, frontAxleZ * 0.72], [0, 0.095, rearAxleZ * 0.72], 0.014, alloy, 16);
+  for (const z of [frontAxleZ * 0.65, rearAxleZ * 0.65]) {
     cylinderBetween(driveshaft, [0, 0.095, z - 0.018], [0, 0.095, z + 0.018], 0.027, darkMetal, 14);
     addMesh(driveshaft, new THREE.SphereGeometry(0.027, 12, 10), alloy, [0, 0.095, z]);
   }
@@ -220,10 +216,10 @@ function makeCarVisual(color, playerName = "") {
 
   // Independent suspension arms, camber links and steering knuckles.
   for (const corner of [
-    { side: -1, z: -0.29, name: "Front-left" },
-    { side: 1, z: -0.29, name: "Front-right" },
-    { side: -1, z: 0.29, name: "Rear-left" },
-    { side: 1, z: 0.29, name: "Rear-right" }
+    { side: -1, z: frontAxleZ, name: "Front-left" },
+    { side: 1, z: frontAxleZ, name: "Front-right" },
+    { side: -1, z: rearAxleZ, name: "Rear-left" },
+    { side: 1, z: rearAxleZ, name: "Rear-right" }
   ]) {
     const isFront = corner.z < 0;
     const arm = makePart(
@@ -268,8 +264,8 @@ function makeCarVisual(color, playerName = "") {
   // Front and rear shock towers. Holes and braces make the plates read as
   // structural towers rather than generic dark blocks.
   for (const end of [
-    { z: -0.345, id: "front-shock-tower", label: "Front shock tower" },
-    { z: 0.345, id: "rear-shock-tower", label: "Rear shock tower" }
+    { z: frontAxleZ, id: "front-shock-tower", label: "Front shock tower" },
+    { z: rearAxleZ, id: "rear-shock-tower", label: "Rear shock tower" }
   ]) {
     const tower = makePart(
       chassisGroup,
@@ -313,24 +309,25 @@ function makeCarVisual(color, playerName = "") {
   }
 
   // Steering servo, servo saver, rack and two front steering links.
+  const frontSteeringZ = frontAxleZ + 0.14;
   const steering = makePart(
     chassisGroup,
     "steering-servo",
     "Water-resistant steering servo",
     "Compact high-torque servo turns the front wheels through the servo horn, steering rack and adjustable tie rods."
   );
-  roundedBox(steering, [0.15, 0.072, 0.105], blue, [-0.105, 0.105, -0.30], null, 0.016);
-  roundedBox(steering, [0.12, 0.012, 0.08], blueDark, [-0.105, 0.146, -0.30], null, 0.009);
+  roundedBox(steering, [0.15, 0.072, 0.105], blue, [-0.105, 0.105, frontSteeringZ], null, 0.016);
+  roundedBox(steering, [0.12, 0.012, 0.08], blueDark, [-0.105, 0.146, frontSteeringZ], null, 0.009);
   for (const x of [-0.16, -0.05]) {
-    roundedBox(steering, [0.025, 0.012, 0.05], alloy, [x, 0.065, -0.30], null, 0.004);
+    roundedBox(steering, [0.025, 0.012, 0.05], alloy, [x, 0.065, frontSteeringZ], null, 0.004);
   }
-  cylinderBetween(steering, [-0.105, 0.15, -0.30], [-0.105, 0.188, -0.30], 0.013, alloy, 12);
-  const servoHorn = addMesh(steering, new THREE.SphereGeometry(0.026, 12, 10), red, [-0.105, 0.19, -0.30]);
+  cylinderBetween(steering, [-0.105, 0.15, frontSteeringZ], [-0.105, 0.188, frontSteeringZ], 0.013, alloy, 12);
+  const servoHorn = addMesh(steering, new THREE.SphereGeometry(0.026, 12, 10), red, [-0.105, 0.19, frontSteeringZ]);
   servoHorn.scale.set(1.35, 0.5, 1.0);
   roundedBox(steering, [0.31, 0.025, 0.035], darkMetal, [0.025, 0.075, -0.36], null, 0.009);
   for (const side of [-1, 1]) {
-    cylinderBetween(steering, [0.02, 0.095, -0.36], [side * 0.29, 0.045, -0.29], 0.009, alloy, 10);
-    addBolt(steering, side * 0.29, 0.07, -0.29, 0.006);
+    cylinderBetween(steering, [0.02, 0.095, frontSteeringZ - 0.06], [side * 0.29, 0.045, frontAxleZ], 0.009, alloy, 10);
+    addBolt(steering, side * 0.29, 0.07, frontAxleZ, 0.006);
   }
 
   // Battery tray, strapped LiPo pack and high-current connector.
@@ -483,12 +480,13 @@ function makeCarVisual(color, playerName = "") {
     "Front impact bumper",
     "Flexible front bumper and two mounting braces protect the nose of the chassis during light bumps."
   );
-  // Keep bumpers close to the shell instead of stretching them with the longer wheelbase.
-  frontBumper.scale.z = shellGeometry ? 0.68 : 1;
-  roundedBox(frontBumper, [0.68, 0.085, 0.09], blackPlastic, [0, -0.005, -0.55], null, 0.025);
-  roundedBox(frontBumper, [0.48, 0.045, 0.06], carbonEdge, [0, 0.035, -0.535], null, 0.015);
+  const frontBumperZ = frontAxleZ - 0.25;
+  // Narrower, shorter bumper pieces are modeled at their final dimensions.
+  roundedBox(frontBumper, [0.54, 0.075, 0.055], blackPlastic, [0, -0.005, frontBumperZ], null, 0.018);
+  roundedBox(frontBumper, [0.40, 0.038, 0.040], carbonEdge, [0, 0.032, frontBumperZ + 0.012], null, 0.010);
   for (const side of [-1, 1]) {
-    cylinderBetween(frontBumper, [side * 0.12, -0.03, -0.46], [side * 0.23, -0.02, -0.53], 0.018, alloy, 10);
+    cylinderBetween(frontBumper, [side * 0.12, -0.03, frontAxleZ - 0.08],
+      [side * 0.20, -0.02, frontBumperZ + 0.02], 0.014, alloy, 10);
   }
 
   const rearStructure = makePart(
@@ -497,8 +495,8 @@ function makeCarVisual(color, playerName = "") {
     "Rear impact bumper",
     "Compact rear impact bumper. The oversized wing, vertical supports, and upper wing plate have been removed."
   );
-  rearStructure.scale.z = shellGeometry ? 0.68 : 1;
-  roundedBox(rearStructure, [0.64, 0.07, 0.085], blackPlastic, [0, -0.005, 0.54], null, 0.022);
+  const rearBumperZ = rearAxleZ + 0.25;
+  roundedBox(rearStructure, [0.54, 0.065, 0.055], blackPlastic, [0, -0.005, rearBumperZ], null, 0.018);
 
   const bodyPosts = makePart(
     chassisGroup,
@@ -506,7 +504,7 @@ function makeCarVisual(color, playerName = "") {
     "Front and rear body-mount posts",
     "Adjustable vertical posts support the removable polycarbonate shell. They remain visible even with the shell removed."
   );
-  for (const z of [-0.47, 0.47]) {
+  for (const z of [frontAxleZ, rearAxleZ]) {
     for (const side of [-1, 1]) {
       cylinderBetween(bodyPosts, [side * 0.17, -0.01, z], [side * 0.17, 0.26, z], 0.012, blackPlastic, 10);
       cylinderBetween(bodyPosts, [side * 0.17, 0.20, z], [side * 0.17, 0.235, z], 0.017, red, 10);
@@ -1044,37 +1042,8 @@ function makeCarVisual(color, playerName = "") {
     makeBodyShell();
   }
 
-  // Fit chassis details inside the imported shell rather than hiding them.
-  // Components retain their own Garage selection and become accessible when
-  // the shell is removed; only their visual height/placement is adjusted.
-  if (shellGeometry) {
-    const rangerInteriorFit = new Map([
-      ["front-shock-tower",              [0.72, -0.055]],
-      ["rear-shock-tower",               [0.72, -0.055]],
-      ["front-left-oil-shock",           [0.72, -0.055]],
-      ["front-right-oil-shock",          [0.72, -0.055]],
-      ["rear-left-oil-shock",            [0.72, -0.055]],
-      ["rear-right-oil-shock",           [0.72, -0.055]],
-      ["steering-servo",                 [0.72, -0.075]],
-      ["lipo-battery",                   [0.66, -0.065]],
-      ["brushless-motor",                [0.70, -0.075]],
-      ["spur-pinion-gears",              [0.82, -0.020]],
-      ["electronic-speed-controller",    [0.72, -0.070]],
-      ["radio-receiver",                 [0.40, -0.060]],
-      ["power-wiring",                   [0.52, -0.085]],
-      ["receiver-servo-wiring",          [0.60, -0.070]],
-      ["body-mount-posts",               [0.48, -0.070]]
-    ]);
-    chassisGroup.traverse((object) => {
-      const partId = object.userData?.partInfo?.id;
-      const fit = partId ? rangerInteriorFit.get(partId) : null;
-      if (fit) {
-        object.scale.y *= fit[0];
-        object.position.y += fit[1];
-        object.visible = true;
-      }
-    });
-  }
+  // All internal chassis components remain present and retain their original
+  // dimensions. The shell mesh is lifted to provide the required clearance.
 
   // All painted shell surfaces share one garage hover identity. The chassis
   // retains its own individual component labels when the shell is removed.
