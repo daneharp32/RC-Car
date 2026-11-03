@@ -288,10 +288,10 @@ function makeCarVisual(color, playerName = "") {
 
   // Four individually selectable oil-filled coil-over dampers.
   for (const corner of [
-    { side: -1, z: -0.29, label: "Front-left" },
-    { side: 1, z: -0.29, label: "Front-right" },
-    { side: -1, z: 0.29, label: "Rear-left" },
-    { side: 1, z: 0.29, label: "Rear-right" }
+    { side: -1, z: frontAxleZ, label: "Front-left" },
+    { side: 1, z: frontAxleZ, label: "Front-right" },
+    { side: -1, z: rearAxleZ, label: "Rear-left" },
+    { side: 1, z: rearAxleZ, label: "Rear-right" }
   ]) {
     const s = corner.side;
     const z = corner.z;
