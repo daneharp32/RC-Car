@@ -1081,27 +1081,37 @@ function makeCarVisual(color, playerName = "") {
     }
 
     const labelCanvas = document.createElement("canvas");
-    labelCanvas.width = 512;
     labelCanvas.height = 128;
     const ctx = labelCanvas.getContext("2d");
     if (!ctx) return;
+
+    const font = "bold 46px system-ui, sans-serif";
+    ctx.font = font;
+    const measuredTextWidth = ctx.measureText(safeName).width;
+    const horizontalPadding = 56;
+    labelCanvas.width = Math.ceil(Math.max(176, measuredTextWidth + horizontalPadding));
+
+    // Keep the sprite's world-space aspect ratio identical to the canvas so
+    // names remain normally proportioned instead of being squeezed sideways.
+    ctx.font = font;
     ctx.fillStyle = "rgba(13,20,29,.82)";
     ctx.beginPath();
-    ctx.roundRect(8, 14, 496, 100, 28);
+    ctx.roundRect(8, 14, labelCanvas.width - 16, 100, 28);
     ctx.fill();
     ctx.fillStyle = "#fff";
-    ctx.font = "bold 46px system-ui";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(safeName, 256, 64);
+    ctx.fillText(safeName, labelCanvas.width / 2, 64);
+
     const texture = new THREE.CanvasTexture(labelCanvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     playerNameSprite = new THREE.Sprite(new THREE.SpriteMaterial({
       map: texture, transparent: true, depthWrite: false
     }));
     playerNameSprite.position.set(0, 0.95, 0);
-    const width = THREE.MathUtils.clamp(0.72 + safeName.length * 0.035, 0.95, 1.55);
-    playerNameSprite.scale.set(width, 0.34, 1);
+    const labelHeight = 0.34;
+    const labelWidth = labelHeight * (labelCanvas.width / labelCanvas.height);
+    playerNameSprite.scale.set(labelWidth, labelHeight, 1);
     root.add(playerNameSprite);
   }
   setPlayerName(playerName, !!playerName);
