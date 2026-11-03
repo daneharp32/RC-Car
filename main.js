@@ -6,6 +6,7 @@ import { createControlsSystem } from "./controls.js";
 import { createMultiplayerSystem } from "./multiplayer.js";
 import { createGarageSystem } from "./garage.js";
 import { createTrackSystem } from "./track.js";
+import { createRaceSystem } from "./race.js";
 import rangerShellPart0 from "./ranger-shell-data-00.js";
 import rangerShellPart1 from "./ranger-shell-data-01.js";
 import rangerShellPart2 from "./ranger-shell-data-02.js";
@@ -255,6 +256,7 @@ const game = {
   vehicle,
   wheelPositions,
   VISUAL_CHASSIS_LENGTH_SCALE,
+  trackLayout,
   spawnX,
   spawnZ,
   spawnYaw,
@@ -267,6 +269,8 @@ const game = {
 
 const controls = createControlsSystem(game);
 game.controls = controls;
+const race = createRaceSystem(game);
+game.race = race;
 const multiplayer = createMultiplayerSystem(game);
 game.multiplayer = multiplayer;
 const garage = createGarageSystem(game);
@@ -318,6 +322,7 @@ function animate(now) {
   garage.updateGarageShellAnimation(now);
   world.step(FIXED_STEP, delta, 3);
   updateLocalVisual();
+  race.update(delta, now);
   multiplayer.updateRemoteVisuals(delta);
 
   const speedMph = chassisBody.velocity.length() * 2.236936;
