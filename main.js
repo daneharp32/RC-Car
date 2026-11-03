@@ -131,6 +131,8 @@ async function loadRangerShellGeometry() {
       positions[i * 3 + axis] =
         minimum[axis] + (quantized / 65535) * (maximum[axis] - minimum[axis]);
     }
+    // Physically seat the body higher by editing the shell's Y vertices.
+    positions[i * 3 + 1] += 0.15;
   }
 
   // Preserve the repaired, split-edge normals rather than averaging across
