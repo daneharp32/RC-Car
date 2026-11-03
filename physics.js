@@ -17,29 +17,34 @@ groundBody.addShape(new CANNON.Plane());
 groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
 world.addBody(groundBody);
 
-// Ramp collision extends slightly past the visible edges. This gives tires
-// room to overhang the rendered ramp without the chassis catching a hard side.
-const RAMP_EDGE_CLEARANCE = 0.6;
+// Cannon heightfields use a local XY grid with height along local Z.
+// Rotate that grid upright, then align it to the same track frame as the mesh.
+// No side overhang is added: the collision surface ends exactly at the smooth
+// zero-height edge of the visible bump, avoiding hidden ledges beside jumps.
+const heightfieldTilt = new CANNON.Quaternion();
+heightfieldTilt.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
+
 for (const jump of trackLayout.jumps) {
-  const halfWidth = jump.width / 2 + RAMP_EDGE_CLEARANCE;
-  const halfLength = jump.length / 2;
-  const height = jump.height;
-  const vertices = [
-    new CANNON.Vec3(-halfWidth, 0, halfLength),
-    new CANNON.Vec3(halfWidth, 0, halfLength),
-    new CANNON.Vec3(-halfWidth, 0, -halfLength),
-    new CANNON.Vec3(halfWidth, 0, -halfLength),
-    new CANNON.Vec3(-halfWidth, height, -halfLength),
-    new CANNON.Vec3(halfWidth, height, -halfLength)
-  ];
-  const faces = [
-    [0, 2, 3, 1], [0, 1, 5, 4], [0, 4, 2],
-    [1, 3, 5], [2, 4, 5, 3]
-  ];
-  const rampBody = new CANNON.Body({ mass: 0, material: groundBody.material });
-  rampBody.addShape(new CANNON.ConvexPolyhedron({ vertices, faces }));
-  rampBody.position.set(jump.x, 0, jump.z);
-  rampBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), jump.yaw);
+  const { profile } = jump;
+  const rampBody = new CANNON.Body({
+    mass: 0,
+    material: groundBody.material
+  });
+  rampBody.addShape(new CANNON.Heightfield(profile.heights, {
+    elementSize: profile.elementSize
+  }));
+
+  // The heightfield's local X/Y origin is the rear-left corner of the bump.
+  // Its local X follows the track normal and local Y follows the driving line.
+  rampBody.position.set(
+    jump.x - jump.normalX * profile.width / 2 - jump.tangentX * profile.length / 2,
+    0.01,
+    jump.z - jump.normalZ * profile.width / 2 - jump.tangentZ * profile.length / 2
+  );
+
+  const rampYaw = new CANNON.Quaternion();
+  rampYaw.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), jump.yaw);
+  rampYaw.mult(heightfieldTilt, rampBody.quaternion);
   world.addBody(rampBody);
 }
 
