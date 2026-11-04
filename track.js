@@ -493,9 +493,11 @@ export function createTrackSystem({ THREE, scene }) {
       const next = edgeCenters[(i + 1) % barrierCountPerSide];
       const previousDistance = current.distanceTo(previous);
       const nextDistance = current.distanceTo(next);
-      const segmentLength = Math.max(
-        0.35, Math.min(previousDistance, nextDistance) - 0.20
-      );
+      // A very tight inside bend can make the offset edge fold toward
+      // itself. Skip only those tiny pieces instead of stretching them into
+      // neighbouring blocks; the matching collision list uses this same gap.
+      const segmentLength = Math.min(previousDistance, nextDistance) - 0.22;
+      if (segmentLength < 0.08) continue;
       const edgeTangent = next.clone().sub(previous).normalize();
       const yaw = Math.atan2(-edgeTangent.x, -edgeTangent.z);
       const x = current.x;
