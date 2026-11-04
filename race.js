@@ -8,6 +8,7 @@ export function createRaceSystem(game) {
   const samples = game.trackLayout.centerlineSamples || [];
 
   let phase = "idle";
+  let sessionMode = "race";
   let lapLimit = 3;
   let isHost = false;
   let driverName = "Driver";
@@ -28,6 +29,7 @@ export function createRaceSystem(game) {
   let spectatingPeerId = null;
   let spectatorRenderKey = "";
   let resultsAnnounced = false;
+  let resultsRenderKey = "";
 
   function clampLapCount(value) {
     const number = Number(value);
@@ -69,7 +71,8 @@ export function createRaceSystem(game) {
     if (status) status.textContent = text;
   }
 
-  function setWaiting(laps, host, name = "Driver") {
+  function setWaiting(laps, host, name = "Driver", mode = sessionMode) {
+    sessionMode = mode === "time-trial" ? "time-trial" : "race";
     phase = "waiting";
     lapLimit = clampLapCount(laps);
     isHost = !!host;
@@ -91,6 +94,7 @@ export function createRaceSystem(game) {
     spectatingPeerId = null;
     spectatorRenderKey = "";
     resultsAnnounced = false;
+    resultsRenderKey = "";
 
     const spectatorPanel = $("raceSpectatorPanel");
     const resultsPanel = $("racePostRacePanel");
@@ -101,10 +105,12 @@ export function createRaceSystem(game) {
     if (startButton) {
       startButton.style.display = isHost ? "inline-flex" : "none";
       startButton.disabled = false;
-      startButton.textContent = "START RACE";
+      startButton.textContent = sessionMode === "time-trial" ? "START TIME TRIAL" : "START RACE";
     }
     updateOverlay("", false);
-    setStatus(isHost ? "READY — START WHEN EVERYONE IS SET" : "WAITING FOR THE HOST");
+    setStatus(sessionMode === "time-trial"
+      ? (isHost ? "READY — START THE TIME TRIAL WHEN EVERYONE IS SET" : "WAITING FOR THE HOST")
+      : (isHost ? "READY — START WHEN EVERYONE IS SET" : "WAITING FOR THE HOST"));
     updateUI();
   }
 
@@ -133,10 +139,10 @@ export function createRaceSystem(game) {
     const button = $("startRaceButton");
     if (button) {
       button.disabled = true;
-      button.textContent = "RACE STARTING...";
+      button.textContent = sessionMode === "time-trial" ? "TRIAL STARTING..." : "RACE STARTING...";
     }
     setStatus("GET READY");
-    showToast("Race starting soon");
+    showToast(sessionMode === "time-trial" ? "Time trial starting soon" : "Race starting soon");
     return true;
   }
 
@@ -186,7 +192,8 @@ export function createRaceSystem(game) {
       progress,
       finished: localFinished,
       finishTimeMs,
-      elapsedMs: localFinished ? finishTimeMs : totalElapsedMs
+      elapsedMs: localFinished ? finishTimeMs : totalElapsedMs,
+      bestLapMs
     };
     const entrants = [local];
     for (const [peerId, state] of remoteStates) {
@@ -195,8 +202,17 @@ export function createRaceSystem(game) {
     }
 
     entrants.sort((a, b) => {
-      if (a.finished !== b.finished) return a.finished ? -1 : 1;
-      if (a.finished && b.finished) return a.finishTimeMs - b.finishTimeMs;
+      if (sessionMode === "time-trial") {
+        const aHasLap = Number.isFinite(a.bestLapMs) && a.bestLapMs > 0;
+        const bHasLap = Number.isFinite(b.bestLapMs) && b.bestLapMs > 0;
+        if (aHasLap !== bHasLap) return aHasLap ? -1 : 1;
+        if (aHasLap && bHasLap && Math.abs(a.bestLapMs - b.bestLapMs) > 0.5) {
+          return a.bestLapMs - b.bestLapMs;
+        }
+      } else {
+        if (a.finished !== b.finished) return a.finished ? -1 : 1;
+        if (a.finished && b.finished) return a.finishTimeMs - b.finishTimeMs;
+      }
       const aScore = a.completedLaps + a.progress;
       const bScore = b.completedLaps + b.progress;
       if (Math.abs(aScore - bScore) > 0.0001) return bScore - aScore;
@@ -276,13 +292,48 @@ export function createRaceSystem(game) {
     const settings = $("raceRestartSettings");
     const restartButton = $("restartRaceButton");
     const lapSelect = $("raceRestartLapCount");
+    const resultsList = $("raceResultsList");
+    const resultsTimeHeading = $("raceResultsTimeHeading");
+    if (resultsTimeHeading) resultsTimeHeading.textContent = sessionMode === "time-trial" ? "BEST LAP" : "FINISH TIME";
+    if (resultsList) {
+      const standings = getStandings();
+      const renderKey = sessionMode + "|" + standings.map((entry) => [
+        entry.id, entry.name, entry.bestLapMs, entry.finishTimeMs, entry.completedLaps
+      ].join(":")).join("|");
+      if (renderKey !== resultsRenderKey) {
+        resultsRenderKey = renderKey;
+        resultsList.replaceChildren();
+        standings.forEach((entry, index) => {
+          const row = document.createElement("div");
+          row.className = "race-result-row";
+          const place = document.createElement("span");
+          place.className = "race-result-place";
+          place.textContent = ordinal(index + 1);
+          const name = document.createElement("span");
+          name.className = "race-result-name";
+          name.textContent = entry.name || "Driver";
+          const time = document.createElement("strong");
+          const recordedTime = sessionMode === "time-trial" ? entry.bestLapMs : entry.finishTimeMs;
+          time.textContent = recordedTime > 0 ? formatTime(recordedTime) : "--:--.---";
+          row.append(place, name, time);
+          resultsList.appendChild(row);
+        });
+      }
+    }
     if (status) {
       status.textContent = isHost
-        ? "EVERY DRIVER HAS FINISHED. CHOOSE THE NEXT RACE SETTINGS."
-        : "EVERY DRIVER HAS FINISHED. WAITING FOR THE HOST TO RESTART.";
+        ? (sessionMode === "time-trial"
+          ? "EVERY DRIVER HAS FINISHED. RESULTS ARE RANKED BY FASTEST LAP."
+          : "EVERY DRIVER HAS FINISHED. CHOOSE THE NEXT RACE SETTINGS.")
+        : (sessionMode === "time-trial"
+          ? "TIME TRIAL COMPLETE. WAITING FOR THE HOST TO RESTART."
+          : "EVERY DRIVER HAS FINISHED. WAITING FOR THE HOST TO RESTART.");
     }
     if (settings) settings.style.display = isHost ? "flex" : "none";
-    if (restartButton) restartButton.style.display = isHost ? "inline-flex" : "none";
+    if (restartButton) {
+      restartButton.style.display = isHost ? "inline-flex" : "none";
+      restartButton.textContent = sessionMode === "time-trial" ? "RESTART TIME TRIAL" : "RESTART RACE";
+    }
     if (lapSelect && lapSelect.value !== String(lapLimit)) {
       lapSelect.value = String(lapLimit);
     }
@@ -304,7 +355,7 @@ export function createRaceSystem(game) {
     updateOverlay("", false);
     const startButton = $("startRaceButton");
     if (startButton) startButton.style.display = "none";
-    setStatus("ALL DRIVERS FINISHED");
+    setStatus(sessionMode === "time-trial" ? "TIME TRIAL RESULTS — FASTEST LAP" : "ALL DRIVERS FINISHED");
     updateSpectatorUI();
     updatePostRaceUI();
     updateUI();
@@ -313,7 +364,7 @@ export function createRaceSystem(game) {
 
   function prepareRestart(laps) {
     if (phase !== "results") return false;
-    setWaiting(laps, isHost, driverName);
+    setWaiting(laps, isHost, driverName, sessionMode);
     return true;
   }
 
@@ -330,6 +381,19 @@ export function createRaceSystem(game) {
     const bestValue = $("raceBestValue");
     const positionValue = $("racePositionValue");
     const lapCountValue = $("raceCompletedValue");
+    const controlLabel = $("raceControlLabel");
+    const positionLabel = $("racePositionLabel");
+    const completedLabel = $("raceCompletedLabel");
+    const timeLabel = $("raceTimeLabel");
+    const resultHeading = $("raceResultsHeading");
+    const startButton = $("startRaceButton");
+    const timeTrial = sessionMode === "time-trial";
+    if (controlLabel) controlLabel.textContent = timeTrial ? "TIME TRIAL CONTROL" : "RACE CONTROL";
+    if (positionLabel) positionLabel.textContent = timeTrial ? "RANK" : "POSITION";
+    if (completedLabel) completedLabel.textContent = timeTrial ? "LAPS COMPLETED" : "LAPS COMPLETED";
+    if (timeLabel) timeLabel.textContent = timeTrial ? "CURRENT LAP" : "LAP TIME";
+    if (resultHeading) resultHeading.textContent = timeTrial ? "TIME TRIAL RESULTS" : "RACE RESULTS";
+    if (startButton && phase === "waiting") startButton.textContent = timeTrial ? "START TIME TRIAL" : "START RACE";
     if (lapValue) lapValue.textContent = "LAP " + Math.min(completedLaps + 1, lapLimit) + " / " + lapLimit;
     if (lapCountValue) lapCountValue.textContent = completedLaps + " / " + lapLimit;
     if (timeValue) {
@@ -354,10 +418,14 @@ export function createRaceSystem(game) {
     finishTimeMs = Math.max(0, now - raceStartAt);
     totalElapsedMs = finishTimeMs;
     lastLapMs = currentLapMs;
-    setStatus("FINISHED — " + formatTime(finishTimeMs));
-    updateOverlay("FINISH!", true);
+    setStatus(sessionMode === "time-trial"
+      ? "TIME TRIAL COMPLETE — BEST " + formatTime(bestLapMs)
+      : "FINISHED — " + formatTime(finishTimeMs));
+    updateOverlay(sessionMode === "time-trial" ? "SESSION COMPLETE!" : "FINISH!", true);
     goOverlayUntil = now + 1800;
-    showToast("Race finished in " + formatTime(finishTimeMs));
+    showToast(sessionMode === "time-trial"
+      ? "Time trial complete — best lap " + formatTime(bestLapMs)
+      : "Race finished in " + formatTime(finishTimeMs));
   }
 
   function handleGateCrossing(gateIndex, now) {
@@ -371,7 +439,7 @@ export function createRaceSystem(game) {
     completedLaps++;
     lastLapMs = Math.max(0, now - lapStartAt);
     bestLapMs = bestLapMs === 0 ? lastLapMs : Math.min(bestLapMs, lastLapMs);
-    showToast("LAP " + completedLaps + " COMPLETE — " + formatTime(lastLapMs));
+    showToast((sessionMode === "time-trial" ? "TIMED LAP " : "LAP ") + completedLaps + " COMPLETE — " + formatTime(lastLapMs));
     nextGateIndex = 0;
 
     if (completedLaps >= lapLimit) {
@@ -400,8 +468,8 @@ export function createRaceSystem(game) {
         progress = nearestTrackProgress(previousPosition);
         updateOverlay("GO!", true);
         goOverlayUntil = now + 900;
-        setStatus("RACE IN PROGRESS");
-        showToast("GO! GO! GO!");
+        setStatus(sessionMode === "time-trial" ? "TIME TRIAL IN PROGRESS" : "RACE IN PROGRESS");
+        showToast(sessionMode === "time-trial" ? "TIME TRIAL STARTED — SET YOUR FASTEST LAP" : "GO! GO! GO!");
       }
     } else if (phase === "racing") {
       totalElapsedMs = Math.max(0, now - raceStartAt);
@@ -509,7 +577,7 @@ export function createRaceSystem(game) {
     const freeDrive = lobby?.mode === "free-drive";
     const card = $("raceCard");
     if (card) card.style.display = freeDrive ? "none" : "block";
-    setWaiting(lobby?.laps || 3, host, name);
+    setWaiting(lobby?.laps || 3, host, name, lobby?.mode);
     if (freeDrive) {
       // Free Drive skips race staging, countdowns, checkpoints and lap UI.
       // The shared physics and multiplayer vehicle snapshots remain active.

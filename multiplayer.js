@@ -102,16 +102,24 @@ export function createMultiplayerSystem(game) {
   }
 
   function createLobbyButtonLabel() {
-    return "CREATE " + (selectedLobbyMode === "free-drive" ? "FREE DRIVE" : "RACE") + " LOBBY";
+    const label = selectedLobbyMode === "free-drive"
+      ? "FREE DRIVE"
+      : selectedLobbyMode === "time-trial"
+        ? "TIME TRIAL"
+        : "RACE";
+    return "CREATE " + label + " LOBBY";
   }
 
   function updatePlayerCount() {
     const count = currentPlayerCount();
     $("playersValue").textContent = count + " / " + MAX_PLAYERS + " PLAYERS";
     const freeDrive = currentLobby?.mode === "free-drive";
+    const timeTrial = currentLobby?.mode === "time-trial";
     $("topStatus").textContent = freeDrive
       ? (peersConnected ? "FREE DRIVE · DRIVERS CONNECTED" : "FREE DRIVE · OPEN SESSION")
-      : (peersConnected ? "MULTIPLAYER CONNECTED" : "WAITING FOR DRIVERS");
+      : timeTrial
+        ? (peersConnected ? "TIME TRIAL · DRIVERS CONNECTED" : "TIME TRIAL · READY")
+        : (peersConnected ? "MULTIPLAYER CONNECTED" : "WAITING FOR DRIVERS");
     $("statusDot").classList.toggle("live", peersConnected);
   }
 
@@ -192,7 +200,8 @@ export function createMultiplayerSystem(game) {
       mode.className = "lobby-row-mode";
       mode.textContent = lobby.mode === "free-drive"
         ? "FREE DRIVE · OPEN SESSION"
-        : "RACE · " + lobby.laps + (lobby.laps === 1 ? " LAP" : " LAPS");
+        : (lobby.mode === "time-trial" ? "TIME TRIAL · " : "RACE · ") +
+          lobby.laps + (lobby.laps === 1 ? " LAP" : " LAPS");
       main.append(name, mode);
 
       const count = document.createElement("div");
@@ -207,7 +216,7 @@ export function createMultiplayerSystem(game) {
       join.textContent = lobby.playerCount >= MAX_PLAYERS
         ? "FULL"
         : lobbyLocked
-          ? (lobby.mode === "free-drive" ? "CLOSED" : "IN RACE")
+          ? (lobby.mode === "free-drive" ? "CLOSED" : "IN SESSION")
           : "JOIN";
       join.disabled = lobby.playerCount >= MAX_PLAYERS || lobbyLocked;
 
@@ -227,8 +236,8 @@ export function createMultiplayerSystem(game) {
   }
 
   function publishLobby() {
-    // Race rooms leave the browser when their countdown starts. Free Drive
-    // rooms stay open and discoverable for as long as the host remains there.
+    // Race and Time Trial rooms leave the browser when their countdown starts.
+    // Free Drive rooms stay open and discoverable while the host remains there.
     if (!hostingLobby || !currentLobby || !directoryAction || !currentLobbyAcceptsPlayers()) return;
 
     const announcement = {
@@ -383,7 +392,9 @@ export function createMultiplayerSystem(game) {
     currentLobby = {
       id: lobby.id,
       name: cleanLobbyName(lobby.name) || "Race Lobby",
-      mode: lobby.mode === "free-drive" ? "free-drive" : "race",
+      mode: lobby.mode === "free-drive"
+        ? "free-drive"
+        : lobby.mode === "time-trial" ? "time-trial" : "race",
       laps: Number.isFinite(lobby.laps) ? Math.max(1, Math.min(20, Math.floor(lobby.laps))) : 3,
       hostPeerId: isHost ? selfId : lobby.peerId
     };
@@ -519,7 +530,9 @@ export function createMultiplayerSystem(game) {
           ? "Free Drive lobby created — drive whenever you're ready"
           : "Joined Free Drive: " + currentLobby.name);
       } else {
-        showToast(isHost ? "Race lobby created — start when everyone is ready" : "Joined " + currentLobby.name);
+        showToast(currentLobby.mode === "time-trial"
+          ? (isHost ? "Time trial lobby created — start when everyone is ready" : "Joined time trial: " + currentLobby.name)
+          : (isHost ? "Race lobby created — start when everyone is ready" : "Joined " + currentLobby.name));
       }
     } catch (error) {
       console.error("Unable to join multiplayer lobby:", error);
@@ -547,9 +560,11 @@ export function createMultiplayerSystem(game) {
     const selectedButton = document.querySelector(".lobby-mode-choice.selected");
     const mode = selectedButton?.dataset.lobbyMode || selectedLobbyMode;
     const name = cleanLobbyName($("lobbyName").value) ||
-      (mode === "free-drive" ? "Free Drive Lobby" : "Race Lobby");
+      (mode === "free-drive"
+        ? "Free Drive Lobby"
+        : mode === "time-trial" ? "Time Trial Lobby" : "Race Lobby");
     const laps = Math.max(1, Math.min(20, Number($("raceLapCount").value) || 3));
-    if (!["race", "free-drive"].includes(mode)) {
+    if (!["race", "free-drive", "time-trial"].includes(mode)) {
       joinError.textContent = "That lobby mode isn't available yet.";
       joinError.style.display = "block";
       return;
@@ -566,17 +581,20 @@ export function createMultiplayerSystem(game) {
   }
 
   function startRace() {
-    if (!hostingLobby || !joined || currentLobby?.mode !== "race" ||
+    if (!hostingLobby || !joined || !["race", "time-trial"].includes(currentLobby?.mode) ||
         game.race?.phase !== "waiting" || !raceControlAction) return false;
     const message = {
       type: "start-race",
       laps: currentLobby.laps,
-      countdownMs: 6000
+      countdownMs: 6000,
+      mode: currentLobby.mode
     };
     if (!game.race.beginCountdown(message)) return false;
     removePublishedLobby();
     raceControlAction.send(message);
-    showToast("Race start announced to all drivers");
+    showToast(currentLobby.mode === "time-trial"
+      ? "Time trial start announced to all drivers"
+      : "Race start announced to all drivers");
     return true;
   }
 
@@ -588,7 +606,7 @@ export function createMultiplayerSystem(game) {
   }
 
   function restartRace(laps) {
-    if (!hostingLobby || !joined || !currentLobby || currentLobby.mode !== "race" ||
+    if (!hostingLobby || !joined || !currentLobby || !["race", "time-trial"].includes(currentLobby.mode) ||
         !raceControlAction || game.race?.phase !== "results") {
       return false;
     }
@@ -607,7 +625,8 @@ export function createMultiplayerSystem(game) {
 
     removePublishedLobby();
     raceControlAction.send(message);
-    showToast("Next race starting with " + nextLapCount + (nextLapCount === 1 ? " lap" : " laps"));
+    showToast((currentLobby.mode === "time-trial" ? "Next time trial starting with " : "Next race starting with ") +
+      nextLapCount + (nextLapCount === 1 ? " lap" : " laps"));
     return true;
   }
 
@@ -721,8 +740,18 @@ export function createMultiplayerSystem(game) {
         item.classList.toggle("selected", item === button);
       });
       const lapField = $("raceLapField");
-      if (lapField) lapField.style.display = selectedLobbyMode === "race" ? "block" : "none";
+      if (lapField) lapField.style.display = selectedLobbyMode === "free-drive" ? "none" : "block";
+      const lapLabel = lapField?.querySelector("span");
+      if (lapLabel) lapLabel.textContent = selectedLobbyMode === "time-trial" ? "Number of timed laps" : "Number of laps";
       joinButton.textContent = createLobbyButtonLabel();
+      const hint = $("lobbyModeHint");
+      if (hint) hint.style.display = selectedLobbyMode === "time-trial" ? "block" : "none";
+      const description = joinPanel.querySelector(".menu-description");
+      if (description) description.textContent = selectedLobbyMode === "time-trial"
+        ? "Complete the selected laps and compete for the fastest valid lap time."
+        : selectedLobbyMode === "free-drive"
+          ? "Create an open session with no race timer or checkpoints."
+          : "Choose a lap count and race through every checkpoint.";
     });
   }
 
