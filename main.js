@@ -287,6 +287,14 @@ for (const button of document.querySelectorAll("[data-camera-mode]")) {
   button.addEventListener("click", () => setCameraMode(button.dataset.cameraMode));
 }
 
+function easeCameraFov(targetFov, delta, response) {
+  const nextFov = camera.fov + (targetFov - camera.fov) * (1 - Math.exp(-response * delta));
+  if (Math.abs(nextFov - camera.fov) > 0.025) {
+    camera.fov = nextFov;
+    camera.updateProjectionMatrix();
+  }
+}
+
 const race = createRaceSystem(game);
 game.race = race;
 const multiplayer = createMultiplayerSystem(game);
@@ -350,6 +358,7 @@ function animate(now) {
 
   // The showroom camera presents the parked truck in menu and garage views.
   if (garage.viewMode === "menu" || garage.viewMode === "mode-select" || garage.viewMode === "create-lobby" || garage.viewMode === "garage") {
+    easeCameraFov(58, delta, 4.0);
     const distance = garage.viewMode === "garage" ? 2.35 : 5.1;
     const height = garage.viewMode === "garage" ? 1.18 : 2.15;
     const orbitDirection = new THREE.Vector3(0, 0, 1)
@@ -381,8 +390,7 @@ function animate(now) {
       const target = followedRoot.position.clone().add(new THREE.Vector3(0, 0.22, 0));
       const distance = Math.max(1, camera.position.distanceTo(target));
       const desiredFov = THREE.MathUtils.clamp(54 * (18 / distance), 12, 54);
-      camera.fov += (desiredFov - camera.fov) * (1 - Math.exp(-2.8 * delta));
-      camera.updateProjectionMatrix();
+      easeCameraFov(desiredFov, delta, 2.8);
       camera.up.copy(worldUp);
       camera.lookAt(target);
     }
@@ -396,8 +404,7 @@ function animate(now) {
       .addScaledVector(fullCarForward, 8.0)
       .add(new THREE.Vector3(0, 0.08, 0));
     camera.position.lerp(hoodPosition, 1 - Math.exp(-18.0 * delta));
-    camera.fov += (66 - camera.fov) * (1 - Math.exp(-3.5 * delta));
-    camera.updateProjectionMatrix();
+    easeCameraFov(66, delta, 3.5);
     camera.up.copy(worldUp);
     camera.lookAt(hoodTarget);
   } else {
@@ -412,8 +419,7 @@ function animate(now) {
       .addScaledVector(cameraDirection, -5.8)
       .add(new THREE.Vector3(0, 2.8, 0));
     camera.position.lerp(desiredCamera, 1 - Math.exp(-2.8 * delta));
-    camera.fov += (58 - camera.fov) * (1 - Math.exp(-4.0 * delta));
-    camera.updateProjectionMatrix();
+    easeCameraFov(58, delta, 4.0);
     const lookTarget = followedRoot.position.clone()
       .add(new THREE.Vector3(0, 0.28, 0))
       .addScaledVector(carForward, 0.85);
