@@ -85,8 +85,8 @@ export function createDustSystem({ THREE, CANNON, scene, chassisBody, vehicle, r
       "  float radius = length(vec2(vUv.x * 0.82, vUv.y * 1.08));",
       "  float edge = 0.66 + turbulence * 0.055;",
       "  float softCloud = 1.0 - smoothstep(edge, 1.08 + turbulence * 0.055, radius);",
-      "  float innerVariation = 0.84 + 0.16 * (1.0 - smoothstep(0.0, 0.95, radius));",
-      "  float alpha = vOpacity * softCloud * innerVariation;",
+      "  float innerVariation = 0.92 + 0.08 * (1.0 - smoothstep(0.0, 0.95, radius));",
+      "  float alpha = min(vOpacity * softCloud * innerVariation, 0.88);",
       "  if (alpha < 0.003) discard;",
       "  gl_FragColor = vec4(vTint, alpha);",
       "}"
@@ -114,6 +114,9 @@ export function createDustSystem({ THREE, CANNON, scene, chassisBody, vehicle, r
     tint: 1
   }));
   const emissionRemainders = [0, 0, 0, 0];
+  // Smooth the slip signal so emissions remain steady through small frame-to-frame
+  // changes in the tire contact calculation instead of flickering on and off.
+  const slipMemory = [0, 0, 0, 0];
   const localRight = new CANNON.Vec3(1, 0, 0);
   const localForward = new CANNON.Vec3(0, 0, 1);
   const worldRight = new CANNON.Vec3();
@@ -167,15 +170,18 @@ export function createDustSystem({ THREE, CANNON, scene, chassisBody, vehicle, r
     particle.endWidth = randomRange(1.75, 2.55);
     particle.startHeight = randomRange(0.36, 0.54);
     particle.endHeight = randomRange(0.98, 1.48);
-    particle.baseOpacity = randomRange(0.32, 0.43) * (0.86 + intensity * 0.24);
-    particle.tint = randomRange(0.90, 1.10);
+    // A denser initial cloud makes the tire plume clearly visible, while the
+    // existing lifetime curve still softens and fades it away naturally.
+    particle.baseOpacity = randomRange(0.52, 0.66) * (0.92 + intensity * 0.18);
+    particle.tint = randomRange(0.94, 1.08);
 
     const firstVertex = particleIndex * VERTICES_PER_PARTICLE;
     for (let vertex = 0; vertex < VERTICES_PER_PARTICLE; vertex++) {
       const v = firstVertex + vertex;
-      colors[v * 3] = 0.49 * particle.tint;
-      colors[v * 3 + 1] = 0.39 * particle.tint;
-      colors[v * 3 + 2] = 0.29 * particle.tint;
+      // Warm, sunlit dirt rather than dark brown smoke.
+      colors[v * 3] = 0.70 * particle.tint;
+      colors[v * 3 + 1] = 0.61 * particle.tint;
+      colors[v * 3 + 2] = 0.47 * particle.tint;
     }
   }
 
@@ -200,6 +206,7 @@ export function createDustSystem({ THREE, CANNON, scene, chassisBody, vehicle, r
         const wheel = vehicle.wheelInfos[i];
         if (!wheel.isInContact || !wheel.raycastResult?.hitPointWorld) {
           emissionRemainders[i] = Math.max(0, emissionRemainders[i] - step * 3);
+          slipMemory[i] *= Math.exp(-4.5 * step);
           continue;
         }
 
@@ -220,28 +227,36 @@ export function createDustSystem({ THREE, CANNON, scene, chassisBody, vehicle, r
         const lateralSpeed =
           contactVelocity.x * tireRightX + contactVelocity.z * tireRightZ;
         const contactSpeed = Math.hypot(tireForwardSpeed, lateralSpeed);
-        const speedGate = clamp((contactSpeed - 1.35) / 3.8, 0, 1);
+        const speedGate = clamp((contactSpeed - 0.85) / 3.0, 0, 1);
         const measuredSlip = clamp(
-          (Math.abs(lateralSpeed) - 0.16) / 0.90,
+          (Math.abs(lateralSpeed) - 0.10) / 0.70,
           0,
           1
         ) * speedGate;
         const skidSeverity = clamp(1 - (wheel.skidInfo ?? 1), 0, 1);
-        const flaggedSlip = wheel.sliding ? 0.42 + skidSeverity * 0.58 : 0;
-        const slipAmount = Math.max(measuredSlip, flaggedSlip * speedGate);
+        const flaggedSlip = wheel.sliding ? 0.58 + skidSeverity * 0.42 : 0;
+        const rawSlip = Math.max(measuredSlip, flaggedSlip * speedGate);
 
-        if (slipAmount < 0.055 || speedGate <= 0) {
+        // Build the dust signal quickly when a tire starts sliding, then let it
+        // fall more slowly when grip returns. This keeps a sustained slide
+        // continuously supplied with fresh dust instead of emitting in bursts.
+        const targetSlip = clamp((rawSlip - 0.025) / 0.62, 0, 1);
+        const slipResponse = targetSlip > slipMemory[i] ? 16 : 3.8;
+        slipMemory[i] +=
+          (targetSlip - slipMemory[i]) * (1 - Math.exp(-slipResponse * step));
+
+        if (slipMemory[i] < 0.035 || speedGate <= 0) {
           emissionRemainders[i] = Math.max(0, emissionRemainders[i] - step * 3);
           continue;
         }
 
         const intensity = clamp(
-          0.18 + slipAmount * 0.88 + Math.abs(lateralSpeed) * 0.12,
-          0.16,
+          0.22 + slipMemory[i] * 0.92 + Math.abs(lateralSpeed) * 0.11,
+          0.18,
           1
         );
-        // Frequent overlapping puffs merge into a continuous-looking plume.
-        const particlesPerSecond = 28 + intensity * 50;
+        // Repeated emission continues for every contacting tire that is sliding.
+        const particlesPerSecond = 34 + intensity * 56;
         emissionRemainders[i] += step * particlesPerSecond;
 
         while (emissionRemainders[i] >= 1) {
@@ -251,6 +266,9 @@ export function createDustSystem({ THREE, CANNON, scene, chassisBody, vehicle, r
       }
     } else {
       emissionRemainders.fill(0);
+      for (let i = 0; i < slipMemory.length; i++) {
+        slipMemory[i] *= Math.exp(-4.5 * step);
+      }
     }
 
     const drag = Math.exp(-0.72 * step);
