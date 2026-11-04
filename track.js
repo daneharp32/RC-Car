@@ -664,7 +664,7 @@ export function createTrackSystem({ THREE, scene }) {
   }
 
   // Reserve a clear pit-side patch for the driver's stand and parked RC trucks.
-  const pitCenter = new THREE.Vector2(-43, -46);
+  const pitCenter = new THREE.Vector2(-42, -45.8);
   function clearOfPitArea(x, z, margin = 8.2) {
     return Math.hypot(x - pitCenter.x, z - pitCenter.y) > margin;
   }
@@ -777,13 +777,21 @@ export function createTrackSystem({ THREE, scene }) {
   driverStand.rotation.y = -1.80;
   trackGroup.add(driverStand);
 
+  // Scale the wooden structure uniformly so it reads as a proper raised
+  // driver's platform. Parked RC cars remain children of the outer pit group,
+  // keeping their original size.
+  const standStructure = new THREE.Group();
+  standStructure.name = "enlarged-wooden-platform";
+  standStructure.scale.setScalar(1.45);
+  driverStand.add(standStructure);
+
   function addTimber(size, position, rotation = [0, 0, 0], material = weatheredWood) {
     const plank = new THREE.Mesh(new THREE.BoxGeometry(size[0], size[1], size[2]), material);
     plank.position.set(position[0], position[1], position[2]);
     plank.rotation.set(rotation[0], rotation[1], rotation[2]);
     plank.castShadow = true;
     plank.receiveShadow = true;
-    driverStand.add(plank);
+    standStructure.add(plank);
     return plank;
   }
 
@@ -799,7 +807,7 @@ export function createTrackSystem({ THREE, scene }) {
     brace.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
     brace.castShadow = true;
     brace.receiveShadow = true;
-    driverStand.add(brace);
+    standStructure.add(brace);
   }
 
   // Four heavy support posts and diagonal braces.
@@ -867,7 +875,7 @@ export function createTrackSystem({ THREE, scene }) {
         const nail = new THREE.Mesh(nailGeometry, nailMaterial);
         nail.position.set(x + Math.sign(x) * 0.10, y, z);
         nail.rotation.z = Math.PI / 2;
-        driverStand.add(nail);
+        standStructure.add(nail);
       }
     }
   }
