@@ -262,7 +262,7 @@
     #playersValue { margin-top: 4px; color: #b8c5cd; font-size: 11px; }
     #controlsCard { left: 18px; bottom: 18px; transform: translateY(-132px); color: #bdc9d0; font-size: 10px; line-height: 1.8; }
     #cameraModeCard {
-      right: 18px; bottom: 18px; min-width: 226px; padding: 9px 10px;
+      right: 18px; bottom: 18px; min-width: 286px; padding: 9px 10px;
       pointer-events: auto;
     }
     .camera-mode-buttons { display: flex; gap: 5px; margin-top: 7px; }
@@ -422,8 +422,8 @@
       #roomCard { right: 12px; top: 66px; }
       #leaveButton { left: 12px; top: 66px; }
       #controlsCard { display: none; }
-      #cameraModeCard { right: 12px; bottom: 12px; min-width: 204px; padding: 8px; }
-      .camera-mode-button { min-height: 29px; padding: 0 6px; font-size: 7px; }
+      #cameraModeCard { right: 12px; bottom: 12px; min-width: 256px; padding: 8px; }
+      .camera-mode-button { min-height: 29px; padding: 0 5px; font-size: 7px; letter-spacing: .04em; }
       .menu-content { top: 13%; padding: 21px 18px; }
       .menu-description { font-size: 11px; }
       #garagePanel { left: 12px; top: auto; bottom: 16px; transform: none; width: min(270px, calc(100vw - 24px)); padding: 17px; }
@@ -617,9 +617,10 @@
     <div id="cameraModeCard" class="hud-card" aria-label="Camera mode">
       <div class="hud-label">CAMERA</div>
       <div class="camera-mode-buttons">
-        <button class="camera-mode-button active" type="button" data-camera-mode="chase" aria-pressed="true">CHASE</button>
-        <button class="camera-mode-button" type="button" data-camera-mode="hood" aria-pressed="false">HOOD</button>
-        <button class="camera-mode-button" type="button" data-camera-mode="stand" aria-pressed="false">STAND POV</button>
+        <button class="camera-mode-button active" type="button" data-camera-mode="chase" aria-pressed="true" title="Chase camera (C)">CHASE</button>
+        <button class="camera-mode-button" type="button" data-camera-mode="hood" aria-pressed="false" title="Hood camera (C)">HOOD</button>
+        <button class="camera-mode-button" type="button" data-camera-mode="interior" aria-pressed="false" title="Interior camera (C)">INTERIOR</button>
+        <button class="camera-mode-button" type="button" data-camera-mode="stand" aria-pressed="false" title="Stand POV camera (C)">STAND POV</button>
       </div>
     </div>
     <div id="speedCard" class="hud-card">
