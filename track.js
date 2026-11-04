@@ -847,7 +847,7 @@ export function createTrackSystem({ THREE, scene }) {
   addTimber([4.20, 0.07, 0.12], [0, 1.94, 0.82], [0, 0, 0], darkWood);
 
   // Worn wooden steps at the front-left corner of the platform.
-  const stairAngle = 0.68;
+  const stairAngle = -0.68;
   for (const x of [-1.82, -0.66]) {
     addTimber([0.13, 0.17, 2.68], [x, 0.91, -1.90], [stairAngle, 0, 0], darkWood);
   }
@@ -1035,6 +1035,12 @@ export function createTrackSystem({ THREE, scene }) {
     return { t, x: point.x, z: point.z };
   });
 
+  // Fixed camera mount just above the driver's platform railing. This stays
+  // at the stand while the Stand POV camera pans and zooms toward the active car.
+  const standCameraPosition = driverStand.localToWorld(
+    new THREE.Vector3(0, 4.12, -0.38)
+  );
+
   return {
     arenaVisuals,
     trackLayout: {
@@ -1044,6 +1050,11 @@ export function createTrackSystem({ THREE, scene }) {
       jumps,
       barriers,
       spawn,
+      standCamera: {
+        x: standCameraPosition.x,
+        y: standCameraPosition.y,
+        z: standCameraPosition.z
+      },
       raceGates,
       centerlineSamples
     }
