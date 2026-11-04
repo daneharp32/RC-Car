@@ -236,8 +236,8 @@ export function createMultiplayerSystem(game) {
   }
 
   function publishLobby() {
-    // Race rooms leave the browser when their countdown starts. Free Drive
-    // rooms stay open and discoverable for as long as the host remains there.
+    // Race and Time Trial rooms leave the browser when their countdown starts.
+    // Free Drive rooms stay open and discoverable while the host remains there.
     if (!hostingLobby || !currentLobby || !directoryAction || !currentLobbyAcceptsPlayers()) return;
 
     const announcement = {
@@ -744,6 +744,8 @@ export function createMultiplayerSystem(game) {
       const lapLabel = lapField?.querySelector("span");
       if (lapLabel) lapLabel.textContent = selectedLobbyMode === "time-trial" ? "Number of timed laps" : "Number of laps";
       joinButton.textContent = createLobbyButtonLabel();
+      const hint = $("lobbyModeHint");
+      if (hint) hint.style.display = selectedLobbyMode === "time-trial" ? "block" : "none";
       const description = joinPanel.querySelector(".menu-description");
       if (description) description.textContent = selectedLobbyMode === "time-trial"
         ? "Complete the selected laps and compete for the fastest valid lap time."
