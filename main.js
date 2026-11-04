@@ -442,14 +442,14 @@ function animate(now) {
     camera.up.copy(worldUp);
     camera.lookAt(hoodTarget);
   } else if (cameraMode === "interior") {
-    // Driver-eye position inside the cab, aimed forward through the windshield.
-    // This is also a rigid mount with a fixed field of view at every speed.
+    // Raised driver-eye position inside the cab, giving a clearer view over
+    // the hood and farther down the track without changing the fixed FOV.
     const interiorPosition = followedRoot.localToWorld(
-      new THREE.Vector3(0, 0.245, 0.055)
+      new THREE.Vector3(0, 0.355, 0.025)
     );
     const interiorTarget = interiorPosition.clone()
-      .addScaledVector(fullCarForward, 10.0)
-      .add(new THREE.Vector3(0, 0.025, 0));
+      .addScaledVector(fullCarForward, 13.0)
+      .add(new THREE.Vector3(0, 0.045, 0));
     camera.position.copy(interiorPosition);
     if (camera.fov !== 74) {
       camera.fov = 74;
