@@ -339,6 +339,24 @@
       margin-bottom: 8px; color: #a9d7ff;
       font-size: 8px; font-weight: 900; letter-spacing: .13em;
     }
+    .race-results-head, .race-result-row {
+      display: grid; grid-template-columns: 48px minmax(0,1fr) 100px;
+      align-items: center; gap: 8px;
+    }
+    .race-results-head {
+      padding: 0 9px 5px; color: #8fa5b7;
+      font-size: 8px; font-weight: 900; letter-spacing: .1em;
+    }
+    .race-results-head span:last-child { text-align: right; }
+    .race-results-list { display: grid; gap: 5px; max-height: 154px; overflow-y: auto; }
+    .race-result-row {
+      min-height: 31px; padding: 5px 9px; border: 1px solid rgba(255,255,255,.07);
+      border-radius: 7px; background: rgba(255,255,255,.035);
+      color: #eaf4fc; font-size: 10px;
+    }
+    .race-result-place { color: #9fcfff; font-weight: 900; }
+    .race-result-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .race-result-row strong { text-align: right; font-size: 11px; font-variant-numeric: tabular-nums; }
     .race-spectator-list { display: flex; flex-wrap: wrap; gap: 7px; }
     .race-spectator-empty {
       color: #aab8c2; font-size: 10px; line-height: 1.45;
@@ -593,6 +611,8 @@
       <div id="racePostRacePanel" class="race-action-panel" style="display:none">
         <div id="raceResultsHeading" class="race-action-heading">RACE RESULTS</div>
         <div id="racePostRaceStatus">ALL DRIVERS HAVE FINISHED</div>
+        <div class="race-results-head"><span>PLACE</span><span>DRIVER</span><span id="raceResultsTimeHeading">FINISH TIME</span></div>
+        <div id="raceResultsList" class="race-results-list" aria-live="polite"></div>
         <div id="raceRestartSettings" class="race-action-row">
           <label class="race-restart-field">
             <span>NEXT RACE LAPS</span>
