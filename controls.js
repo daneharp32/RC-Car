@@ -94,6 +94,8 @@ const localForwardAxis = new CANNON.Vec3(0, 0, 1);
 const worldRightAxis = new CANNON.Vec3();
 const worldUpAxis = new CANNON.Vec3();
 const worldForwardAxis = new CANNON.Vec3();
+const horizontalRightAxis = new CANNON.Vec3();
+const horizontalForwardAxis = new CANNON.Vec3();
 const worldLeanTorque = new CANNON.Vec3();
 const localAirTorque = new CANNON.Vec3();
 const worldAirTorque = new CANNON.Vec3();
@@ -164,8 +166,23 @@ function updateDrivingControls(delta) {
   chassisBody.quaternion.vmult(localRightAxis, worldRightAxis);
   chassisBody.quaternion.vmult(localUpAxis, worldUpAxis);
   chassisBody.quaternion.vmult(localForwardAxis, worldForwardAxis);
-  let forwardSpeed = chassisBody.velocity.dot(worldForwardAxis);
-  let lateralSpeed = chassisBody.velocity.dot(worldRightAxis);
+
+  // Flatten the heading axes for tire slip and braking so a pitched car never
+  // loses vertical jump velocity just because the driver is holding brake.
+  const horizontalForwardLength = Math.hypot(worldForwardAxis.x, worldForwardAxis.z);
+  if (horizontalForwardLength > 1e-4) {
+    horizontalForwardAxis.set(
+      worldForwardAxis.x / horizontalForwardLength,
+      0,
+      worldForwardAxis.z / horizontalForwardLength
+    );
+  } else {
+    horizontalForwardAxis.set(0, 0, 1);
+  }
+  horizontalRightAxis.set(horizontalForwardAxis.z, 0, -horizontalForwardAxis.x);
+
+  let forwardSpeed = chassisBody.velocity.dot(horizontalForwardAxis);
+  let lateralSpeed = chassisBody.velocity.dot(horizontalRightAxis);
 
   if (keys[" "] && delta > 0) {
     const forwardBrakeFactor = Math.exp(-3.1 * delta);
@@ -173,13 +190,11 @@ function updateDrivingControls(delta) {
     const forwardChange = (forwardBrakeFactor - 1) * forwardSpeed;
     const lateralChange = (lateralBrakeFactor - 1) * lateralSpeed;
     chassisBody.velocity.x +=
-      worldForwardAxis.x * forwardChange + worldRightAxis.x * lateralChange;
-    chassisBody.velocity.y +=
-      worldForwardAxis.y * forwardChange + worldRightAxis.y * lateralChange;
+      horizontalForwardAxis.x * forwardChange + horizontalRightAxis.x * lateralChange;
     chassisBody.velocity.z +=
-      worldForwardAxis.z * forwardChange + worldRightAxis.z * lateralChange;
-    forwardSpeed = chassisBody.velocity.dot(worldForwardAxis);
-    lateralSpeed = chassisBody.velocity.dot(worldRightAxis);
+      horizontalForwardAxis.z * forwardChange + horizontalRightAxis.z * lateralChange;
+    forwardSpeed = chassisBody.velocity.dot(horizontalForwardAxis);
+    lateralSpeed = chassisBody.velocity.dot(horizontalRightAxis);
   }
 
   const groundedWheels = vehicle.wheelInfos.reduce(
