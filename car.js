@@ -1,5 +1,20 @@
 import { RoundedBoxGeometry } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/geometries/RoundedBoxGeometry.js";
 
+// All cars share one parsed Concept4 asset. Each vehicle gets a cloned scene
+// graph while the underlying detailed geometries and materials stay shared.
+let sharedConcept4ShellPromise = null;
+function getSharedConcept4Shell(THREE) {
+  if (!sharedConcept4ShellPromise) {
+    sharedConcept4ShellPromise = import("./concept4-shell-loader.js")
+      .then(({ loadConcept4Shell }) => loadConcept4Shell(THREE))
+      .catch((error) => {
+        sharedConcept4ShellPromise = null;
+        throw error;
+      });
+  }
+  return sharedConcept4ShellPromise;
+}
+
 // Builds the detailed chassis, wheels, and the separately removable shell.
 export function createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellGeometry = null }) {
 function makeCarVisual(color, playerName = "") {
@@ -1108,10 +1123,9 @@ function makeCarVisual(color, playerName = "") {
     if (variant !== "concept4") throw new Error("Unknown body shell option.");
     if (concept4ShellVariant.children.length) return true;
     if (!concept4LoadPromise) {
-      concept4LoadPromise = import("./concept4-shell-loader.js")
-        .then(({ loadConcept4Shell }) => loadConcept4Shell(THREE))
+      concept4LoadPromise = getSharedConcept4Shell(THREE)
         .then((result) => {
-          concept4ShellVariant.add(result.group);
+          concept4ShellVariant.add(result.group.clone(true));
           concept4ShellVariant.userData.meshCount = result.meshCount;
           concept4ShellVariant.visible = activeShellVariant === "concept4";
           console.info("Concept4 shell loaded at full detail:", result.meshCount, "mesh objects");
