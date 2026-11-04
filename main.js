@@ -379,8 +379,9 @@ function animate(now) {
   }
   garage.updateGarageShellAnimation(now);
   world.step(FIXED_STEP, delta, 3);
-  updateLocalVisual();
+  // Read wheel contact and sliding flags before visual wheel transforms refresh them.
   dustSystem.update(delta, multiplayer.joined);
+  updateLocalVisual();
   race.update(delta, now);
   multiplayer.updateRemoteVisuals(delta);
 
