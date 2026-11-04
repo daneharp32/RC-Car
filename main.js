@@ -270,6 +270,23 @@ const game = {
 
 const controls = createControlsSystem(game);
 game.controls = controls;
+
+// Chase remains the default camera. The selector changes only the view and
+// never alters steering, throttle, suspension, or vehicle physics.
+let cameraMode = "chase";
+function setCameraMode(mode) {
+  if (!["chase", "hood", "stand"].includes(mode)) return;
+  cameraMode = mode;
+  for (const button of document.querySelectorAll("[data-camera-mode]")) {
+    const active = button.dataset.cameraMode === cameraMode;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  }
+}
+for (const button of document.querySelectorAll("[data-camera-mode]")) {
+  button.addEventListener("click", () => setCameraMode(button.dataset.cameraMode));
+}
+
 const race = createRaceSystem(game);
 game.race = race;
 const multiplayer = createMultiplayerSystem(game);
@@ -344,27 +361,65 @@ function animate(now) {
     camera.lookAt(localCar.root.position.clone().add(new THREE.Vector3(0, 0.12, 0)));
     garage.updateHoverBounds();
   } else {
-  // Finished drivers can spectate a live opponent; otherwise the camera
-  // follows the local truck as usual. Remote visuals are already interpolated.
+  // Finished drivers can spectate a live opponent; otherwise each camera
+  // follows the local truck. Remote car visuals are already interpolated.
   const spectatedPlayer = race.getSpectateTarget();
   const followedCar = spectatedPlayer?.visual || localCar;
   const followedRoot = followedCar.root;
+  const worldUp = new THREE.Vector3(0, 1, 0);
+  const fullCarForward = new THREE.Vector3(0, 0, -1)
+    .applyQuaternion(followedRoot.quaternion)
+    .normalize();
 
-  // Follow horizontal heading only; ignore chassis pitch and roll.
-  const carForward = new THREE.Vector3(0, 0, -1).applyQuaternion(followedRoot.quaternion);
-  carForward.y = 0;
-  if (carForward.lengthSq() < 0.0001) carForward.set(0, 0, -1);
-  carForward.normalize();
-  const cameraDirection = carForward.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), controls.cameraOrbitYaw);
-  const desiredCamera = followedRoot.position.clone()
-    .addScaledVector(cameraDirection, -5.8)
-    .add(new THREE.Vector3(0, 2.8, 0));
-  camera.position.lerp(desiredCamera, 1 - Math.exp(-2.8 * delta));
-  const lookTarget = followedRoot.position.clone()
-    .add(new THREE.Vector3(0, 0.28, 0))
-    .addScaledVector(carForward, 0.85);
-  camera.up.set(0, 1, 0);
-  camera.lookAt(lookTarget);
+  if (cameraMode === "stand") {
+    // Fixed operator viewpoint above the wooden stand. The camera pans toward
+    // the active car and optically zooms as the car moves farther around track.
+    const mount = trackLayout.standCamera;
+    if (mount) {
+      const standPosition = new THREE.Vector3(mount.x, mount.y, mount.z);
+      camera.position.lerp(standPosition, 1 - Math.exp(-4.0 * delta));
+      const target = followedRoot.position.clone().add(new THREE.Vector3(0, 0.22, 0));
+      const distance = Math.max(1, camera.position.distanceTo(target));
+      const desiredFov = THREE.MathUtils.clamp(54 * (18 / distance), 12, 54);
+      camera.fov += (desiredFov - camera.fov) * (1 - Math.exp(-2.8 * delta));
+      camera.updateProjectionMatrix();
+      camera.up.copy(worldUp);
+      camera.lookAt(target);
+    }
+  } else if (cameraMode === "hood") {
+    // Mount the view just above the front hood. It follows the truck's pitch
+    // and heading, with a slight smoothing step to avoid camera vibration.
+    const hoodPosition = followedRoot.localToWorld(
+      new THREE.Vector3(0, 0.345, -0.34)
+    );
+    const hoodTarget = hoodPosition.clone()
+      .addScaledVector(fullCarForward, 8.0)
+      .add(new THREE.Vector3(0, 0.08, 0));
+    camera.position.lerp(hoodPosition, 1 - Math.exp(-18.0 * delta));
+    camera.fov += (66 - camera.fov) * (1 - Math.exp(-3.5 * delta));
+    camera.updateProjectionMatrix();
+    camera.up.copy(worldUp);
+    camera.lookAt(hoodTarget);
+  } else {
+    // Original Chase camera: same trailing distance, height, orbit control,
+    // and follow target as before this selector was added.
+    const carForward = fullCarForward.clone();
+    carForward.y = 0;
+    if (carForward.lengthSq() < 0.0001) carForward.set(0, 0, -1);
+    carForward.normalize();
+    const cameraDirection = carForward.clone().applyAxisAngle(worldUp, controls.cameraOrbitYaw);
+    const desiredCamera = followedRoot.position.clone()
+      .addScaledVector(cameraDirection, -5.8)
+      .add(new THREE.Vector3(0, 2.8, 0));
+    camera.position.lerp(desiredCamera, 1 - Math.exp(-2.8 * delta));
+    camera.fov += (58 - camera.fov) * (1 - Math.exp(-4.0 * delta));
+    camera.updateProjectionMatrix();
+    const lookTarget = followedRoot.position.clone()
+      .add(new THREE.Vector3(0, 0.28, 0))
+      .addScaledVector(carForward, 0.85);
+    camera.up.copy(worldUp);
+    camera.lookAt(lookTarget);
+  }
   }
 
   multiplayer.sendSnapshotIfReady(delta);
