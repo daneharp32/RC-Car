@@ -273,9 +273,17 @@ game.controls = controls;
 
 // Chase remains the default camera. The selector changes only the view and
 // never alters steering, throttle, suspension, or vehicle physics.
+const CAMERA_MODES = ["chase", "hood", "interior", "stand"];
+const CAMERA_MODE_LABELS = {
+  chase: "CHASE",
+  hood: "HOOD",
+  interior: "INTERIOR",
+  stand: "STAND POV"
+};
 let cameraMode = "chase";
+
 function setCameraMode(mode) {
-  if (!["chase", "hood", "stand"].includes(mode)) return;
+  if (!CAMERA_MODES.includes(mode)) return;
   cameraMode = mode;
   for (const button of document.querySelectorAll("[data-camera-mode]")) {
     const active = button.dataset.cameraMode === cameraMode;
@@ -283,9 +291,31 @@ function setCameraMode(mode) {
     button.setAttribute("aria-pressed", active ? "true" : "false");
   }
 }
+
+function cycleCameraMode() {
+  const currentIndex = CAMERA_MODES.indexOf(cameraMode);
+  const nextMode = CAMERA_MODES[(currentIndex + 1) % CAMERA_MODES.length];
+  setCameraMode(nextMode);
+  showToast("CAMERA: " + CAMERA_MODE_LABELS[nextMode]);
+}
+
 for (const button of document.querySelectorAll("[data-camera-mode]")) {
   button.addEventListener("click", () => setCameraMode(button.dataset.cameraMode));
 }
+
+// C cycles cameras while driving. Ignore text fields so the shortcut never
+// interferes with typing a driver name or lobby name.
+window.addEventListener("keydown", (event) => {
+  if (event.repeat || event.ctrlKey || event.metaKey || event.altKey ||
+      event.key.toLowerCase() !== "c" || !multiplayer?.joined) return;
+  const activeElement = document.activeElement;
+  if (activeElement && (
+    ["INPUT", "TEXTAREA", "SELECT"].includes(activeElement.tagName) ||
+    activeElement.isContentEditable
+  )) return;
+  event.preventDefault();
+  cycleCameraMode();
+});
 
 function easeCameraFov(targetFov, delta, response) {
   const nextFov = camera.fov + (targetFov - camera.fov) * (1 - Math.exp(-response * delta));
@@ -395,18 +425,38 @@ function animate(now) {
       camera.lookAt(target);
     }
   } else if (cameraMode === "hood") {
-    // Mount the view just above the front hood. It follows the truck's pitch
-    // and heading, with a slight smoothing step to avoid camera vibration.
+    // Rigid hood mount: position and field of view do not change with speed.
+    // Copy the mount directly so acceleration cannot leave the camera lagging
+    // behind the truck and create the impression of an unwanted zoom-out.
     const hoodPosition = followedRoot.localToWorld(
       new THREE.Vector3(0, 0.345, -0.34)
     );
     const hoodTarget = hoodPosition.clone()
       .addScaledVector(fullCarForward, 8.0)
       .add(new THREE.Vector3(0, 0.08, 0));
-    camera.position.lerp(hoodPosition, 1 - Math.exp(-18.0 * delta));
-    easeCameraFov(66, delta, 3.5);
+    camera.position.copy(hoodPosition);
+    if (camera.fov !== 66) {
+      camera.fov = 66;
+      camera.updateProjectionMatrix();
+    }
     camera.up.copy(worldUp);
     camera.lookAt(hoodTarget);
+  } else if (cameraMode === "interior") {
+    // Driver-eye position inside the cab, aimed forward through the windshield.
+    // This is also a rigid mount with a fixed field of view at every speed.
+    const interiorPosition = followedRoot.localToWorld(
+      new THREE.Vector3(0, 0.245, 0.055)
+    );
+    const interiorTarget = interiorPosition.clone()
+      .addScaledVector(fullCarForward, 10.0)
+      .add(new THREE.Vector3(0, 0.025, 0));
+    camera.position.copy(interiorPosition);
+    if (camera.fov !== 74) {
+      camera.fov = 74;
+      camera.updateProjectionMatrix();
+    }
+    camera.up.copy(worldUp);
+    camera.lookAt(interiorTarget);
   } else {
     // Original Chase camera: same trailing distance, height, orbit control,
     // and follow target as before this selector was added.
