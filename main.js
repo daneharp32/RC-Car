@@ -6,6 +6,9 @@ import { createControlsSystem } from "./controls.js";
 import { createMultiplayerSystem } from "./multiplayer.js";
 import { createGarageSystem } from "./garage.js";
 import { createTrackSystem } from "./track.js";
+import { createRaceSystem } from "./race.js";
+
+import { cleanRangerShellGeometry } from "./shell-cleanup.js";
 import rangerShellPart0 from "./ranger-shell-data-00.js";
 import rangerShellPart1 from "./ranger-shell-data-01.js";
 import rangerShellPart2 from "./ranger-shell-data-02.js";
@@ -163,7 +166,7 @@ async function loadRangerShellGeometry() {
   geometry.setIndex(new THREE.BufferAttribute(indices, 1));
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
-  return geometry;
+  return cleanRangerShellGeometry(THREE, geometry);
 }
 
 let shellGeometry = null;
@@ -177,7 +180,7 @@ try {
 // Physics: Cannon's RaycastVehicle applies suspension and tire impulses only
 // when each wheel ray has actually found a surface to touch.
 
-const physicsSystem = createPhysicsSystem({ CANNON, trackLayout, shellFit: !!shellGeometry });
+const physicsSystem = createPhysicsSystem({ CANNON, trackLayout, shellFit: !!shellGeometry, shellGeometry });
 const {
   world,
   chassisBody,
@@ -191,6 +194,7 @@ const {
 
 const makeCarVisual = createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellGeometry });
 const localCar = makeCarVisual(0xffa33d);
+
 
 function updateLocalVisual() {
   localCar.root.position.set(chassisBody.position.x, chassisBody.position.y, chassisBody.position.z);
@@ -255,6 +259,7 @@ const game = {
   vehicle,
   wheelPositions,
   VISUAL_CHASSIS_LENGTH_SCALE,
+  trackLayout,
   spawnX,
   spawnZ,
   spawnYaw,
@@ -267,6 +272,63 @@ const game = {
 
 const controls = createControlsSystem(game);
 game.controls = controls;
+
+// Chase remains the default camera. The selector changes only the view and
+// never alters steering, throttle, suspension, or vehicle physics.
+const CAMERA_MODES = ["chase", "hood", "interior", "stand"];
+const CAMERA_MODE_LABELS = {
+  chase: "CHASE",
+  hood: "HOOD",
+  interior: "INTERIOR",
+  stand: "STAND POV"
+};
+let cameraMode = "chase";
+
+function setCameraMode(mode) {
+  if (!CAMERA_MODES.includes(mode)) return;
+  cameraMode = mode;
+  for (const button of document.querySelectorAll("[data-camera-mode]")) {
+    const active = button.dataset.cameraMode === cameraMode;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  }
+}
+
+function cycleCameraMode() {
+  const currentIndex = CAMERA_MODES.indexOf(cameraMode);
+  const nextMode = CAMERA_MODES[(currentIndex + 1) % CAMERA_MODES.length];
+  setCameraMode(nextMode);
+  showToast("CAMERA: " + CAMERA_MODE_LABELS[nextMode]);
+}
+
+for (const button of document.querySelectorAll("[data-camera-mode]")) {
+  button.addEventListener("click", () => setCameraMode(button.dataset.cameraMode));
+}
+
+// C cycles cameras while driving. Ignore text fields so the shortcut never
+// interferes with typing a driver name or lobby name.
+window.addEventListener("keydown", (event) => {
+  if (event.repeat || event.ctrlKey || event.metaKey || event.altKey ||
+      event.key.toLowerCase() !== "c" || !multiplayer?.joined) return;
+  const activeElement = document.activeElement;
+  if (activeElement && (
+    ["INPUT", "TEXTAREA", "SELECT"].includes(activeElement.tagName) ||
+    activeElement.isContentEditable
+  )) return;
+  event.preventDefault();
+  cycleCameraMode();
+});
+
+function easeCameraFov(targetFov, delta, response) {
+  const nextFov = camera.fov + (targetFov - camera.fov) * (1 - Math.exp(-response * delta));
+  if (Math.abs(nextFov - camera.fov) > 0.025) {
+    camera.fov = nextFov;
+    camera.updateProjectionMatrix();
+  }
+}
+
+const race = createRaceSystem(game);
+game.race = race;
 const multiplayer = createMultiplayerSystem(game);
 game.multiplayer = multiplayer;
 const garage = createGarageSystem(game);
@@ -317,7 +379,10 @@ function animate(now) {
   }
   garage.updateGarageShellAnimation(now);
   world.step(FIXED_STEP, delta, 3);
+  // Read wheel contact and sliding flags before visual wheel transforms refresh them.
+
   updateLocalVisual();
+  race.update(delta, now);
   multiplayer.updateRemoteVisuals(delta);
 
   const speedMph = chassisBody.velocity.length() * 2.236936;
@@ -327,6 +392,7 @@ function animate(now) {
 
   // The showroom camera presents the parked truck in menu and garage views.
   if (garage.viewMode === "menu" || garage.viewMode === "mode-select" || garage.viewMode === "create-lobby" || garage.viewMode === "garage") {
+    easeCameraFov(58, delta, 4.0);
     const distance = garage.viewMode === "garage" ? 2.35 : 5.1;
     const height = garage.viewMode === "garage" ? 1.18 : 2.15;
     const orbitDirection = new THREE.Vector3(0, 0, 1)
@@ -338,21 +404,82 @@ function animate(now) {
     camera.lookAt(localCar.root.position.clone().add(new THREE.Vector3(0, 0.12, 0)));
     garage.updateHoverBounds();
   } else {
-  // Follow horizontal heading only; ignore chassis pitch and roll.
-  const carForward = new THREE.Vector3(0, 0, -1).applyQuaternion(localCar.root.quaternion);
-  carForward.y = 0;
-  if (carForward.lengthSq() < 0.0001) carForward.set(0, 0, -1);
-  carForward.normalize();
-  const cameraDirection = carForward.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), controls.cameraOrbitYaw);
-  const desiredCamera = localCar.root.position.clone()
-    .addScaledVector(cameraDirection, -5.8)
-    .add(new THREE.Vector3(0, 2.8, 0));
-  camera.position.lerp(desiredCamera, 1 - Math.exp(-2.8 * delta));
-  const lookTarget = localCar.root.position.clone()
-    .add(new THREE.Vector3(0, 0.28, 0))
-    .addScaledVector(carForward, 0.85);
-  camera.up.set(0, 1, 0);
-  camera.lookAt(lookTarget);
+  // Finished drivers can spectate a live opponent; otherwise each camera
+  // follows the local truck. Remote car visuals are already interpolated.
+  const spectatedPlayer = race.getSpectateTarget();
+  const followedCar = spectatedPlayer?.visual || localCar;
+  const followedRoot = followedCar.root;
+  const worldUp = new THREE.Vector3(0, 1, 0);
+  const fullCarForward = new THREE.Vector3(0, 0, -1)
+    .applyQuaternion(followedRoot.quaternion)
+    .normalize();
+
+  if (cameraMode === "stand") {
+    // Fixed operator viewpoint above the wooden stand. The camera pans toward
+    // the active car and optically zooms as the car moves farther around track.
+    const mount = trackLayout.standCamera;
+    if (mount) {
+      const standPosition = new THREE.Vector3(mount.x, mount.y, mount.z);
+      camera.position.lerp(standPosition, 1 - Math.exp(-4.0 * delta));
+      const target = followedRoot.position.clone().add(new THREE.Vector3(0, 0.22, 0));
+      const distance = Math.max(1, camera.position.distanceTo(target));
+      const desiredFov = THREE.MathUtils.clamp(54 * (18 / distance), 12, 54);
+      easeCameraFov(desiredFov, delta, 2.8);
+      camera.up.copy(worldUp);
+      camera.lookAt(target);
+    }
+  } else if (cameraMode === "hood") {
+    // Rigid hood mount: position and field of view do not change with speed.
+    // Copy the mount directly so acceleration cannot leave the camera lagging
+    // behind the truck and create the impression of an unwanted zoom-out.
+    const hoodPosition = followedRoot.localToWorld(
+      new THREE.Vector3(0, 0.345, -0.34)
+    );
+    const hoodTarget = hoodPosition.clone()
+      .addScaledVector(fullCarForward, 8.0)
+      .add(new THREE.Vector3(0, 0.08, 0));
+    camera.position.copy(hoodPosition);
+    if (camera.fov !== 66) {
+      camera.fov = 66;
+      camera.updateProjectionMatrix();
+    }
+    camera.up.copy(worldUp);
+    camera.lookAt(hoodTarget);
+  } else if (cameraMode === "interior") {
+    // Raised driver-eye position inside the cab, giving a clearer view over
+    // the hood and farther down the track without changing the fixed FOV.
+    const interiorPosition = followedRoot.localToWorld(
+      new THREE.Vector3(0, 0.355, 0.025)
+    );
+    const interiorTarget = interiorPosition.clone()
+      .addScaledVector(fullCarForward, 13.0)
+      .add(new THREE.Vector3(0, 0.045, 0));
+    camera.position.copy(interiorPosition);
+    if (camera.fov !== 74) {
+      camera.fov = 74;
+      camera.updateProjectionMatrix();
+    }
+    camera.up.copy(worldUp);
+    camera.lookAt(interiorTarget);
+  } else {
+    // Original Chase camera: same trailing distance, height, orbit control,
+    // and follow target as before this selector was added.
+    const carForward = fullCarForward.clone();
+    carForward.y = 0;
+    if (carForward.lengthSq() < 0.0001) carForward.set(0, 0, -1);
+    carForward.normalize();
+    const cameraDirection = carForward.clone().applyAxisAngle(worldUp, controls.cameraOrbitYaw);
+    const desiredCamera = followedRoot.position.clone()
+      .addScaledVector(cameraDirection, -5.8)
+      .add(new THREE.Vector3(0, 2.8, 0));
+    camera.position.lerp(desiredCamera, 1 - Math.exp(-2.8 * delta));
+    easeCameraFov(58, delta, 4.0);
+    const lookTarget = followedRoot.position.clone()
+      .add(new THREE.Vector3(0, 0.28, 0))
+      .addScaledVector(carForward, 0.85);
+    camera.up.copy(worldUp);
+    camera.lookAt(lookTarget);
+  }
   }
 
   multiplayer.sendSnapshotIfReady(delta);
@@ -364,5 +491,44 @@ $("loading").style.display = "none";
 garage.showMainMenu();
 requestAnimationFrame(animate);
 
-// Generate a local default nickname so each tab is easy to distinguish.
-$("driverName").value = "Driver" + String(Math.floor(100 + Math.random() * 900));
+// Keep the driver's name in the multiplayer lobby browser between visits.
+const DRIVER_NAME_STORAGE_KEY = "rc-car-driver-nickname";
+function cleanDriverName(value) {
+  return String(value || "")
+    .replace(/[\u0000-\u001f\u007f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 18);
+}
+let savedDriverName = "";
+try {
+  savedDriverName = cleanDriverName(window.localStorage.getItem(DRIVER_NAME_STORAGE_KEY));
+} catch (error) {
+  console.warn("Driver-name storage is unavailable in this browser:", error);
+}
+if (!savedDriverName) {
+  savedDriverName = "Driver" + String(Math.floor(100 + Math.random() * 900));
+}
+
+const driverNameInput = $("driverName");
+driverNameInput.value = savedDriverName;
+multiplayer.setDriverName(savedDriverName);
+
+function syncDriverName() {
+  const driverName = cleanDriverName(driverNameInput.value);
+  if (!driverName) return;
+  driverNameInput.value = driverName;
+  multiplayer.setDriverName(driverName);
+  savedDriverName = driverName;
+  try {
+    window.localStorage.setItem(DRIVER_NAME_STORAGE_KEY, driverName);
+  } catch (error) {
+    console.warn("Could not save the driver name in this browser:", error);
+  }
+}
+function restoreDriverName() {
+  driverNameInput.value = savedDriverName;
+  multiplayer.setDriverName(savedDriverName);
+}
+driverNameInput.addEventListener("input", syncDriverName);
+driverNameInput.addEventListener("blur", restoreDriverName);

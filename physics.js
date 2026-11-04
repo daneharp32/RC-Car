@@ -1,8 +1,17 @@
 import { selfId } from "https://esm.sh/trystero@0.26.0";
 
+const DEFAULT_COLLISION_GROUP = 1;
+const JUMP_COLLISION_GROUP = 2;
+
+// Tire grip tuned for a planted short-course truck on packed dirt.
+// A small rear bias allows the back to rotate under hard cornering, but
+// substantial grip remains available to recover from a slide.
+export const FRONT_TIRE_BASE_GRIP = 2.68;
+export const REAR_TIRE_BASE_GRIP = 2.40;
+
 // Builds the Cannon-es world, terrain colliders, chassis, and four-wheel
 // raycast vehicle. The returned objects are shared by the driving systems.
-export function createPhysicsSystem({ CANNON, trackLayout, shellFit = false }) {
+export function createPhysicsSystem({ CANNON, trackLayout, shellFit = false, shellGeometry = null }) {
 const world = new CANNON.World({
   gravity: new CANNON.Vec3(0, -9.82, 0)
 });
@@ -17,24 +26,36 @@ groundBody.addShape(new CANNON.Plane());
 groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
 world.addBody(groundBody);
 
-// Matching convex wedge colliders keep the approach edge flush with the ground.
+// Cannon heightfields use a local XY grid with height along local Z.
+// Rotate that grid upright, then align it to the same track frame as the mesh.
+// No side overhang is added: the collision surface ends exactly at the smooth
+// zero-height edge of the visible bump, avoiding hidden ledges beside jumps.
+const heightfieldTilt = new CANNON.Quaternion();
+heightfieldTilt.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
+
 for (const jump of trackLayout.jumps) {
-  const w = jump.width / 2;
-  const l = jump.length / 2;
-  const h = jump.height;
-  const vertices = [
-    new CANNON.Vec3(-w, 0, l), new CANNON.Vec3(w, 0, l),
-    new CANNON.Vec3(-w, 0, -l), new CANNON.Vec3(w, 0, -l),
-    new CANNON.Vec3(-w, h, -l), new CANNON.Vec3(w, h, -l)
-  ];
-  const faces = [
-    [0, 2, 3, 1], [0, 1, 5, 4], [0, 4, 2],
-    [1, 3, 5], [2, 4, 5, 3]
-  ];
-  const rampBody = new CANNON.Body({ mass: 0, material: groundBody.material });
-  rampBody.addShape(new CANNON.ConvexPolyhedron({ vertices, faces }));
-  rampBody.position.set(jump.x, 0, jump.z);
-  rampBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), jump.yaw);
+  const { profile } = jump;
+  const rampBody = new CANNON.Body({
+    mass: 0,
+    material: groundBody.material,
+    collisionFilterGroup: JUMP_COLLISION_GROUP,
+    collisionFilterMask: -1
+  });
+  rampBody.addShape(new CANNON.Heightfield(profile.heights, {
+    elementSize: profile.elementSize
+  }));
+
+  // The heightfield's local X/Y origin is the rear-left corner of the bump.
+  // Its local X follows the track normal and local Y follows the driving line.
+  rampBody.position.set(
+    jump.x - jump.normalX * profile.width / 2 - jump.tangentX * profile.length / 2,
+    0.01,
+    jump.z - jump.normalZ * profile.width / 2 - jump.tangentZ * profile.length / 2
+  );
+
+  const rampYaw = new CANNON.Quaternion();
+  rampYaw.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), jump.yaw);
+  rampYaw.mult(heightfieldTilt, rampBody.quaternion);
   world.addBody(rampBody);
 }
 
@@ -62,10 +83,96 @@ const chassisBody = new CANNON.Body({
   material: chassisMaterial,
   position: new CANNON.Vec3(spawnX, 0.24, spawnZ),
   linearDamping: 0.12,
-  angularDamping: 0.90
+  // Moderate yaw damping prevents a slide from turning into an uncontrolled spin.
+  // Tire contact forces still provide most of the grip and recovery.
+  angularDamping: 0.72,
+  collisionFilterGroup: DEFAULT_COLLISION_GROUP,
+  // Chassis and shell must not snag on jump faces. Wheel rays still query the
+  // jump group, so suspension contact can launch the truck naturally.
+  collisionFilterMask: ~JUMP_COLLISION_GROUP
 });
 chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), spawnYaw);
 chassisBody.addShape(new CANNON.Box(new CANNON.Vec3(0.30, 0.08, shellFit ? 0.53 : 0.43)));
+
+// The shell is a visual mesh, so give it a lightweight compound collision
+// profile made from thin panels instead of a costly triangle-by-triangle mesh.
+function addBodyShellColliders(body, geometry) {
+  const bounds = geometry?.boundingBox;
+  const min = bounds
+    ? bounds.min
+    : { x: -0.37, y: -0.075, z: -0.503 };
+  const max = bounds
+    ? bounds.max
+    : { x: 0.37, y: 0.164, z: 0.503 };
+
+  const centerX = (min.x + max.x) * 0.5;
+  const centerY = (min.y + max.y) * 0.5;
+  const centerZ = (min.z + max.z) * 0.5;
+  const halfWidth = Math.max(0.12, (max.x - min.x) * 0.5);
+  const shellHeight = Math.max(0.08, max.y - min.y);
+  const halfLength = Math.max(0.25, (max.z - min.z) * 0.5);
+
+  function addPanel(halfExtents, x, y, z) {
+    const shape = new CANNON.Box(new CANNON.Vec3(
+      halfExtents.x,
+      halfExtents.y,
+      halfExtents.z
+    ));
+    body.addShape(shape, new CANNON.Vec3(x, y, z));
+  }
+
+  // Keep shell collision on its upper side walls. The lower sill remains
+  // above the running surface so it does not scrape over raised jump faces.
+  const collisionLowerY = Math.max(min.y + shellHeight * 0.52, 0.035);
+  const collisionHeight = Math.max(0.025, max.y - collisionLowerY);
+  const sideHalfWidth = Math.max(0.02, halfWidth * 0.09);
+  const sideHalfHeight = collisionHeight * 0.5;
+  const sideCenterY = collisionLowerY + sideHalfHeight;
+  const sideHalfLength = halfLength * 0.84;
+  for (const side of [-1, 1]) {
+    addPanel(
+      { x: sideHalfWidth, y: sideHalfHeight, z: sideHalfLength },
+      centerX + side * (halfWidth - sideHalfWidth),
+      sideCenterY,
+      centerZ
+    );
+  }
+
+  // A thin upper skin lets the roof, hood, and bed contact the ground when
+  // the truck rolls over, while keeping the underside open around the tyres.
+  const topHalfThickness = Math.max(0.012, shellHeight * 0.055);
+  addPanel(
+    {
+      x: halfWidth * 0.86,
+      y: topHalfThickness,
+      z: halfLength * 0.91
+    },
+    centerX,
+    max.y - topHalfThickness,
+    centerZ
+  );
+
+  // Upper nose and tail sections still collide during a rollover, but the
+  // lower edges are lifted clear of the jump surface to prevent drag.
+  const endHalfDepth = Math.max(0.025, halfLength * 0.055);
+  const endHalfHeight = collisionHeight * 0.5;
+  for (const end of [-1, 1]) {
+    addPanel(
+      {
+        x: halfWidth * 0.82,
+        y: endHalfHeight,
+        z: endHalfDepth
+      },
+      centerX,
+      sideCenterY,
+      centerZ + end * (halfLength - endHalfDepth)
+    );
+  }
+
+  body.updateMassProperties();
+  body.updateBoundingRadius();
+}
+addBodyShellColliders(chassisBody, shellGeometry);
 chassisBody.allowSleep = false;
 
 const vehicle = new CANNON.RaycastVehicle({
@@ -97,13 +204,19 @@ for (let i = 0; i < 4; i++) {
     axleLocal: new CANNON.Vec3(-1, 0, 0),
     suspensionRestLength: 0.12,
     suspensionStiffness: 52,
-    dampingCompression: 5.6,
-    dampingRelaxation: 4.8,
+    // A touch more compression damping and a calmer rebound make weight
+    // transfer visible without letting the truck pogo after a jump landing.
+    dampingCompression: 6.1,
+    dampingRelaxation: 4.5,
     maxSuspensionTravel: 0.17,
     maxSuspensionForce: 350,
     radius: 0.13,
-    frictionSlip: 4.8,
-    rollInfluence: 0.08,
+    // Start with moderate grip. controls.js adjusts this per wheel as slip
+    // builds, allowing the rear to rotate instead of snapping all velocity
+    // into the direction the front wheels happen to be pointing.
+    frictionSlip: i < 2 ? FRONT_TIRE_BASE_GRIP : REAR_TIRE_BASE_GRIP,
+    // Let tire forces transfer enough load to the chassis for visible body lean.
+    rollInfluence: 0.17,
     isFrontWheel: i < 2,
     useCustomSlidingRotationalSpeed: true,
     customSlidingRotationalSpeed: 18

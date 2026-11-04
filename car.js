@@ -273,16 +273,18 @@ function makeCarVisual(color, playerName = "") {
       end.label,
       "Reinforced vertical plate that anchors the upper shock eyes and suspension bracing."
     );
-    roundedBox(tower, [0.47, 0.215, 0.032], carbonEdge, [0, 0.17, end.z], null, 0.012);
-    roundedBox(tower, [0.30, 0.055, 0.045], blackPlastic, [0, 0.275, end.z], null, 0.012);
+    // Shorter tower plates keep the top mounts lower without changing any
+    // wheel, arm, or physics attachment coordinates.
+    roundedBox(tower, [0.47, 0.145, 0.032], carbonEdge, [0, 0.13, end.z], null, 0.012);
+    roundedBox(tower, [0.30, 0.035, 0.045], blackPlastic, [0, 0.201, end.z], null, 0.010);
     for (const x of [-0.19, -0.11, 0, 0.11, 0.19]) {
       const hole = addMesh(tower, new THREE.CylinderGeometry(0.012, 0.012, 0.007, 12), blackPlastic,
-        [x, 0.19, end.z + (end.z < 0 ? -0.02 : 0.02)], [Math.PI / 2, 0, 0]);
+        [x, 0.145, end.z + (end.z < 0 ? -0.02 : 0.02)], [Math.PI / 2, 0, 0]);
       hole.castShadow = false;
-      addBolt(tower, x, 0.29, end.z, 0.0055);
+      addBolt(tower, x, 0.211, end.z, 0.0055);
     }
     for (const side of [-1, 1]) {
-      cylinderBetween(tower, [side * 0.17, 0.07, end.z], [side * 0.21, 0.275, end.z], 0.012, alloy, 10);
+      cylinderBetween(tower, [side * 0.17, 0.07, end.z], [side * 0.21, 0.201, end.z], 0.012, alloy, 10);
     }
   }
 
@@ -295,7 +297,9 @@ function makeCarVisual(color, playerName = "") {
   ]) {
     const s = corner.side;
     const z = corner.z;
-    const top = [s * 0.19, 0.275, z + (z < 0 ? 0.045 : -0.045)];
+    // The visible damper is shortened to meet the new tower height. Its
+    // lower eye stays in the same visual position; physics shocks are separate.
+    const top = [s * 0.19, 0.195, z + (z < 0 ? 0.045 : -0.045)];
     const bottom = [s * 0.272, -0.012, z];
     addShock(
       chassisGroup,
@@ -348,6 +352,8 @@ function makeCarVisual(color, playerName = "") {
   }
   roundedBox(battery, [0.055, 0.032, 0.045], red, [-0.105, 0.12, -0.225], null, 0.008);
   roundedBox(battery, [0.035, 0.025, 0.025], amber, [-0.105, 0.12, -0.25], null, 0.005);
+  // Lower the complete battery assembly so its straps sit below the bed edge.
+  battery.position.y = -0.045;
 
   // Brushless motor with anodized can, cooling fins, end bell and fan detail.
   const motor = makePart(
@@ -383,6 +389,9 @@ function makeCarVisual(color, playerName = "") {
   for (const y of [0.11, 0.18]) {
     cylinderBetween(motor, [0.045, y, 0.205], [0.175, y, 0.205], 0.003, darkMetal, 7);
   }
+  // Translate the complete motor, preserving its shape and its relationship
+  // to its cooling fins and end bell while lowering it into the chassis.
+  motor.position.y = -0.055;
 
   // Motor gear mesh: exposed spur gear, pinion and protective side guard.
   const gearing = makePart(
@@ -457,6 +466,8 @@ function makeCarVisual(color, playerName = "") {
     [0.135, 0.13, -0.015], [0.20, 0.17, 0.03],
     [0.205, 0.18, 0.12], [0.18, 0.18, 0.19]
   ], 0.005, wireBlack);
+  // Lower both power leads as one routed assembly, keeping their curves intact.
+  powerWiring.position.y = -0.045;
 
   const signalWiring = makePart(
     chassisGroup,
@@ -472,6 +483,8 @@ function makeCarVisual(color, playerName = "") {
     [-0.105, 0.17, 0.25], [-0.08, 0.20, 0.12],
     [0.02, 0.19, 0.00], [0.13, 0.18, -0.05]
   ], 0.0035, wireRed);
+  // Tuck the signal-wire runs slightly lower without altering their routing.
+  signalWiring.position.y = -0.035;
 
   // Front / rear bumpers and body posts remain exposed with the shell removed.
   const frontBumper = makePart(
@@ -493,10 +506,24 @@ function makeCarVisual(color, playerName = "") {
     chassisGroup,
     "rear-bumper",
     "Rear impact bumper",
-    "Compact rear impact bumper. The oversized wing, vertical supports, and upper wing plate have been removed."
+    "Compact rear impact bumper with two reinforced mounting braces tied into the rear chassis rails."
   );
-  const rearBumperZ = rearAxleZ + 0.25;
+  const rearBumperZ = rearAxleZ + 0.31;
   roundedBox(rearStructure, [0.54, 0.065, 0.055], blackPlastic, [0, -0.005, rearBumperZ], null, 0.018);
+  // Two angled mounts visibly tie the rear bumper back into the chassis rails.
+  for (const side of [-1, 1]) {
+    roundedBox(rearStructure, [0.075, 0.055, 0.060], darkMetal,
+      [side * 0.19, -0.005, rearBumperZ - 0.018], null, 0.010);
+    cylinderBetween(
+      rearStructure,
+      [side * 0.18, -0.01, rearAxleZ + 0.02],
+      [side * 0.19, -0.005, rearBumperZ - 0.045],
+      0.014,
+      carbonEdge,
+      12
+    );
+    addBolt(rearStructure, side * 0.19, 0.025, rearBumperZ - 0.018, 0.0055);
+  }
 
   const bodyPosts = makePart(
     chassisGroup,
@@ -1060,29 +1087,73 @@ function makeCarVisual(color, playerName = "") {
     }
   });
 
-  if (playerName) {
+  let playerNameSprite = null;
+  function setPlayerName(name, visible = true) {
+    const safeName = String(name || "").replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 18);
+    if (!visible || !safeName) {
+      if (playerNameSprite) {
+        root.remove(playerNameSprite);
+        playerNameSprite.material.map?.dispose();
+        playerNameSprite.material.dispose();
+        playerNameSprite = null;
+      }
+      return;
+    }
+
+    if (playerNameSprite) {
+      root.remove(playerNameSprite);
+      playerNameSprite.material.map?.dispose();
+      playerNameSprite.material.dispose();
+      playerNameSprite = null;
+    }
+
+    // Draw at a much higher source resolution so the text stays sharp when
+    // the floating tag is reduced to its on-screen size.
     const labelCanvas = document.createElement("canvas");
-    labelCanvas.width = 512;
-    labelCanvas.height = 128;
+    const canvasHeight = 256;
+    const font = "700 176px Arial, sans-serif";
+    const measureCanvas = document.createElement("canvas");
+    const measureContext = measureCanvas.getContext("2d");
+    if (!measureContext) return;
+    measureContext.font = font;
+    const measuredTextWidth = measureContext.measureText(safeName).width;
+    const horizontalPadding = 160;
+    labelCanvas.height = canvasHeight;
+    labelCanvas.width = Math.ceil(Math.max(1024, measuredTextWidth + horizontalPadding));
+
     const ctx = labelCanvas.getContext("2d");
-    ctx.fillStyle = "rgba(13,20,29,.82)";
+    if (!ctx) return;
+    ctx.imageSmoothingEnabled = true;
+    ctx.font = font;
+    ctx.fillStyle = "rgba(13,20,29,.88)";
     ctx.beginPath();
-    ctx.roundRect(8, 14, 496, 100, 28);
+    ctx.roundRect(12, 18, labelCanvas.width - 24, canvasHeight - 36, 58);
     ctx.fill();
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 46px system-ui";
+    ctx.fillStyle = "#ffffff";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(playerName.slice(0, 18), 256, 64);
+    ctx.fillText(safeName, labelCanvas.width / 2, canvasHeight / 2);
+
     const texture = new THREE.CanvasTexture(labelCanvas);
     texture.colorSpace = THREE.SRGBColorSpace;
-    const tag = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: texture, transparent: true, depthWrite: false
+    texture.generateMipmaps = true;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.anisotropy = Math.min(8, renderer?.capabilities?.getMaxAnisotropy?.() || 1);
+    playerNameSprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: texture, transparent: true, depthWrite: false, toneMapped: false
     }));
-    tag.position.set(0, 0.95, 0);
-    tag.scale.set(1.34, 0.34, 1);
-    root.add(tag);
+    playerNameSprite.position.set(0, 1.02, 0);
+
+    // Calculate width from the canvas aspect ratio, then cap the overall
+    // world width so long driver names do not become oversized billboards.
+    const aspect = labelCanvas.width / labelCanvas.height;
+    const labelWidth = Math.min(1.85, 0.36 * aspect);
+    const labelHeight = labelWidth / aspect;
+    playerNameSprite.scale.set(labelWidth, labelHeight, 1);
+    root.add(playerNameSprite);
   }
+  setPlayerName(playerName, !!playerName);
 
   scene.add(root);
   return {
@@ -1090,7 +1161,8 @@ function makeCarVisual(color, playerName = "") {
     wheelPivots,
     shellGroup,
     chassisGroup,
-    setShellVisible(visible) { shellGroup.visible = !!visible; }
+    setShellVisible(visible) { shellGroup.visible = !!visible; },
+    setPlayerName
   };
 }
   return makeCarVisual;

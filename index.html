@@ -192,7 +192,7 @@
       margin: 4px 0 8px; color: #8ecbff; font-size: 9px; font-weight: 900;
       letter-spacing: .16em; text-align: left;
     }
-    .lobby-mode-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin-bottom: 15px; }
+    .lobby-mode-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin-bottom: 15px; }
     .lobby-mode-choice {
       min-height: 68px; padding: 9px 6px; display: grid; align-content: center; gap: 6px;
       color: #eef7ff; border: 1px solid rgba(155,205,255,.23);
@@ -261,10 +261,139 @@
     #roomValue { margin-top: 4px; font-size: 13px; font-weight: 900; letter-spacing: .12em; }
     #playersValue { margin-top: 4px; color: #b8c5cd; font-size: 11px; }
     #controlsCard { left: 18px; bottom: 18px; transform: translateY(-132px); color: #bdc9d0; font-size: 10px; line-height: 1.8; }
+    #cameraModeCard {
+      right: 18px; bottom: 18px; min-width: 286px; padding: 9px 10px;
+      pointer-events: auto;
+    }
+    .camera-mode-buttons { display: flex; gap: 5px; margin-top: 7px; }
+    .camera-mode-button {
+      flex: 1; min-height: 31px; padding: 0 9px; border-radius: 7px;
+      border: 1px solid rgba(160,195,222,.22);
+      background: rgba(255,255,255,.07); color: #cbd8e1;
+      font-size: 8px; font-weight: 900; letter-spacing: .07em;
+      pointer-events: auto;
+    }
+    .camera-mode-button.active {
+      border-color: rgba(91,176,255,.72);
+      background: linear-gradient(145deg, rgba(37,143,233,.48), rgba(20,86,189,.46));
+      color: #fff;
+      box-shadow: inset 0 0 0 1px rgba(89,180,255,.16);
+    }
     kbd {
       display: inline-grid; min-width: 19px; height: 19px; margin: 0 2px; padding: 0 4px;
       place-items: center; border: 1px solid rgba(255,255,255,.2); border-radius: 5px;
       background: rgba(255,255,255,.1); color: white; font: 800 10px ui-monospace, monospace;
+    }
+    .race-lap-field { text-align: left; }
+    select {
+      display: block; width: 100%; height: 43px; padding: 0 12px;
+      border: 1px solid rgba(255,255,255,.15); border-radius: 10px;
+      outline: none; background: #172535; color: #f4f8fc; font: inherit;
+      font-size: 12px; user-select: auto;
+    }
+    select:focus { border-color: #4da9ff; box-shadow: 0 0 0 3px rgba(77,169,255,.12); }
+    .race-card {
+      top: 72px; left: 50%; transform: translateX(-50%);
+      width: min(500px, calc(100vw - 400px)); min-width: 390px;
+      padding: 11px 13px 10px; text-align: left;
+    }
+    .race-card-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    #raceStatus {
+      margin-top: 3px; color: #eaf4fc; font-size: 10px;
+      font-weight: 900; letter-spacing: .07em;
+    }
+    #startRaceButton {
+      min-height: 34px; padding: 0 12px; pointer-events: auto;
+      color: #f7fbff; background: linear-gradient(145deg,#258fe9,#1456bd);
+      font: 900 9px "Orbitron",ui-sans-serif,sans-serif; letter-spacing: .07em;
+    }
+    #startRaceButton:disabled { opacity: .55; cursor: wait; }
+    .race-stats {
+      display: grid; grid-template-columns: .85fr 1.1fr 1.45fr;
+      gap: 9px; margin-top: 10px;
+    }
+    .race-stat {
+      display: grid; gap: 3px; min-width: 0;
+      border: 1px solid rgba(255,255,255,.08); border-radius: 8px;
+      background: rgba(255,255,255,.035); padding: 7px 8px;
+    }
+    .race-stat span {
+      color: #9babb8; font-size: 8px; font-weight: 900; letter-spacing: .11em;
+    }
+    .race-stat strong {
+      color: #f4f8fc; font-size: 16px; font-weight: 900;
+      font-variant-numeric: tabular-nums; white-space: nowrap;
+    }
+    #raceTimeValue { font-size: 15px; }
+    .race-card-bottom {
+      display: flex; justify-content: space-between; gap: 12px;
+      margin-top: 7px; color: #9eafbd; font-size: 9px;
+      font-weight: 800; letter-spacing: .08em;
+    }
+    .race-action-panel {
+      margin-top: 10px; padding: 10px;
+      border: 1px solid rgba(112,183,240,.2); border-radius: 9px;
+      background: rgba(7,17,29,.76);
+    }
+    .race-action-heading {
+      margin-bottom: 8px; color: #a9d7ff;
+      font-size: 8px; font-weight: 900; letter-spacing: .13em;
+    }
+    .race-spectator-list { display: flex; flex-wrap: wrap; gap: 7px; }
+    .race-spectator-empty {
+      color: #aab8c2; font-size: 10px; line-height: 1.45;
+    }
+    .race-spectator-button, .race-action-button {
+      min-height: 31px; padding: 0 10px; pointer-events: auto;
+      border: 1px solid rgba(105,180,255,.32); border-radius: 7px;
+      background: rgba(37,143,233,.22); color: #eaf5ff;
+      font: 800 8px "Orbitron",ui-sans-serif,sans-serif; letter-spacing: .04em;
+    }
+    .race-spectator-button.selected {
+      border-color: rgba(123,224,165,.65);
+      background: rgba(55,147,105,.25);
+    }
+    .race-action-row {
+      display: flex; align-items: end; flex-wrap: wrap; gap: 8px;
+    }
+    .race-restart-field {
+      display: grid; gap: 5px; min-width: 130px; flex: 1;
+    }
+    .race-restart-field span {
+      color: #9eafbd; font-size: 8px; font-weight: 900; letter-spacing: .1em;
+    }
+    #raceRestartLapCount {
+      height: 34px; pointer-events: auto; font-size: 10px;
+    }
+    #restartRaceButton {
+      min-height: 34px; padding: 0 13px; pointer-events: auto;
+      background: linear-gradient(145deg,#258fe9,#1456bd); color: #f7fbff;
+      font: 900 8px "Orbitron",ui-sans-serif,sans-serif; letter-spacing: .05em;
+    }
+    #racePostRaceStatus {
+      margin-bottom: 8px; color: #eaf4fc; font-size: 9px;
+      font-weight: 800; line-height: 1.45; letter-spacing: .04em;
+    }
+    #raceCountdownOverlay {
+      display: none; position: fixed; z-index: 6; inset: 0;
+      place-items: center; pointer-events: none;
+      color: #fff; font: 900 clamp(76px,16vw,150px) "Orbitron",ui-sans-serif,sans-serif;
+      letter-spacing: .04em; text-shadow: 0 8px 34px rgba(0,0,0,.62);
+    }
+    @media (max-width: 700px) {
+      .race-card {
+        top: 122px; left: 12px; transform: none;
+        width: calc(100vw - 24px); min-width: 0;
+        padding: 9px 10px;
+      }
+      .race-stats { gap: 5px; }
+      .race-stat { padding: 6px; }
+      .race-stat span { font-size: 7px; }
+      .race-stat strong { font-size: 13px; }
+      #raceTimeValue { font-size: 12px; }
+      .race-action-panel { margin-top: 8px; padding: 8px; }
+      .race-spectator-list { gap: 5px; }
+      .race-spectator-button, .race-action-button { min-height: 29px; font-size: 7px; }
     }
     #leaveButton {
       position: absolute; top: 72px; left: 18px; pointer-events: auto; padding: 9px 12px;
@@ -293,6 +422,8 @@
       #roomCard { right: 12px; top: 66px; }
       #leaveButton { left: 12px; top: 66px; }
       #controlsCard { display: none; }
+      #cameraModeCard { right: 12px; bottom: 12px; min-width: 256px; padding: 8px; }
+      .camera-mode-button { min-height: 29px; padding: 0 5px; font-size: 7px; letter-spacing: .04em; }
       .menu-content { top: 13%; padding: 21px 18px; }
       .menu-description { font-size: 11px; }
       #garagePanel { left: 12px; top: auto; bottom: 16px; transform: none; width: min(270px, calc(100vw - 24px)); padding: 17px; }
@@ -339,7 +470,7 @@
     <div class="menu-content lobby-menu-content">
       <div class="menu-kicker">ONLINE MULTIPLAYER</div>
       <h1 class="menu-title">MULTIPLAYER<br>LOBBIES</h1>
-      <p class="menu-description">Join an open lobby or create your own race.</p>
+      <p class="menu-description">Join an open lobby or create a race or free-drive session.</p>
 
       <label class="field lobby-driver-field">
         <span>Driver name</span>
@@ -383,13 +514,27 @@
 
       <label class="field">
         <span>Lobby name</span>
-        <input id="lobbyName" maxlength="28" autocomplete="off" value="" placeholder="Example: Friday Night Race">
+        <input id="lobbyName" maxlength="28" autocomplete="off" value="">
+      </label>
+
+      <label id="raceLapField" class="field race-lap-field">
+        <span>Number of laps</span>
+        <select id="raceLapCount" aria-label="Number of race laps">
+          <option value="1">1 LAP — SPRINT</option>
+          <option value="3" selected>3 LAPS</option>
+          <option value="5">5 LAPS</option>
+          <option value="10">10 LAPS</option>
+          <option value="20">20 LAPS — ENDURANCE</option>
+        </select>
       </label>
 
       <div class="lobby-mode-heading">LOBBY MODE</div>
       <div class="lobby-mode-grid">
         <button id="lobbyModeRace" class="lobby-mode-choice selected" data-lobby-mode="race" type="button">
-          <strong>RACE</strong><small>AVAILABLE</small>
+          <strong>RACE</strong><small>LAPS &amp; CHECKPOINTS</small>
+        </button>
+        <button id="lobbyModeFreeDrive" class="lobby-mode-choice" data-lobby-mode="free-drive" type="button">
+          <strong>FREE DRIVE</strong><small>OPEN DRIVING SESSION</small>
         </button>
         <button class="lobby-mode-choice unavailable" data-lobby-mode="time-trial" type="button" disabled>
           <strong>TIME TRIAL</strong><small>COMING SOON</small>
@@ -413,10 +558,70 @@
       <div id="roomValue">PIT-LANE</div>
       <div id="playersValue">1 DRIVER</div>
     </div>
+    <div id="raceCard" class="hud-card race-card" style="display:none">
+      <div class="race-card-top">
+        <div>
+          <div class="hud-label">RACE CONTROL</div>
+          <div id="raceStatus">WAITING FOR THE HOST</div>
+        </div>
+        <button id="startRaceButton" type="button">START RACE</button>
+      </div>
+      <div class="race-stats">
+        <div class="race-stat">
+          <span>POSITION</span>
+          <strong id="racePositionValue">--</strong>
+        </div>
+        <div class="race-stat">
+          <span>LAPS COMPLETED</span>
+          <strong id="raceCompletedValue">0 / 3</strong>
+        </div>
+        <div class="race-stat">
+          <span>LAP TIME</span>
+          <strong id="raceTimeValue">00:00.000</strong>
+        </div>
+      </div>
+      <div class="race-card-bottom">
+        <span id="raceLapValue">LAP 1 / 3</span>
+        <span id="raceBestValue">BEST --:--.---</span>
+      </div>
+      <div id="raceSpectatorPanel" class="race-action-panel" style="display:none">
+        <div class="race-action-heading">YOU'RE FINISHED — SPECTATE OTHER DRIVERS</div>
+        <div id="raceSpectatorList" class="race-spectator-list" aria-live="polite"></div>
+        <button id="returnToCarButton" class="race-action-button" type="button" style="display:none;margin-top:8px">RETURN TO YOUR FINISH LINE</button>
+      </div>
+      <div id="racePostRacePanel" class="race-action-panel" style="display:none">
+        <div class="race-action-heading">RACE RESULTS</div>
+        <div id="racePostRaceStatus">ALL DRIVERS HAVE FINISHED</div>
+        <div id="raceRestartSettings" class="race-action-row">
+          <label class="race-restart-field">
+            <span>NEXT RACE LAPS</span>
+            <select id="raceRestartLapCount" aria-label="Laps for the next race">
+              <option value="1">1 LAP — SPRINT</option>
+              <option value="3" selected>3 LAPS</option>
+              <option value="5">5 LAPS</option>
+              <option value="10">10 LAPS</option>
+              <option value="20">20 LAPS — ENDURANCE</option>
+            </select>
+          </label>
+          <button id="restartRaceButton" type="button">RESTART RACE</button>
+        </div>
+      </div>
+    </div>
+    <div id="raceCountdownOverlay" aria-live="assertive"></div>
+
     <div id="controlsCard" class="hud-card">
       <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Drive / steer</div>
       <div><kbd>SPACE</kbd> Brake</div>
       <div><kbd>R</kbd> Reset car</div>
+    </div>
+    <div id="cameraModeCard" class="hud-card" aria-label="Camera mode">
+      <div class="hud-label">CAMERA · C TO CYCLE</div>
+      <div class="camera-mode-buttons">
+        <button class="camera-mode-button active" type="button" data-camera-mode="chase" aria-pressed="true" title="Chase camera (C)">CHASE</button>
+        <button class="camera-mode-button" type="button" data-camera-mode="hood" aria-pressed="false" title="Hood camera (C)">HOOD</button>
+        <button class="camera-mode-button" type="button" data-camera-mode="interior" aria-pressed="false" title="Interior camera (C)">INTERIOR</button>
+        <button class="camera-mode-button" type="button" data-camera-mode="stand" aria-pressed="false" title="Stand POV camera (C)">STAND POV</button>
+      </div>
     </div>
     <div id="speedCard" class="hud-card">
       <div class="hud-label">GROUND SPEED</div>
