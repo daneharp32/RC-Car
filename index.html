@@ -470,7 +470,7 @@
     <div class="menu-content lobby-menu-content">
       <div class="menu-kicker">ONLINE MULTIPLAYER</div>
       <h1 class="menu-title">MULTIPLAYER<br>LOBBIES</h1>
-      <p class="menu-description">Join an open lobby or create a race or free-drive session.</p>
+      <p class="menu-description">Join an open lobby or create a race, time trial, or free-drive session.</p>
 
       <label class="field lobby-driver-field">
         <span>Driver name</span>
@@ -518,7 +518,7 @@
       </label>
 
       <label id="raceLapField" class="field race-lap-field">
-        <span>Number of laps</span>
+        <span id="raceLapFieldLabel">Number of laps</span>
         <select id="raceLapCount" aria-label="Number of race laps">
           <option value="1">1 LAP — SPRINT</option>
           <option value="3" selected>3 LAPS</option>
@@ -536,14 +536,15 @@
         <button id="lobbyModeFreeDrive" class="lobby-mode-choice" data-lobby-mode="free-drive" type="button">
           <strong>FREE DRIVE</strong><small>OPEN DRIVING SESSION</small>
         </button>
-        <button class="lobby-mode-choice unavailable" data-lobby-mode="time-trial" type="button" disabled>
-          <strong>TIME TRIAL</strong><small>COMING SOON</small>
+        <button class="lobby-mode-choice" data-lobby-mode="time-trial" type="button">
+          <strong>TIME TRIAL</strong><small>FASTEST LAP WINS · CHECKPOINTS</small>
         </button>
         <button class="lobby-mode-choice unavailable" data-lobby-mode="sandbox" type="button" disabled>
           <strong>SANDBOX</strong><small>COMING SOON</small>
         </button>
       </div>
 
+      <p id="lobbyModeHint" class="fine-print" style="display:none">Your fastest valid lap is compared with the other drivers after the selected number of laps.</p>
       <button id="joinButton" class="menu-button" type="button">CREATE RACE LOBBY</button>
       <button id="driveBackButton" type="button">BACK TO LOBBIES</button>
       <div id="joinError"></div>
@@ -561,22 +562,22 @@
     <div id="raceCard" class="hud-card race-card" style="display:none">
       <div class="race-card-top">
         <div>
-          <div class="hud-label">RACE CONTROL</div>
+          <div id="raceControlLabel" class="hud-label">RACE CONTROL</div>
           <div id="raceStatus">WAITING FOR THE HOST</div>
         </div>
         <button id="startRaceButton" type="button">START RACE</button>
       </div>
       <div class="race-stats">
         <div class="race-stat">
-          <span>POSITION</span>
+          <span id="racePositionLabel">POSITION</span>
           <strong id="racePositionValue">--</strong>
         </div>
         <div class="race-stat">
-          <span>LAPS COMPLETED</span>
+          <span id="raceCompletedLabel">LAPS COMPLETED</span>
           <strong id="raceCompletedValue">0 / 3</strong>
         </div>
         <div class="race-stat">
-          <span>LAP TIME</span>
+          <span id="raceTimeLabel">LAP TIME</span>
           <strong id="raceTimeValue">00:00.000</strong>
         </div>
       </div>
@@ -590,7 +591,7 @@
         <button id="returnToCarButton" class="race-action-button" type="button" style="display:none;margin-top:8px">RETURN TO YOUR FINISH LINE</button>
       </div>
       <div id="racePostRacePanel" class="race-action-panel" style="display:none">
-        <div class="race-action-heading">RACE RESULTS</div>
+        <div id="raceResultsHeading" class="race-action-heading">RACE RESULTS</div>
         <div id="racePostRaceStatus">ALL DRIVERS HAVE FINISHED</div>
         <div id="raceRestartSettings" class="race-action-row">
           <label class="race-restart-field">
