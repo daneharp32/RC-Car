@@ -192,7 +192,7 @@
       margin: 4px 0 8px; color: #8ecbff; font-size: 9px; font-weight: 900;
       letter-spacing: .16em; text-align: left;
     }
-    .lobby-mode-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin-bottom: 15px; }
+    .lobby-mode-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin-bottom: 15px; }
     .lobby-mode-choice {
       min-height: 68px; padding: 9px 6px; display: grid; align-content: center; gap: 6px;
       color: #eef7ff; border: 1px solid rgba(155,205,255,.23);
@@ -450,7 +450,7 @@
     <div class="menu-content lobby-menu-content">
       <div class="menu-kicker">ONLINE MULTIPLAYER</div>
       <h1 class="menu-title">MULTIPLAYER<br>LOBBIES</h1>
-      <p class="menu-description">Join an open lobby or create your own race.</p>
+      <p class="menu-description">Join an open lobby or create a race or free-drive session.</p>
 
       <label class="field lobby-driver-field">
         <span>Driver name</span>
@@ -497,7 +497,7 @@
         <input id="lobbyName" maxlength="28" autocomplete="off" value="">
       </label>
 
-      <label class="field race-lap-field">
+      <label id="raceLapField" class="field race-lap-field">
         <span>Number of laps</span>
         <select id="raceLapCount" aria-label="Number of race laps">
           <option value="1">1 LAP — SPRINT</option>
@@ -511,7 +511,10 @@
       <div class="lobby-mode-heading">LOBBY MODE</div>
       <div class="lobby-mode-grid">
         <button id="lobbyModeRace" class="lobby-mode-choice selected" data-lobby-mode="race" type="button">
-          <strong>RACE</strong><small>AVAILABLE</small>
+          <strong>RACE</strong><small>LAPS &amp; CHECKPOINTS</small>
+        </button>
+        <button id="lobbyModeFreeDrive" class="lobby-mode-choice" data-lobby-mode="free-drive" type="button">
+          <strong>FREE DRIVE</strong><small>OPEN DRIVING SESSION</small>
         </button>
         <button class="lobby-mode-choice unavailable" data-lobby-mode="time-trial" type="button" disabled>
           <strong>TIME TRIAL</strong><small>COMING SOON</small>
