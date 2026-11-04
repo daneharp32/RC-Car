@@ -43,6 +43,7 @@ export function createMultiplayerSystem(game) {
       qw: chassisBody.quaternion.w,
       wheels: vehicle.wheelInfos.map((wheel) => wheel.rotation),
       steer: vehicle.wheelInfos[0].steering,
+      body: game.localCar?.getShellVariant?.() || "current",
       mph: chassisBody.velocity.length() * 2.236936,
       race: game.race ? game.race.getNetworkState() : null
     };
@@ -146,7 +147,11 @@ export function createMultiplayerSystem(game) {
         lastSeen: performance.now(),
         wheelRotations: [0, 0, 0, 0],
         steering: 0,
-        name
+        name,
+        shellVariant: "current",
+        desiredShellVariant: "current",
+        shellLoadInProgress: false,
+        shellLoadFailed: false
       };
       remotePlayers.set(peerId, remote);
       updatePlayerCount();
@@ -166,6 +171,35 @@ export function createMultiplayerSystem(game) {
         : remote.wheelRotations;
       remote.steering = Number.isFinite(data.steer) ? data.steer : 0;
       remote.lastSeen = performance.now();
+
+      // Body selection travels with the same compact vehicle snapshot. Older
+      // game clients omit this field and continue to appear with the old shell.
+      const requestedShell = data.body === "concept4" ? "concept4" : "current";
+      remote.desiredShellVariant = requestedShell;
+      if (requestedShell === "current") {
+        remote.shellLoadFailed = false;
+        if (remote.shellVariant !== "current") {
+          remote.visual.setShellVariant?.("current");
+          remote.shellVariant = "current";
+        }
+      } else if (remote.shellVariant !== "concept4" &&
+                 !remote.shellLoadInProgress && !remote.shellLoadFailed) {
+        remote.shellLoadInProgress = true;
+        remote.visual.loadShellVariant("concept4")
+          .then(() => {
+            remote.shellLoadInProgress = false;
+            if (remotePlayers.get(peerId) === remote &&
+                remote.desiredShellVariant === "concept4" &&
+                remote.visual.setShellVariant("concept4")) {
+              remote.shellVariant = "concept4";
+            }
+          })
+          .catch((error) => {
+            remote.shellLoadInProgress = false;
+            remote.shellLoadFailed = true;
+            console.warn("A remote Concept4 shell could not be loaded:", error);
+          });
+      }
     }
   }
 
