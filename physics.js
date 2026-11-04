@@ -196,14 +196,19 @@ for (let i = 0; i < 4; i++) {
     axleLocal: new CANNON.Vec3(-1, 0, 0),
     suspensionRestLength: 0.12,
     suspensionStiffness: 52,
-    dampingCompression: 5.6,
-    dampingRelaxation: 4.8,
+    // A touch more compression damping and a calmer rebound make weight
+    // transfer visible without letting the truck pogo after a jump landing.
+    dampingCompression: 6.1,
+    dampingRelaxation: 4.5,
     maxSuspensionTravel: 0.17,
     maxSuspensionForce: 350,
     radius: 0.13,
-    // Additional tire grip keeps drive force from fading on smooth jump faces.
-    frictionSlip: 6.5,
-    rollInfluence: 0.08,
+    // Start with moderate grip. controls.js adjusts this per wheel as slip
+    // builds, allowing the rear to rotate instead of snapping all velocity
+    // into the direction the front wheels happen to be pointing.
+    frictionSlip: i < 2 ? 4.9 : 4.45,
+    // Let tire forces transfer enough load to the chassis for visible body lean.
+    rollInfluence: 0.17,
     isFrontWheel: i < 2,
     useCustomSlidingRotationalSpeed: true,
     customSlidingRotationalSpeed: 18
