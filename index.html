@@ -261,6 +261,24 @@
     #roomValue { margin-top: 4px; font-size: 13px; font-weight: 900; letter-spacing: .12em; }
     #playersValue { margin-top: 4px; color: #b8c5cd; font-size: 11px; }
     #controlsCard { left: 18px; bottom: 18px; transform: translateY(-132px); color: #bdc9d0; font-size: 10px; line-height: 1.8; }
+    #cameraModeCard {
+      right: 18px; bottom: 18px; min-width: 226px; padding: 9px 10px;
+      pointer-events: auto;
+    }
+    .camera-mode-buttons { display: flex; gap: 5px; margin-top: 7px; }
+    .camera-mode-button {
+      flex: 1; min-height: 31px; padding: 0 9px; border-radius: 7px;
+      border: 1px solid rgba(160,195,222,.22);
+      background: rgba(255,255,255,.07); color: #cbd8e1;
+      font-size: 8px; font-weight: 900; letter-spacing: .07em;
+      pointer-events: auto;
+    }
+    .camera-mode-button.active {
+      border-color: rgba(91,176,255,.72);
+      background: linear-gradient(145deg, rgba(37,143,233,.48), rgba(20,86,189,.46));
+      color: #fff;
+      box-shadow: inset 0 0 0 1px rgba(89,180,255,.16);
+    }
     kbd {
       display: inline-grid; min-width: 19px; height: 19px; margin: 0 2px; padding: 0 4px;
       place-items: center; border: 1px solid rgba(255,255,255,.2); border-radius: 5px;
@@ -404,6 +422,8 @@
       #roomCard { right: 12px; top: 66px; }
       #leaveButton { left: 12px; top: 66px; }
       #controlsCard { display: none; }
+      #cameraModeCard { right: 12px; bottom: 12px; min-width: 204px; padding: 8px; }
+      .camera-mode-button { min-height: 29px; padding: 0 6px; font-size: 7px; }
       .menu-content { top: 13%; padding: 21px 18px; }
       .menu-description { font-size: 11px; }
       #garagePanel { left: 12px; top: auto; bottom: 16px; transform: none; width: min(270px, calc(100vw - 24px)); padding: 17px; }
@@ -593,6 +613,14 @@
       <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Drive / steer</div>
       <div><kbd>SPACE</kbd> Brake</div>
       <div><kbd>R</kbd> Reset car</div>
+    </div>
+    <div id="cameraModeCard" class="hud-card" aria-label="Camera mode">
+      <div class="hud-label">CAMERA</div>
+      <div class="camera-mode-buttons">
+        <button class="camera-mode-button active" type="button" data-camera-mode="chase" aria-pressed="true">CHASE</button>
+        <button class="camera-mode-button" type="button" data-camera-mode="hood" aria-pressed="false">HOOD</button>
+        <button class="camera-mode-button" type="button" data-camera-mode="stand" aria-pressed="false">STAND POV</button>
+      </div>
     </div>
     <div id="speedCard" class="hud-card">
       <div class="hud-label">GROUND SPEED</div>
