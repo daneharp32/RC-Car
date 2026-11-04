@@ -1,3 +1,5 @@
+import { FRONT_TIRE_BASE_GRIP, REAR_TIRE_BASE_GRIP } from "./physics.js";
+
 // Camera orbit, keyboard input, vehicle reset, and driving forces.
 export function createControlsSystem(game) {
   const { THREE, CANNON, chassisBody, vehicle, spawnX, spawnZ, spawnYaw } = game;
@@ -77,7 +79,7 @@ function resetCar() {
     vehicle.wheelInfos[i].rotation = 0;
     vehicle.wheelInfos[i].deltaRotation = 0;
     vehicle.wheelInfos[i].engineForce = 0;
-    vehicle.wheelInfos[i].frictionSlip = i < 2 ? 4.9 : 4.45;
+    vehicle.wheelInfos[i].frictionSlip = i < 2 ? FRONT_TIRE_BASE_GRIP : REAR_TIRE_BASE_GRIP;
   }
   showToast("Car reset");
 }
@@ -99,6 +101,9 @@ const horizontalForwardAxis = new CANNON.Vec3();
 const worldLeanTorque = new CANNON.Vec3();
 const localAirTorque = new CANNON.Vec3();
 const worldAirTorque = new CANNON.Vec3();
+const wheelContactVelocity = new CANNON.Vec3();
+const wheelForwardDirection = new CANNON.Vec3();
+const wheelRightDirection = new CANNON.Vec3();
 const activeWheelbase = Math.max(
   0.45,
   Math.abs(
@@ -124,7 +129,7 @@ function updateDrivingControls(delta) {
     previousGroundedForwardSpeed = null;
     smoothedLongitudinalAcceleration = 0;
     for (let i = 0; i < 4; i++) {
-      vehicle.wheelInfos[i].frictionSlip = i < 2 ? 4.9 : 4.45;
+      vehicle.wheelInfos[i].frictionSlip = i < 2 ? FRONT_TIRE_BASE_GRIP : REAR_TIRE_BASE_GRIP;
     }
     return;
   }
@@ -202,26 +207,77 @@ function updateDrivingControls(delta) {
     0
   );
 
-  // A progressive friction circle lets the truck retain some lateral speed
-  // through a landing and during a drift. Rear grip falls a little more than
-  // front grip under high slip, making the slide catchable with counter-steer.
-  const horizontalSpeed = Math.hypot(forwardSpeed, lateralSpeed);
-  const slipAngle = Math.atan2(
-    Math.abs(lateralSpeed),
-    Math.abs(forwardSpeed) + 0.65
+  // Estimate the lateral force each tire is being asked to produce.
+  // Tight, fast cornering raises demand even before a large slide develops.
+  const expectedLateralAcceleration =
+    (forwardSpeed * forwardSpeed * Math.abs(Math.tan(steeringAngleState))) /
+    activeWheelbase;
+  const corneringLoad = THREE.MathUtils.clamp(
+    (expectedLateralAcceleration - 3.0) / 6.5,
+    0,
+    1
   );
-  const speedGate = THREE.MathUtils.clamp((horizontalSpeed - 1.25) / 4.0, 0, 1);
-  const slipLoad = THREE.MathUtils.clamp((slipAngle - 0.10) / 0.72, 0, 1) * speedGate;
-  const steeringLoad =
-    THREE.MathUtils.clamp(Math.abs(steeringAngleState) / 0.34, 0, 1) *
-    speedGate * 0.48;
-  const driftLoad = Math.max(slipLoad, steeringLoad);
 
+  // Evaluate slip at each tire's contact patch, including the yaw velocity
+  // contributed by the chassis rotating around its centre of mass.
   for (let i = 0; i < 4; i++) {
     const wheel = vehicle.wheelInfos[i];
-    const baseGrip = wheel.isFrontWheel ? 4.9 : 4.45;
-    const gripReduction = wheel.isFrontWheel ? 0.78 : 1.12;
-    wheel.frictionSlip = baseGrip - driftLoad * gripReduction;
+    const wheelSteeringAngle = wheel.isFrontWheel ? wheel.steering : 0;
+    const steeringCosine = Math.cos(wheelSteeringAngle);
+    const steeringSine = Math.sin(wheelSteeringAngle);
+
+    wheelForwardDirection.set(
+      horizontalForwardAxis.x * steeringCosine + horizontalRightAxis.x * steeringSine,
+      0,
+      horizontalForwardAxis.z * steeringCosine + horizontalRightAxis.z * steeringSine
+    );
+    wheelRightDirection.set(
+      horizontalRightAxis.x * steeringCosine - horizontalForwardAxis.x * steeringSine,
+      0,
+      horizontalRightAxis.z * steeringCosine - horizontalForwardAxis.z * steeringSine
+    );
+
+    let tireForwardSpeed = forwardSpeed;
+    let tireLateralSpeed = lateralSpeed;
+    if (wheel.isInContact && wheel.raycastResult?.body) {
+      chassisBody.getVelocityAtWorldPoint(
+        wheel.raycastResult.hitPointWorld,
+        wheelContactVelocity
+      );
+      tireForwardSpeed = wheelContactVelocity.dot(wheelForwardDirection);
+      tireLateralSpeed = wheelContactVelocity.dot(wheelRightDirection);
+    }
+
+    const tireSpeed = Math.hypot(tireForwardSpeed, tireLateralSpeed);
+    const tireSlipAngle = Math.atan2(
+      Math.abs(tireLateralSpeed),
+      Math.abs(tireForwardSpeed) + 0.85
+    );
+    const tireSlipSpeedGate = THREE.MathUtils.clamp(
+      (tireSpeed - 1.25) / 3.75,
+      0,
+      1
+    );
+    const tireSlipLoad = THREE.MathUtils.clamp(
+      (tireSlipAngle - 0.075) / 0.42,
+      0,
+      1
+    ) * tireSlipSpeedGate;
+
+    // The rear axle reaches its dirt-grip limit a little earlier, allowing
+    // the truck to rotate into a slide. Front grip remains stronger so the
+    // driver can catch that slide with counter-steer.
+    const axleCorneringLoad = corneringLoad * (wheel.isFrontWheel ? 0.72 : 1.0);
+    const totalGripLoad = Math.max(tireSlipLoad, axleCorneringLoad);
+    const baseGrip = wheel.isFrontWheel
+      ? FRONT_TIRE_BASE_GRIP
+      : REAR_TIRE_BASE_GRIP;
+    const gripReduction = wheel.isFrontWheel ? 0.28 : 0.36;
+    const minimumGrip = wheel.isFrontWheel ? 0.77 : 0.57;
+    wheel.frictionSlip = Math.max(
+      minimumGrip,
+      baseGrip - totalGripLoad * gripReduction
+    );
   }
 
   // Do not apply flight controls while the truck is merely settling at spawn.
