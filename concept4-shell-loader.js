@@ -69,5 +69,5 @@ export async function loadConcept4Shell(THREE) {
   });
   for (const material of oldMaterials) material.dispose?.();
   if (!meshCount) throw new Error("The Concept4 body contains no renderable meshes.");
-  return { group: fitGroup, meshCount, bounds: bounds.getSize(new THREE.Vector3()), triangleCount: model.traverse ? undefined : undefined };
+  return { group: fitGroup, meshCount, bounds: bounds.getSize(new THREE.Vector3()) };
 }
