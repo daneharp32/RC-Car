@@ -142,64 +142,6 @@ function makeJumpSurfaceGeometry(THREE, profile) {
   return geometry;
 }
 
-function makeTrackSignTexture(THREE, heading, subheading) {
-  const canvas = document.createElement("canvas");
-  canvas.width = 512;
-  canvas.height = 160;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Could not create the track sign canvas.");
-
-  context.fillStyle = "#202a30";
-  context.fillRect(0, 0, 512, 160);
-  context.fillStyle = "#df3c31";
-  context.fillRect(0, 0, 512, 13);
-  context.fillStyle = "#f0eee8";
-  context.fillRect(0, 147, 512, 13);
-  context.fillStyle = "#f6f1e6";
-  context.font = "900 48px Arial";
-  context.textAlign = "center";
-  context.textBaseline = "middle";
-  context.fillText(heading, 256, 66);
-  context.fillStyle = "#d2b38c";
-  context.font = "700 20px Arial";
-  context.fillText(subheading, 256, 113);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 4;
-  return texture;
-}
-
-function addTrackSign(THREE, parent, position, yaw, heading, subheading) {
-  const group = new THREE.Group();
-  group.position.copy(position);
-  group.rotation.y = yaw;
-  const postMaterial = new THREE.MeshStandardMaterial({
-    color: 0x353a3d,
-    metalness: 0.35,
-    roughness: 0.68
-  });
-  const postGeometry = new THREE.BoxGeometry(0.10, 1.55, 0.12);
-  for (const x of [-1.95, 1.95]) {
-    const post = new THREE.Mesh(postGeometry, postMaterial);
-    post.position.set(x, 0.77, 0);
-    post.castShadow = true;
-    group.add(post);
-  }
-  const panel = new THREE.Mesh(
-    new THREE.BoxGeometry(4.15, 0.84, 0.14),
-    new THREE.MeshStandardMaterial({
-      map: makeTrackSignTexture(THREE, heading, subheading),
-      roughness: 0.76,
-      metalness: 0.08
-    })
-  );
-  panel.position.y = 1.34;
-  panel.castShadow = true;
-  group.add(panel);
-  parent.add(group);
-}
-
 export function createTrackSystem({ THREE, scene }) {
   const trackGroup = new THREE.Group();
   trackGroup.name = "closed-dirt-track";
@@ -494,35 +436,27 @@ export function createTrackSystem({ THREE, scene }) {
     trackGroup.add(ramp);
   }
 
-  // Alternating red/white safety curbs run around both edges of the entire
-  // loop. Instanced meshes keep draw calls low; matching box dimensions are
-  // exported for the static collision barriers.
-  const barrierWidth = 0.58;
-  const barrierHeight = 0.28;
-  const barrierSpacingTarget = 2.9;
+  // Alternating red/white safety curbs follow the actual offset edge path.
+  // Each block is sized from the distance to its neighbours, with a deliberate
+  // gap so the blocks do not clip through one another on tight bends.
+  const barrierWidth = 0.52;
+  const barrierHeight = 0.25;
+  const barrierOffset = trackHalfWidth + barrierWidth * 0.5 + 0.09;
+  const barrierSpacingTarget = 2.45;
   const barrierCountPerSide = Math.max(24, Math.ceil(trackLength / barrierSpacingTarget));
-  const barrierLength = trackLength / barrierCountPerSide - 0.07;
+  const totalBarrierCount = barrierCountPerSide * 2;
   const barrierGeometry = new THREE.BoxGeometry(barrierWidth, barrierHeight, 1);
   const redBarrierMaterial = new THREE.MeshStandardMaterial({
-    color: 0xd83b31,
-    roughness: 0.76,
-    metalness: 0.02
+    color: 0xd83b31, roughness: 0.76, metalness: 0.02
   });
   const whiteBarrierMaterial = new THREE.MeshStandardMaterial({
-    color: 0xf0eee6,
-    roughness: 0.76,
-    metalness: 0.02
+    color: 0xf0eee6, roughness: 0.76, metalness: 0.02
   });
-  const totalBarrierCount = barrierCountPerSide * 2;
   const redBarriers = new THREE.InstancedMesh(
-    barrierGeometry,
-    redBarrierMaterial,
-    Math.ceil(totalBarrierCount / 2)
+    barrierGeometry, redBarrierMaterial, Math.ceil(totalBarrierCount / 2)
   );
   const whiteBarriers = new THREE.InstancedMesh(
-    barrierGeometry,
-    whiteBarrierMaterial,
-    Math.floor(totalBarrierCount / 2)
+    barrierGeometry, whiteBarrierMaterial, Math.floor(totalBarrierCount / 2)
   );
   redBarriers.name = "red-curb-blocks";
   whiteBarriers.name = "white-curb-blocks";
@@ -535,20 +469,41 @@ export function createTrackSystem({ THREE, scene }) {
   const barriers = [];
   let redIndex = 0;
   let whiteIndex = 0;
+
+  function getBarrierEdgePoint(t, side) {
+    const wrappedT = ((t % 1) + 1) % 1;
+    const point = centerline.getPointAt(wrappedT);
+    const tangent = centerline.getTangentAt(wrappedT).normalize();
+    const normalX = -tangent.z;
+    const normalZ = tangent.x;
+    return new THREE.Vector3(
+      point.x + normalX * side * barrierOffset, 0,
+      point.z + normalZ * side * barrierOffset
+    );
+  }
+
   for (const side of [-1, 1]) {
+    const edgeCenters = Array.from({ length: barrierCountPerSide }, (_, i) =>
+      getBarrierEdgePoint((i + 0.5) / barrierCountPerSide, side)
+    );
+
     for (let i = 0; i < barrierCountPerSide; i++) {
-      const t = (i + 0.5) / barrierCountPerSide;
-      const point = centerline.getPointAt(t);
-      const tangent = centerline.getTangentAt(t).normalize();
-      const normalX = -tangent.z;
-      const normalZ = tangent.x;
-      const yaw = Math.atan2(-tangent.x, -tangent.z);
-      const x = point.x + normalX * side * (trackHalfWidth + 0.13);
-      const z = point.z + normalZ * side * (trackHalfWidth + 0.13);
+      const previous = edgeCenters[(i - 1 + barrierCountPerSide) % barrierCountPerSide];
+      const current = edgeCenters[i];
+      const next = edgeCenters[(i + 1) % barrierCountPerSide];
+      const previousDistance = current.distanceTo(previous);
+      const nextDistance = current.distanceTo(next);
+      const segmentLength = Math.max(
+        0.35, Math.min(previousDistance, nextDistance) - 0.20
+      );
+      const edgeTangent = next.clone().sub(previous).normalize();
+      const yaw = Math.atan2(-edgeTangent.x, -edgeTangent.z);
+      const x = current.x;
+      const z = current.z;
 
       dummy.position.set(x, barrierHeight / 2, z);
       dummy.rotation.set(0, yaw, 0);
-      dummy.scale.set(1, 1, barrierLength);
+      dummy.scale.set(1, 1, segmentLength);
       dummy.updateMatrix();
       if ((i + (side > 0 ? 1 : 0)) % 2 === 0) {
         redBarriers.setMatrixAt(redIndex++, dummy.matrix);
@@ -557,16 +512,12 @@ export function createTrackSystem({ THREE, scene }) {
       }
 
       barriers.push({
-        x,
-        y: barrierHeight / 2,
-        z,
-        yaw,
-        width: barrierWidth,
-        height: barrierHeight,
-        length: barrierLength
+        x, y: barrierHeight / 2, z, yaw,
+        width: barrierWidth, height: barrierHeight, length: segmentLength
       });
     }
   }
+
   redBarriers.count = redIndex;
   whiteBarriers.count = whiteIndex;
   redBarriers.instanceMatrix.needsUpdate = true;
@@ -628,37 +579,8 @@ export function createTrackSystem({ THREE, scene }) {
   beam.position.y = 2.63;
   beam.castShadow = true;
   gantry.add(beam);
-  const gantryBoard = new THREE.Mesh(
-    new THREE.BoxGeometry(4.8, 0.62, 0.18),
-    new THREE.MeshStandardMaterial({
-      map: makeTrackSignTexture(THREE, "RC DIRT CUP", "START / FINISH"),
-      roughness: 0.7
-    })
-  );
-  gantryBoard.position.set(0, 2.12, 0);
-  gantry.add(gantryBoard);
+  // Keep the start/finish gantry as an unlabelled frame, without signage.
   trackGroup.add(gantry);
-
-  // Trackside signs, marshal markers, tire stacks, and cones provide scale and
-  // recognizable RC-racing detail without cluttering the racing line.
-  const signLocations = [
-    { t: 0.22, side: -1, title: "JUMP ZONE", subtitle: "KEEP IT CLEAN" },
-    { t: 0.48, side: 1, title: "TECHNICAL", subtitle: "WATCH THE INSIDE" },
-    { t: 0.76, side: -1, title: "BACK SECTION", subtitle: "FULL THROTTLE" }
-  ];
-  for (const sign of signLocations) {
-    const point = centerline.getPointAt(sign.t);
-    const tangent = centerline.getTangentAt(sign.t).normalize();
-    const normalX = -tangent.z;
-    const normalZ = tangent.x;
-    const yaw = Math.atan2(-tangent.x, -tangent.z);
-    const position = new THREE.Vector3(
-      point.x + normalX * sign.side * (trackHalfWidth + 2.3),
-      0,
-      point.z + normalZ * sign.side * (trackHalfWidth + 2.3)
-    );
-    addTrackSign(THREE, trackGroup, position, yaw, sign.title, sign.subtitle);
-  }
 
   const tireMaterial = new THREE.MeshStandardMaterial({
     color: 0x17191b,
@@ -739,6 +661,12 @@ export function createTrackSystem({ THREE, scene }) {
     return minimum > margin * margin;
   }
 
+  // Reserve a clear pit-side patch for the driver's stand and parked RC trucks.
+  const pitCenter = new THREE.Vector2(-43, -46);
+  function clearOfPitArea(x, z, margin = 8.2) {
+    return Math.hypot(x - pitCenter.x, z - pitCenter.y) > margin;
+  }
+
   const rockGeometry = new THREE.DodecahedronGeometry(0.46, 0);
   const rockMaterial = new THREE.MeshStandardMaterial({
     color: 0x514337,
@@ -752,7 +680,7 @@ export function createTrackSystem({ THREE, scene }) {
     attempts++;
     const x = (random() - 0.5) * 158;
     const z = (random() - 0.5) * 158;
-    if (!clearOfTrack(x, z, trackHalfWidth + 8.5)) continue;
+    if (!clearOfTrack(x, z, trackHalfWidth + 8.5) || !clearOfPitArea(x, z)) continue;
     propDummy.position.set(x, 0.12 + random() * 0.15, z);
     propDummy.rotation.set(random() * 0.45, random() * Math.PI, random() * 0.45);
     const scale = 0.35 + random() * 1.15;
@@ -776,7 +704,7 @@ export function createTrackSystem({ THREE, scene }) {
     attempts++;
     const x = (random() - 0.5) * 158;
     const z = (random() - 0.5) * 158;
-    if (!clearOfTrack(x, z, trackHalfWidth + 6.8)) continue;
+    if (!clearOfTrack(x, z, trackHalfWidth + 6.8) || !clearOfPitArea(x, z)) continue;
     propDummy.position.set(x, 0.26, z);
     propDummy.rotation.set(0, random() * Math.PI, (random() - 0.5) * 0.18);
     const scale = 0.45 + random() * 1.1;
@@ -787,6 +715,276 @@ export function createTrackSystem({ THREE, scene }) {
   scrub.count = scrubCount;
   scrub.castShadow = true;
   trackGroup.add(scrub);
+
+  // A small, weather-beaten wooden driver's stand gives the track a proper
+  // club-track viewing point. It sits well outside the racing line.
+  const woodCanvas = document.createElement("canvas");
+  woodCanvas.width = 256;
+  woodCanvas.height = 256;
+  const woodContext = woodCanvas.getContext("2d");
+  if (!woodContext) throw new Error("Could not create the weathered wood texture.");
+  woodContext.fillStyle = "#746754";
+  woodContext.fillRect(0, 0, 256, 256);
+  const woodRandom = makeSeededRandom(19044);
+  const woodGrainColors = ["#403a31", "#51493d", "#97866c", "#b0a087", "#5a5042"];
+  for (let i = 0; i < 150; i++) {
+    const y = woodRandom() * 256;
+    woodContext.globalAlpha = 0.12 + woodRandom() * 0.28;
+    woodContext.strokeStyle = woodGrainColors[Math.floor(woodRandom() * woodGrainColors.length)];
+    woodContext.lineWidth = 0.5 + woodRandom() * 2.1;
+    woodContext.beginPath();
+    const x = woodRandom() * 256;
+    woodContext.moveTo(x, y);
+    woodContext.bezierCurveTo(
+      x + 35, y + (woodRandom() - 0.5) * 5,
+      x + 95, y + (woodRandom() - 0.5) * 7,
+      x + 190, y + (woodRandom() - 0.5) * 5
+    );
+    woodContext.stroke();
+  }
+  for (let i = 0; i < 7; i++) {
+    const x = 18 + woodRandom() * 220;
+    const y = 18 + woodRandom() * 220;
+    woodContext.globalAlpha = 0.22;
+    woodContext.strokeStyle = "#302a23";
+    woodContext.lineWidth = 1.1;
+    woodContext.beginPath();
+    woodContext.ellipse(x, y, 4 + woodRandom() * 5, 2 + woodRandom() * 3, woodRandom(), 0, Math.PI * 2);
+    woodContext.stroke();
+  }
+  woodContext.globalAlpha = 1;
+  const woodTexture = new THREE.CanvasTexture(woodCanvas);
+  woodTexture.colorSpace = THREE.SRGBColorSpace;
+  woodTexture.wrapS = THREE.RepeatWrapping;
+  woodTexture.wrapT = THREE.RepeatWrapping;
+  woodTexture.anisotropy = 4;
+
+  const weatheredWood = new THREE.MeshStandardMaterial({
+    map: woodTexture, color: 0xc3b49b, roughness: 1, metalness: 0
+  });
+  const fadedWood = new THREE.MeshStandardMaterial({
+    map: woodTexture, color: 0x96866e, roughness: 1, metalness: 0
+  });
+  const darkWood = new THREE.MeshStandardMaterial({
+    color: 0x493e32, roughness: 1, metalness: 0
+  });
+
+  const driverStand = new THREE.Group();
+  driverStand.name = "old-wooden-rc-drivers-stand";
+  driverStand.position.set(pitCenter.x, 0, pitCenter.y);
+  driverStand.rotation.y = -1.80;
+  trackGroup.add(driverStand);
+
+  function addTimber(size, position, rotation = [0, 0, 0], material = weatheredWood) {
+    const plank = new THREE.Mesh(new THREE.BoxGeometry(size[0], size[1], size[2]), material);
+    plank.position.set(position[0], position[1], position[2]);
+    plank.rotation.set(rotation[0], rotation[1], rotation[2]);
+    plank.castShadow = true;
+    plank.receiveShadow = true;
+    driverStand.add(plank);
+    return plank;
+  }
+
+  function addTimberBrace(start, end, thickness = 0.12, material = fadedWood) {
+    const a = new THREE.Vector3(start[0], start[1], start[2]);
+    const b = new THREE.Vector3(end[0], end[1], end[2]);
+    const direction = b.clone().sub(a);
+    const brace = new THREE.Mesh(
+      new THREE.BoxGeometry(thickness, direction.length(), thickness),
+      material
+    );
+    brace.position.copy(a).add(b).multiplyScalar(0.5);
+    brace.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+    brace.castShadow = true;
+    brace.receiveShadow = true;
+    driverStand.add(brace);
+  }
+
+  // Four heavy support posts and diagonal braces.
+  for (const x of [-2.05, 2.05]) {
+    for (const z of [-0.78, 0.78]) {
+      addTimber([0.19, 1.82, 0.19], [x, 0.91, z], [0, 0, (x * z > 0 ? 0.012 : -0.012)], fadedWood);
+    }
+    addTimberBrace([x, 0.18, -0.70], [x, 1.60, 0.70], 0.13, weatheredWood);
+    addTimberBrace([x, 0.18, 0.70], [x, 1.60, -0.70], 0.11, fadedWood);
+  }
+
+  // Platform frame and mismatched, separated deck planks.
+  addTimber([4.55, 0.17, 0.20], [0, 1.70, -0.78], [0, 0, 0], darkWood);
+  addTimber([4.55, 0.17, 0.20], [0, 1.70, 0.78], [0, 0, 0], darkWood);
+  addTimber([0.18, 0.17, 1.50], [-2.05, 1.70, 0], [0, 0, 0], darkWood);
+  addTimber([0.18, 0.17, 1.50], [2.05, 1.70, 0], [0, 0, 0], darkWood);
+  for (let i = 0; i < 9; i++) {
+    const z = -0.82 + i * 0.205;
+    const tilt = (woodRandom() - 0.5) * 0.012;
+    addTimber(
+      [4.40, 0.095, 0.185 + woodRandom() * 0.012],
+      [(woodRandom() - 0.5) * 0.025, 1.835 + (woodRandom() - 0.5) * 0.012, z],
+      [tilt, 0, (woodRandom() - 0.5) * 0.009],
+      i % 3 === 0 ? fadedWood : weatheredWood
+    );
+  }
+
+  // Aged rails around the back and sides, leaving the front open for viewing.
+  for (const x of [-2.12, 2.12]) {
+    addTimber([0.13, 0.94, 0.13], [x, 2.34, 0.82], [0, 0, 0], fadedWood);
+    addTimber([0.13, 0.82, 0.13], [x, 2.28, -0.78], [0, 0, 0], fadedWood);
+    addTimber([0.11, 0.10, 1.58], [x, 2.67, 0.02], [0, 0, 0], weatheredWood);
+    addTimber([0.10, 0.09, 1.55], [x, 2.22, 0.02], [0, 0, 0], fadedWood);
+  }
+  addTimber([4.30, 0.11, 0.13], [0, 2.67, 0.82], [0, 0, 0], weatheredWood);
+  addTimber([4.22, 0.10, 0.12], [0, 2.22, 0.82], [0, 0, 0], fadedWood);
+  addTimber([4.20, 0.07, 0.12], [0, 1.94, 0.82], [0, 0, 0], darkWood);
+
+  // Worn wooden steps at the front-left corner of the platform.
+  const stairAngle = 0.68;
+  for (const x of [-1.82, -0.66]) {
+    addTimber([0.13, 0.17, 2.68], [x, 0.91, -1.90], [stairAngle, 0, 0], darkWood);
+  }
+  for (let i = 0; i < 7; i++) {
+    const z = -2.73 + i * 0.285;
+    const y = 0.14 + i * 0.245;
+    addTimber(
+      [1.22, 0.095, 0.25],
+      [-1.24, y, z],
+      [(woodRandom() - 0.5) * 0.018, 0, 0],
+      i % 2 === 0 ? weatheredWood : fadedWood
+    );
+  }
+  for (const x of [-1.84, -0.64]) {
+    addTimberBrace([x, 0.25, -2.55], [x, 1.62, -1.12], 0.08, fadedWood);
+  }
+
+  const nailMaterial = new THREE.MeshStandardMaterial({
+    color: 0x302d29, roughness: 0.88, metalness: 0.28
+  });
+  const nailGeometry = new THREE.CylinderGeometry(0.018, 0.018, 0.012, 8);
+  for (const x of [-2.05, 2.05]) {
+    for (const z of [-0.78, 0.78]) {
+      for (const y of [0.30, 1.54, 1.91]) {
+        const nail = new THREE.Mesh(nailGeometry, nailMaterial);
+        nail.position.set(x + Math.sign(x) * 0.10, y, z);
+        nail.rotation.z = Math.PI / 2;
+        driverStand.add(nail);
+      }
+    }
+  }
+
+  // Four small parked short-course trucks: two complete shells and two exposed
+  // chassis with battery, motor, towers and miniature shocks.
+  const pitTireMaterial = new THREE.MeshStandardMaterial({
+    color: 0x151719, roughness: 0.99, metalness: 0
+  });
+  const pitWheelHubMaterial = new THREE.MeshStandardMaterial({
+    color: 0x8d9699, roughness: 0.45, metalness: 0.66
+  });
+  const pitChassisMaterial = new THREE.MeshStandardMaterial({
+    color: 0x252b30, roughness: 0.76, metalness: 0.28
+  });
+  const pitBatteryMaterial = new THREE.MeshStandardMaterial({
+    color: 0x183c58, roughness: 0.6, metalness: 0.12
+  });
+  const pitShockMaterial = new THREE.MeshStandardMaterial({
+    color: 0xb6bec0, roughness: 0.38, metalness: 0.72
+  });
+
+  function addPitRcCar(position, yaw, bodyColor, shellRemoved, accentColor) {
+    const car = new THREE.Group();
+    car.position.set(position[0], 0.02, position[1]);
+    car.rotation.y = yaw;
+    car.scale.setScalar(0.86);
+    car.name = shellRemoved ? "parked-rc-truck-shell-removed" : "parked-rc-truck";
+    driverStand.add(car);
+
+    function part(geometry, material, pos, rot = [0, 0, 0]) {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(pos[0], pos[1], pos[2]);
+      mesh.rotation.set(rot[0], rot[1], rot[2]);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      car.add(mesh);
+      return mesh;
+    }
+    function rod(start, end, radius, material) {
+      const a = new THREE.Vector3(start[0], start[1], start[2]);
+      const b = new THREE.Vector3(end[0], end[1], end[2]);
+      const direction = b.clone().sub(a);
+      const mesh = part(
+        new THREE.CylinderGeometry(radius, radius, direction.length(), 8),
+        material,
+        a.clone().add(b).multiplyScalar(0.5).toArray()
+      );
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+      return mesh;
+    }
+
+    part(new THREE.BoxGeometry(0.45, 0.065, 0.72), pitChassisMaterial, [0, 0.145, 0]);
+    for (const x of [-0.285, 0.285]) {
+      for (const z of [-0.255, 0.255]) {
+        part(
+          new THREE.CylinderGeometry(0.118, 0.118, 0.095, 16),
+          pitTireMaterial,
+          [x, 0.135, z],
+          [0, 0, Math.PI / 2]
+        );
+        part(
+          new THREE.CylinderGeometry(0.063, 0.063, 0.102, 12),
+          pitWheelHubMaterial,
+          [x + Math.sign(x) * 0.004, 0.135, z],
+          [0, 0, Math.PI / 2]
+        );
+      }
+    }
+
+    for (const x of [-0.20, 0.20]) {
+      for (const z of [-0.24, 0.24]) {
+        rod([x * 0.50, 0.135, z], [x * 1.40, 0.135, z], 0.012, pitChassisMaterial);
+        rod([x * 0.78, 0.18, z], [x * 1.18, 0.32, z + (z < 0 ? -0.02 : 0.02)], 0.019, pitShockMaterial);
+      }
+    }
+
+    if (shellRemoved) {
+      for (const z of [-0.29, 0.29]) {
+        part(new THREE.BoxGeometry(0.47, 0.24, 0.045), pitChassisMaterial, [0, 0.245, z]);
+        for (const x of [-0.14, 0.14]) {
+          part(new THREE.CylinderGeometry(0.012, 0.012, 0.035, 7), pitWheelHubMaterial, [x, 0.37, z]);
+        }
+      }
+      part(new THREE.BoxGeometry(0.18, 0.09, 0.32), pitBatteryMaterial, [-0.075, 0.245, 0.015]);
+      part(new THREE.BoxGeometry(0.13, 0.075, 0.12), new THREE.MeshStandardMaterial({
+        color: accentColor, roughness: 0.34, metalness: 0.48
+      }), [0.13, 0.245, 0.12]);
+      rod([-0.15, 0.30, -0.10], [0.16, 0.31, -0.23], 0.009, pitShockMaterial);
+      rod([-0.15, 0.30, 0.09], [0.16, 0.31, 0.23], 0.009, pitShockMaterial);
+      part(new THREE.BoxGeometry(0.035, 0.025, 0.30), pitBatteryMaterial, [0.02, 0.31, 0]);
+      for (const x of [-0.21, 0.21]) {
+        part(new THREE.BoxGeometry(0.035, 0.035, 0.24), pitWheelHubMaterial, [x, 0.205, 0]);
+      }
+    } else {
+      const shellMaterial = new THREE.MeshStandardMaterial({
+        color: bodyColor, roughness: 0.58, metalness: 0.015
+      });
+      part(new THREE.BoxGeometry(0.53, 0.115, 0.79), shellMaterial, [0, 0.285, 0]);
+      part(new THREE.BoxGeometry(0.50, 0.055, 0.26), shellMaterial, [0, 0.345, -0.245]);
+      part(new THREE.BoxGeometry(0.45, 0.055, 0.20), shellMaterial, [0, 0.345, 0.285]);
+      part(new THREE.BoxGeometry(0.40, 0.145, 0.29), shellMaterial, [0, 0.405, 0.015]);
+      const glassMaterial = new THREE.MeshStandardMaterial({
+        color: 0x18252c, roughness: 0.36, metalness: 0.12
+      });
+      part(new THREE.BoxGeometry(0.36, 0.065, 0.018), glassMaterial, [0, 0.435, -0.135], [0.12, 0, 0]);
+      part(new THREE.BoxGeometry(0.36, 0.065, 0.018), glassMaterial, [0, 0.435, 0.165], [-0.12, 0, 0]);
+      for (const x of [-0.255, 0.255]) {
+        part(new THREE.BoxGeometry(0.035, 0.045, 0.54), shellMaterial, [x, 0.30, 0]);
+      }
+      part(new THREE.BoxGeometry(0.18, 0.035, 0.025), pitWheelHubMaterial, [0, 0.36, -0.39]);
+    }
+    return car;
+  }
+
+  addPitRcCar([-3.45, -2.45], -0.25, 0xe4512c, false, 0xe4512c);
+  addPitRcCar([3.45, -2.30], 0.35, 0x2d75c5, false, 0x2d75c5);
+  addPitRcCar([-3.35, 2.25], 0.65, 0x2c3439, true, 0x2689b5);
+  addPitRcCar([3.35, 2.35], -0.55, 0x2c3439, true, 0xd94e36);
 
   const spawnT = 0.012;
   const spawnPoint = centerline.getPointAt(spawnT);
