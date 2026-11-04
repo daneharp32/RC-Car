@@ -3,6 +3,11 @@ import { selfId } from "https://esm.sh/trystero@0.26.0";
 const DEFAULT_COLLISION_GROUP = 1;
 const JUMP_COLLISION_GROUP = 2;
 
+// Baseline tire grip is tuned for loose dirt rather than high-grip asphalt.
+// The driving controller progressively lowers it further when a tire slides.
+export const FRONT_TIRE_BASE_GRIP = 1.05;
+export const REAR_TIRE_BASE_GRIP = 0.93;
+
 // Builds the Cannon-es world, terrain colliders, chassis, and four-wheel
 // raycast vehicle. The returned objects are shared by the driving systems.
 export function createPhysicsSystem({ CANNON, trackLayout, shellFit = false, shellGeometry = null }) {
@@ -77,7 +82,9 @@ const chassisBody = new CANNON.Body({
   material: chassisMaterial,
   position: new CANNON.Vec3(spawnX, 0.24, spawnZ),
   linearDamping: 0.12,
-  angularDamping: 0.90,
+  // Avoid overdamping yaw: the tires should be able to rotate the truck
+  // into a controllable slide, while tire forces and body-load damping settle it.
+  angularDamping: 0.48,
   collisionFilterGroup: DEFAULT_COLLISION_GROUP,
   // Chassis and shell must not snag on jump faces. Wheel rays still query the
   // jump group, so suspension contact can launch the truck naturally.
@@ -206,7 +213,7 @@ for (let i = 0; i < 4; i++) {
     // Start with moderate grip. controls.js adjusts this per wheel as slip
     // builds, allowing the rear to rotate instead of snapping all velocity
     // into the direction the front wheels happen to be pointing.
-    frictionSlip: i < 2 ? 4.9 : 4.45,
+    frictionSlip: i < 2 ? FRONT_TIRE_BASE_GRIP : REAR_TIRE_BASE_GRIP,
     // Let tire forces transfer enough load to the chassis for visible body lean.
     rollInfluence: 0.17,
     isFrontWheel: i < 2,
