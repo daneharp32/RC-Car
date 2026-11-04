@@ -6,8 +6,8 @@ const JUMP_COLLISION_GROUP = 2;
 // Tire grip tuned for a planted short-course truck on packed dirt.
 // A small rear bias allows the back to rotate under hard cornering, but
 // substantial grip remains available to recover from a slide.
-export const FRONT_TIRE_BASE_GRIP = 2.75;
-export const REAR_TIRE_BASE_GRIP = 2.50;
+export const FRONT_TIRE_BASE_GRIP = 2.68;
+export const REAR_TIRE_BASE_GRIP = 2.40;
 
 // Builds the Cannon-es world, terrain colliders, chassis, and four-wheel
 // raycast vehicle. The returned objects are shared by the driving systems.
