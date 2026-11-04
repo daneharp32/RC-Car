@@ -1,8 +1,8 @@
 // Pooled, camera-facing dust plumes. Each puff is a soft elongated quad,
 // not a round point sprite; frequent overlapping puffs blend into a continuous
 // cloud trailing from the tires while keeping draw calls low.
-export function createDustSystem({ THREE, CANNON, scene, chassisBody, vehicle, renderer }) {
-  const MAX_PARTICLES = 640;
+export function createDustSystem({ THREE, CANNON, scene, chassisBody, vehicle, renderer, trackLayout }) {
+  const MAX_PARTICLES = 1400;
   const VERTICES_PER_PARTICLE = 4;
   const positions = new Float32Array(MAX_PARTICLES * VERTICES_PER_PARTICLE * 3);
   const sizes = new Float32Array(MAX_PARTICLES * VERTICES_PER_PARTICLE * 2);
@@ -131,7 +131,49 @@ export function createDustSystem({ THREE, CANNON, scene, chassisBody, vehicle, r
     return t * t * (3 - 2 * t);
   };
 
-  function emitParticle(wheel, intensity, lateralSpeed) {
+  // The visible lane is a lighter compacted dirt than the dark runoff around
+  // it. THREE.Color converts these sRGB hex values into the shader's linear
+  // working space, preventing the pale/white wash of the previous fixed tint.
+  const laneDustColor = new THREE.Color(0x98663f);
+  const runoffDustColor = new THREE.Color(0x38271d);
+  const sampledSurfaceDustColor = new THREE.Color();
+  const centerlineSamples = trackLayout?.centerlineSamples || [];
+  const trackHalfWidth = trackLayout?.trackHalfWidth ?? 5.75;
+
+  function getSurfaceDustColor(x, z) {
+    if (centerlineSamples.length < 2) {
+      return sampledSurfaceDustColor.copy(laneDustColor);
+    }
+
+    let minimumDistanceSquared = Infinity;
+    for (let i = 0; i < centerlineSamples.length; i++) {
+      const start = centerlineSamples[i];
+      const end = centerlineSamples[(i + 1) % centerlineSamples.length];
+      const segmentX = end.x - start.x;
+      const segmentZ = end.z - start.z;
+      const segmentLengthSquared = segmentX * segmentX + segmentZ * segmentZ;
+      const projection = segmentLengthSquared > 0
+        ? clamp(((x - start.x) * segmentX + (z - start.z) * segmentZ) / segmentLengthSquared, 0, 1)
+        : 0;
+      const closestX = start.x + segmentX * projection;
+      const closestZ = start.z + segmentZ * projection;
+      const dx = x - closestX;
+      const dz = z - closestZ;
+      minimumDistanceSquared = Math.min(minimumDistanceSquared, dx * dx + dz * dz);
+    }
+
+    const distanceFromLaneCenter = Math.sqrt(minimumDistanceSquared);
+    const laneBlend = 1 - smoothStep(
+      trackHalfWidth - 0.20,
+      trackHalfWidth + 0.20,
+      distanceFromLaneCenter
+    );
+    return sampledSurfaceDustColor
+      .copy(runoffDustColor)
+      .lerp(laneDustColor, laneBlend);
+  }
+
+  function emitParticle(wheel, intensity, lateralSpeed, surfaceColor) {
     const hit = wheel.raycastResult.hitPointWorld;
     const particleIndex = nextParticle;
     const particle = particles[particleIndex];
@@ -153,35 +195,34 @@ export function createDustSystem({ THREE, CANNON, scene, chassisBody, vehicle, r
     particle.y = hit.y + 0.20;
     particle.z = hit.z + randomRange(-0.07, 0.07);
     particle.vx =
-      chassisBody.velocity.x * 0.10 +
-      behindX * (0.28 + intensity * 0.62) +
+      chassisBody.velocity.x * 0.34 +
+      behindX * (0.20 + intensity * 0.36) +
       worldRight.x * sideKick +
-      randomRange(-0.20, 0.20);
+      randomRange(-0.16, 0.16);
     particle.vz =
-      chassisBody.velocity.z * 0.10 +
-      behindZ * (0.28 + intensity * 0.62) +
+      chassisBody.velocity.z * 0.34 +
+      behindZ * (0.20 + intensity * 0.36) +
       worldRight.z * sideKick +
-      randomRange(-0.20, 0.20);
-    particle.vy = randomRange(0.48, 0.78) + intensity * 0.34;
+      randomRange(-0.16, 0.16);
+    particle.vy = randomRange(0.56, 0.90) + intensity * 0.42;
 
     particle.age = 0;
-    particle.lifespan = randomRange(1.35, 1.90);
-    particle.startWidth = randomRange(0.58, 0.88);
-    particle.endWidth = randomRange(1.75, 2.55);
-    particle.startHeight = randomRange(0.36, 0.54);
-    particle.endHeight = randomRange(0.98, 1.48);
-    // A denser initial cloud makes the tire plume clearly visible, while the
-    // existing lifetime curve still softens and fades it away naturally.
-    particle.baseOpacity = randomRange(0.52, 0.66) * (0.92 + intensity * 0.18);
-    particle.tint = randomRange(0.94, 1.08);
+    // Denser, longer-lived puffs overlap into the broad continuous plume in
+    // the reference. Each particle keeps the tint of the surface under its tire.
+    particle.baseOpacity = randomRange(0.58, 0.72) * (0.96 + intensity * 0.16);
+    particle.tint = randomRange(0.88, 1.12);
+    particle.lifespan = randomRange(2.05, 2.75);
+    particle.startWidth = randomRange(0.72, 1.05);
+    particle.endWidth = randomRange(2.65, 4.05);
+    particle.startHeight = randomRange(0.44, 0.68);
+    particle.endHeight = randomRange(1.35, 2.10);
 
     const firstVertex = particleIndex * VERTICES_PER_PARTICLE;
     for (let vertex = 0; vertex < VERTICES_PER_PARTICLE; vertex++) {
       const v = firstVertex + vertex;
-      // Warm, sunlit dirt rather than dark brown smoke.
-      colors[v * 3] = 0.70 * particle.tint;
-      colors[v * 3 + 1] = 0.61 * particle.tint;
-      colors[v * 3 + 2] = 0.47 * particle.tint;
+      colors[v * 3] = surfaceColor.r * particle.tint;
+      colors[v * 3 + 1] = surfaceColor.g * particle.tint;
+      colors[v * 3 + 2] = surfaceColor.b * particle.tint;
     }
   }
 
@@ -200,6 +241,24 @@ export function createDustSystem({ THREE, CANNON, scene, chassisBody, vehicle, r
     worldRight.z /= rightLength;
     worldForward.x /= forwardLength;
     worldForward.z /= forwardLength;
+
+    // Measure drift from the chassis' actual travel direction as well as each
+    // tire's local slip. This stays active through a long controlled slide even
+    // when Cannon's per-wheel sliding flag briefly drops between frames.
+    const chassisForwardSpeed =
+      chassisBody.velocity.x * worldForward.x +
+      chassisBody.velocity.z * worldForward.z;
+    const chassisLateralSpeed =
+      chassisBody.velocity.x * worldRight.x +
+      chassisBody.velocity.z * worldRight.z;
+    const chassisSpeed = Math.hypot(chassisBody.velocity.x, chassisBody.velocity.z);
+    const chassisDriftAngle = Math.abs(Math.atan2(
+      chassisLateralSpeed,
+      Math.max(Math.abs(chassisForwardSpeed), 0.8)
+    ));
+    const chassisDrift = clamp((Math.abs(chassisLateralSpeed) - 0.28) / 0.95, 0, 1) *
+      clamp((chassisDriftAngle - 0.055) / 0.28, 0, 1) *
+      clamp((chassisSpeed - 1.15) / 1.8, 0, 1);
 
     if (enabled && step > 0) {
       for (let i = 0; i < vehicle.wheelInfos.length; i++) {
@@ -235,7 +294,7 @@ export function createDustSystem({ THREE, CANNON, scene, chassisBody, vehicle, r
         ) * speedGate;
         const skidSeverity = clamp(1 - (wheel.skidInfo ?? 1), 0, 1);
         const flaggedSlip = wheel.sliding ? 0.58 + skidSeverity * 0.42 : 0;
-        const rawSlip = Math.max(measuredSlip, flaggedSlip * speedGate);
+        const rawSlip = Math.max(measuredSlip, flaggedSlip * speedGate, chassisDrift);
 
         // Build the dust signal quickly when a tire starts sliding, then let it
         // fall more slowly when grip returns. This keeps a sustained slide
@@ -256,11 +315,15 @@ export function createDustSystem({ THREE, CANNON, scene, chassisBody, vehicle, r
           1
         );
         // Repeated emission continues for every contacting tire that is sliding.
-        const particlesPerSecond = 34 + intensity * 56;
+        const particlesPerSecond = 56 + intensity * 82;
         emissionRemainders[i] += step * particlesPerSecond;
+        const surfaceColor = getSurfaceDustColor(
+          wheel.raycastResult.hitPointWorld.x,
+          wheel.raycastResult.hitPointWorld.z
+        );
 
         while (emissionRemainders[i] >= 1) {
-          emitParticle(wheel, intensity, lateralSpeed);
+          emitParticle(wheel, intensity, lateralSpeed, surfaceColor);
           emissionRemainders[i] -= 1;
         }
       }
@@ -271,7 +334,7 @@ export function createDustSystem({ THREE, CANNON, scene, chassisBody, vehicle, r
       }
     }
 
-    const drag = Math.exp(-0.72 * step);
+    const drag = Math.exp(-0.48 * step);
     for (let i = 0; i < MAX_PARTICLES; i++) {
       const particle = particles[i];
       if (particle.lifespan <= 0) continue;
