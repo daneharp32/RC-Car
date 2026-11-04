@@ -506,9 +506,9 @@ function makeCarVisual(color, playerName = "") {
     chassisGroup,
     "rear-bumper",
     "Rear impact bumper",
-    "Compact rear impact bumper. The oversized wing, vertical supports, and upper wing plate have been removed."
+    "Compact rear impact bumper with two reinforced mounting braces tied into the rear chassis rails."
   );
-  const rearBumperZ = rearAxleZ + 0.34;
+  const rearBumperZ = rearAxleZ + 0.31;
   roundedBox(rearStructure, [0.54, 0.065, 0.055], blackPlastic, [0, -0.005, rearBumperZ], null, 0.018);
   // Two angled mounts visibly tie the rear bumper back into the chassis rails.
   for (const side of [-1, 1]) {
@@ -516,7 +516,7 @@ function makeCarVisual(color, playerName = "") {
       [side * 0.19, -0.005, rearBumperZ - 0.018], null, 0.010);
     cylinderBetween(
       rearStructure,
-      [side * 0.18, 0.012, rearAxleZ + 0.105],
+      [side * 0.18, -0.01, rearAxleZ + 0.02],
       [side * 0.19, -0.005, rearBumperZ - 0.045],
       0.014,
       carbonEdge,
