@@ -503,6 +503,7 @@ export function createMultiplayerSystem(game) {
       joinPanel.style.display = "none";
       modeSelectPanel.style.display = "none";
       hud.style.display = "block";
+      $("topStatus").style.display = "flex";
       game.garage.viewMode = "drive";
       game.garage.setArenaVisible(true);
       game.controls.cameraOrbitYaw = 0;
@@ -553,7 +554,6 @@ export function createMultiplayerSystem(game) {
       joinError.style.display = "block";
       return;
     }
-    selectedLobbyMode = mode;
     selectedLobbyMode = mode;
     enterRaceLobby({
       id: createRoomId(),
