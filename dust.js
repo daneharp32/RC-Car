@@ -1,5 +1,6 @@
-// Lightweight pooled tire-dust particles. Emitters only run when Cannon's
-// raycast tires report that they have exceeded their available grip.
+// Lightweight pooled tire-dust particles. Emission is driven by measured
+// sideways velocity at the tire contact patch, with Cannon's skid flag as
+// an additional signal for stronger slides.
 export function createDustSystem({ THREE, CANNON, scene, chassisBody, vehicle, renderer }) {
   const MAX_PARTICLES = 160;
   const positions = new Float32Array(MAX_PARTICLES * 3);
@@ -41,7 +42,7 @@ export function createDustSystem({ THREE, CANNON, scene, chassisBody, vehicle, r
         vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
         gl_Position = projectionMatrix * viewPosition;
         gl_PointSize = aSize * uPixelRatio *
-          (120.0 / max(1.0, -viewPosition.z));
+          (170.0 / max(1.0, -viewPosition.z));
       }
     `,
     fragmentShader: `
@@ -127,10 +128,10 @@ export function createDustSystem({ THREE, CANNON, scene, chassisBody, vehicle, r
     particle.vy = randomRange(0.34, 0.62) + intensity * 0.28;
 
     particle.age = 0;
-    particle.lifespan = randomRange(0.82, 1.28);
-    particle.startSize = randomRange(0.16, 0.25);
-    particle.endSize = randomRange(0.52, 0.86);
-    particle.baseOpacity = randomRange(0.20, 0.31) * (0.78 + intensity * 0.32);
+    particle.lifespan = randomRange(0.95, 1.45);
+    particle.startSize = randomRange(0.22, 0.32);
+    particle.endSize = randomRange(0.72, 1.12);
+    particle.baseOpacity = randomRange(0.30, 0.42) * (0.82 + intensity * 0.28);
 
     const tint = randomRange(0.88, 1.12);
     const index = nextParticle === 0 ? MAX_PARTICLES - 1 : nextParticle - 1;
@@ -144,10 +145,21 @@ export function createDustSystem({ THREE, CANNON, scene, chassisBody, vehicle, r
     chassisBody.quaternion.vmult(localRight, worldRight);
     chassisBody.quaternion.vmult(localForward, worldForward);
 
+    // Flatten the chassis axes onto the track so suspension pitch/roll does
+    // not incorrectly count vertical motion as sideways tire slip.
+    worldRight.y = 0;
+    worldForward.y = 0;
+    const rightLength = Math.hypot(worldRight.x, worldRight.z) || 1;
+    const forwardLength = Math.hypot(worldForward.x, worldForward.z) || 1;
+    worldRight.x /= rightLength;
+    worldRight.z /= rightLength;
+    worldForward.x /= forwardLength;
+    worldForward.z /= forwardLength;
+
     if (enabled && step > 0) {
       for (let i = 0; i < vehicle.wheelInfos.length; i++) {
         const wheel = vehicle.wheelInfos[i];
-        if (!wheel.isInContact || !wheel.sliding || !wheel.raycastResult?.hitPointWorld) {
+        if (!wheel.isInContact || !wheel.raycastResult?.hitPointWorld) {
           emissionRemainders[i] = Math.max(0, emissionRemainders[i] - step * 3);
           continue;
         }
@@ -156,14 +168,45 @@ export function createDustSystem({ THREE, CANNON, scene, chassisBody, vehicle, r
           wheel.raycastResult.hitPointWorld,
           contactVelocity
         );
-        const lateralSpeed = contactVelocity.dot(worldRight);
+
+        // Compare velocity to the direction each tire is pointing. This is
+        // especially important for the steered front wheels: cornering alone
+        // should not create dust unless the tread is actually slipping.
+        const steering = wheel.isFrontWheel ? wheel.steering || 0 : 0;
+        const cosine = Math.cos(steering);
+        const sine = Math.sin(steering);
+        const tireForwardX = worldForward.x * cosine + worldRight.x * sine;
+        const tireForwardZ = worldForward.z * cosine + worldRight.z * sine;
+        const tireRightX = worldRight.x * cosine - worldForward.x * sine;
+        const tireRightZ = worldRight.z * cosine - worldForward.z * sine;
+        const tireForwardSpeed =
+          contactVelocity.x * tireForwardX + contactVelocity.z * tireForwardZ;
+        const lateralSpeed =
+          contactVelocity.x * tireRightX + contactVelocity.z * tireRightZ;
+        const contactSpeed = Math.hypot(tireForwardSpeed, lateralSpeed);
+        const speedGate = clamp((contactSpeed - 1.35) / 3.8, 0, 1);
+        const measuredSlip = clamp(
+          (Math.abs(lateralSpeed) - 0.16) / 0.90,
+          0,
+          1
+        ) * speedGate;
         const skidSeverity = clamp(1 - (wheel.skidInfo ?? 1), 0, 1);
+        const flaggedSlip = wheel.sliding ? 0.42 + skidSeverity * 0.58 : 0;
+        const slipAmount = Math.max(measuredSlip, flaggedSlip * speedGate);
+
+        // Emit at a lower threshold than Cannon's binary sliding flag so a
+        // small, visible controlled slide still throws up a light dust trail.
+        if (slipAmount < 0.055 || speedGate <= 0) {
+          emissionRemainders[i] = Math.max(0, emissionRemainders[i] - step * 3);
+          continue;
+        }
+
         const intensity = clamp(
-          0.24 + skidSeverity * 1.35 + Math.abs(lateralSpeed) * 0.10,
-          0.2,
+          0.18 + slipAmount * 0.88 + Math.abs(lateralSpeed) * 0.12,
+          0.16,
           1
         );
-        const particlesPerSecond = 9 + intensity * 21;
+        const particlesPerSecond = 12 + intensity * 28;
         emissionRemainders[i] += step * particlesPerSecond;
 
         while (emissionRemainders[i] >= 1) {
