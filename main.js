@@ -194,7 +194,7 @@ const {
 
 const makeCarVisual = createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellGeometry });
 const localCar = makeCarVisual(0xffa33d);
-const dustSystem = createDustSystem({ THREE, CANNON, scene, chassisBody, vehicle, renderer });
+const dustSystem = createDustSystem({ THREE, CANNON, scene, chassisBody, vehicle, renderer, trackLayout });
 
 function updateLocalVisual() {
   localCar.root.position.set(chassisBody.position.x, chassisBody.position.y, chassisBody.position.z);
