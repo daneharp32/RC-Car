@@ -86,10 +86,10 @@ const localAirTorque = new CANNON.Vec3();
 const worldAirTorque = new CANNON.Vec3();
 
 function updateDrivingControls(delta) {
-  const raceAllowsDriving = !game.race || game.race.phase === "racing";
+  const raceAllowsDriving = !game.race || game.race.phase === "racing" || game.race.phase === "free-drive";
   if (!game.multiplayer?.joined || !raceAllowsDriving) {
-    // Cars stay parked in the grid while the host is preparing the race and
-    // during the countdown. Inputs are only enabled after the shared GO state.
+    // Race cars stay parked on the grid until GO. Free Drive has no staging
+    // phase, so normal throttle, steering, braking and air control stay active.
     for (let i = 0; i < 4; i++) {
       vehicle.applyEngineForce(0, i);
       vehicle.setBrake(game.multiplayer?.joined ? 12 : 0, i);
