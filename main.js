@@ -7,6 +7,7 @@ import { createMultiplayerSystem } from "./multiplayer.js";
 import { createGarageSystem } from "./garage.js";
 import { createTrackSystem } from "./track.js";
 import { createRaceSystem } from "./race.js";
+import { cleanRangerShellGeometry } from "./shell-cleanup.js";
 import rangerShellPart0 from "./ranger-shell-data-00.js";
 import rangerShellPart1 from "./ranger-shell-data-01.js";
 import rangerShellPart2 from "./ranger-shell-data-02.js";
@@ -164,7 +165,7 @@ async function loadRangerShellGeometry() {
   geometry.setIndex(new THREE.BufferAttribute(indices, 1));
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
-  return geometry;
+  return cleanRangerShellGeometry(THREE, geometry);
 }
 
 let shellGeometry = null;
