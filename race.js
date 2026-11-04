@@ -29,6 +29,7 @@ export function createRaceSystem(game) {
   let spectatingPeerId = null;
   let spectatorRenderKey = "";
   let resultsAnnounced = false;
+  let resultsRenderKey = "";
 
   function clampLapCount(value) {
     const number = Number(value);
@@ -93,6 +94,7 @@ export function createRaceSystem(game) {
     spectatingPeerId = null;
     spectatorRenderKey = "";
     resultsAnnounced = false;
+    resultsRenderKey = "";
 
     const spectatorPanel = $("raceSpectatorPanel");
     const resultsPanel = $("racePostRacePanel");
@@ -290,6 +292,34 @@ export function createRaceSystem(game) {
     const settings = $("raceRestartSettings");
     const restartButton = $("restartRaceButton");
     const lapSelect = $("raceRestartLapCount");
+    const resultsList = $("raceResultsList");
+    const resultsTimeHeading = $("raceResultsTimeHeading");
+    if (resultsTimeHeading) resultsTimeHeading.textContent = sessionMode === "time-trial" ? "BEST LAP" : "FINISH TIME";
+    if (resultsList) {
+      const standings = getStandings();
+      const renderKey = sessionMode + "|" + standings.map((entry) => [
+        entry.id, entry.name, entry.bestLapMs, entry.finishTimeMs, entry.completedLaps
+      ].join(":")).join("|");
+      if (renderKey !== resultsRenderKey) {
+        resultsRenderKey = renderKey;
+        resultsList.replaceChildren();
+        standings.forEach((entry, index) => {
+          const row = document.createElement("div");
+          row.className = "race-result-row";
+          const place = document.createElement("span");
+          place.className = "race-result-place";
+          place.textContent = ordinal(index + 1);
+          const name = document.createElement("span");
+          name.className = "race-result-name";
+          name.textContent = entry.name || "Driver";
+          const time = document.createElement("strong");
+          const recordedTime = sessionMode === "time-trial" ? entry.bestLapMs : entry.finishTimeMs;
+          time.textContent = recordedTime > 0 ? formatTime(recordedTime) : "--:--.---";
+          row.append(place, name, time);
+          resultsList.appendChild(row);
+        });
+      }
+    }
     if (status) {
       status.textContent = isHost
         ? (sessionMode === "time-trial"
