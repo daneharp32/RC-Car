@@ -446,7 +446,7 @@ export function createRaceSystem(game) {
 
   function updateRemoteState(peerId, state) {
     if (!peerId || !state || typeof state !== "object") return;
-    const validPhases = ["waiting", "countdown", "racing", "finished", "results"];
+    const validPhases = ["waiting", "countdown", "racing", "finished", "results", "free-drive"];
     if (!validPhases.includes(state.phase)) return;
     const numeric = [
       state.completedLaps, state.progress, state.elapsedMs,
@@ -506,9 +506,18 @@ export function createRaceSystem(game) {
   }
 
   function enterLobby(lobby, host, name) {
+    const freeDrive = lobby?.mode === "free-drive";
     const card = $("raceCard");
-    if (card) card.style.display = "block";
+    if (card) card.style.display = freeDrive ? "none" : "block";
     setWaiting(lobby?.laps || 3, host, name);
+    if (freeDrive) {
+      // Free Drive skips race staging, countdowns, checkpoints and lap UI.
+      // The shared physics and multiplayer vehicle snapshots remain active.
+      phase = "free-drive";
+      updateOverlay("", false);
+      setStatus("FREE DRIVE — EXPLORE THE TRACK");
+      updateUI();
+    }
   }
 
   function startButtonPressed() {
