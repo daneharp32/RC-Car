@@ -41,6 +41,201 @@ garageGroup.add(displayRing);
 const showroomLight = new THREE.PointLight(0x7dbfff, 24, 15, 2);
 showroomLight.position.set(0, 4.8, 1.5);
 garageGroup.add(showroomLight);
+ 
+// Build the detailed workshop as an optional, self-contained scene layer.
+// If a decoration ever fails to construct, the original showroom still renders.
+try {
+  const workshopGroup = new THREE.Group();
+  workshopGroup.name = "modern-rc-workshop-details";
+
+  const materials = {
+    wall: new THREE.MeshStandardMaterial({ color: 0x263646, roughness: 0.86, metalness: 0.12 }),
+    wallDark: new THREE.MeshStandardMaterial({ color: 0x101c28, roughness: 0.76, metalness: 0.28 }),
+    cabinet: new THREE.MeshStandardMaterial({ color: 0x303b46, roughness: 0.54, metalness: 0.42 }),
+    cabinetDark: new THREE.MeshStandardMaterial({ color: 0x18232d, roughness: 0.58, metalness: 0.38 }),
+    metal: new THREE.MeshStandardMaterial({ color: 0x9aaab6, roughness: 0.34, metalness: 0.82 }),
+    steel: new THREE.MeshStandardMaterial({ color: 0x596a78, roughness: 0.42, metalness: 0.76 }),
+    worktop: new THREE.MeshStandardMaterial({ color: 0x202b35, roughness: 0.44, metalness: 0.5 }),
+    rubber: new THREE.MeshStandardMaterial({ color: 0x11171c, roughness: 0.95 }),
+    blue: new THREE.MeshStandardMaterial({ color: 0x167dcc, roughness: 0.42, metalness: 0.42 }),
+    orange: new THREE.MeshStandardMaterial({ color: 0xf0782f, roughness: 0.48, metalness: 0.18 }),
+    battery: new THREE.MeshStandardMaterial({ color: 0x1f384d, roughness: 0.58, metalness: 0.2 }),
+    darkGlass: new THREE.MeshStandardMaterial({ color: 0x08131d, roughness: 0.2, metalness: 0.22 }),
+    warmGlow: new THREE.MeshBasicMaterial({ color: 0xffd9a0 }),
+    coolGlow: new THREE.MeshBasicMaterial({ color: 0x69bdff }),
+    statusGlow: new THREE.MeshBasicMaterial({ color: 0x45e2a4 })
+  };
+
+  function workshopBox(size, position, material, castShadow = false, receiveShadow = false) {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(size[0], size[1], size[2]), material);
+    mesh.position.set(position[0], position[1], position[2]);
+    mesh.castShadow = castShadow;
+    mesh.receiveShadow = receiveShadow;
+    workshopGroup.add(mesh);
+    return mesh;
+  }
+
+  function workshopCylinder(radiusTop, radiusBottom, height, position, material, rotation = [0, 0, 0], segments = 16) {
+    const mesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(radiusTop, radiusBottom, height, segments),
+      material
+    );
+    mesh.position.set(position[0], position[1], position[2]);
+    mesh.rotation.set(rotation[0], rotation[1], rotation[2]);
+    workshopGroup.add(mesh);
+    return mesh;
+  }
+
+  // A darker industrial wall with narrow acoustic/metal ribs.
+  for (let x = -9.1; x <= 9.11; x += 1.3) {
+    workshopBox([0.045, 5.9, 0.075], [x, 3.0, -4.965], materials.steel);
+  }
+  workshopBox([18.2, 0.09, 0.14], [0, 4.82, -4.86], materials.blue);
+  workshopBox([18.2, 0.055, 0.12], [0, 1.72, -4.86], materials.wallDark);
+
+  // Long workbench, drawer cabinets, and a continuous metal front edge.
+  workshopBox([9.5, 0.17, 1.12], [0, 1.04, -4.12], materials.worktop, true, true);
+  workshopBox([9.55, 0.055, 0.07], [0, 0.97, -3.55], materials.blue);
+  for (const x of [-3.15, 0, 3.15]) {
+    workshopBox([2.82, 0.86, 0.92], [x, 0.48, -4.15], materials.cabinet, true, true);
+    workshopBox([2.72, 0.075, 0.035], [x, 0.80, -3.675], materials.cabinetDark);
+    for (const y of [0.27, 0.49, 0.69]) {
+      workshopBox([2.63, 0.17, 0.045], [x, y, -3.655], materials.steel);
+      workshopBox([0.48, 0.028, 0.035], [x, y, -3.61], materials.metal);
+    }
+    workshopBox([0.035, 0.77, 0.035], [x - 1.38, 0.48, -3.63], materials.cabinetDark);
+  }
+
+  // Pegboard panel with repeated mounting holes.
+  workshopBox([9.7, 1.72, 0.13], [0, 2.77, -4.835], materials.wallDark, false, true);
+  workshopBox([9.82, 0.055, 0.16], [0, 3.64, -4.79], materials.blue);
+  workshopBox([9.82, 0.045, 0.16], [0, 1.89, -4.79], materials.steel);
+  const pegHoleGeometry = new THREE.CylinderGeometry(0.022, 0.022, 0.016, 8);
+  const pegHoleMaterial = new THREE.MeshBasicMaterial({ color: 0x070e15 });
+  const pegHoles = new THREE.InstancedMesh(pegHoleGeometry, pegHoleMaterial, 168);
+  const pegDummy = new THREE.Object3D();
+  let pegIndex = 0;
+  for (let row = 0; row < 7; row++) {
+    for (let column = 0; column < 24; column++) {
+      pegDummy.position.set(-4.55 + column * 0.395, 2.16 + row * 0.195, -4.747);
+      pegDummy.rotation.set(Math.PI / 2, 0, 0);
+      pegDummy.updateMatrix();
+      pegHoles.setMatrixAt(pegIndex++, pegDummy.matrix);
+    }
+  }
+  pegHoles.count = pegIndex;
+  workshopGroup.add(pegHoles);
+
+  // Hanging hand tools and organized tool rails.
+  workshopBox([5.2, 0.045, 0.075], [-1.85, 3.30, -4.69], materials.metal);
+  for (let i = 0; i < 9; i++) {
+    const x = -4.15 + i * 0.58;
+    workshopBox([0.045, 0.48 + (i % 3) * 0.08, 0.045], [x, 2.97, -4.675], i % 3 === 0 ? materials.orange : materials.metal);
+    workshopBox([0.16, 0.065, 0.055], [x, 2.72, -4.665], materials.cabinetDark);
+  }
+  for (let i = 0; i < 5; i++) {
+    const x = 1.15 + i * 0.46;
+    workshopBox([0.035, 0.72, 0.04], [x, 2.92, -4.665], materials.blue);
+    workshopBox([0.13, 0.045, 0.045], [x, 2.58, -4.65], materials.steel);
+  }
+
+  // Two wall shelves holding RC parts, tires, boxes, and setup equipment.
+  for (const side of [-1, 1]) {
+    const shelfX = side * 6.25;
+    workshopBox([2.45, 0.12, 0.72], [shelfX, 2.78, -4.43], materials.steel, true);
+    workshopBox([2.45, 0.10, 0.72], [shelfX, 3.72, -4.43], materials.steel, true);
+    for (const xOffset of [-0.95, 0.95]) {
+      workshopBox([0.075, 1.0, 0.1], [shelfX + xOffset, 3.2, -4.75], materials.metal);
+    }
+    workshopBox([0.68, 0.42, 0.46], [shelfX - 0.62, 3.04, -4.38], materials.battery);
+    workshopBox([0.58, 0.34, 0.42], [shelfX + 0.57, 3.91, -4.36], materials.cabinetDark);
+    workshopBox([0.22, 0.025, 0.025], [shelfX - 0.62, 3.27, -4.12], materials.statusGlow);
+    workshopBox([0.24, 0.025, 0.025], [shelfX + 0.57, 4.10, -4.12], materials.orange);
+  }
+
+  // Upright spare short-course tires on a compact rack at the left.
+  const spareTire = new THREE.Mesh(
+    new THREE.TorusGeometry(0.34, 0.095, 10, 24),
+    materials.rubber
+  );
+  const spareHub = new THREE.Mesh(
+    new THREE.TorusGeometry(0.135, 0.026, 8, 20),
+    materials.steel
+  );
+  for (let i = 0; i < 3; i++) {
+    const tire = spareTire.clone();
+    tire.position.set(-7.35, 1.05 + i * 0.73, -4.27);
+    workshopGroup.add(tire);
+    const hub = spareHub.clone();
+    hub.position.copy(tire.position);
+    hub.position.z += 0.012;
+    workshopGroup.add(hub);
+  }
+  workshopBox([0.10, 2.45, 0.10], [-7.35, 1.75, -4.58], materials.metal);
+
+  // Tall parts cabinet on the right, with a glazed door and blue status strip.
+  workshopBox([1.42, 3.4, 0.92], [7.42, 1.85, -4.35], materials.cabinet, true, true);
+  workshopBox([1.14, 2.82, 0.055], [7.42, 1.92, -3.85], materials.darkGlass);
+  workshopBox([0.07, 2.78, 0.065], [6.86, 1.92, -3.80], materials.metal);
+  workshopBox([0.07, 2.78, 0.065], [7.98, 1.92, -3.80], materials.metal);
+  for (const y of [0.68, 1.36, 2.04, 2.72]) {
+    workshopBox([1.05, 0.035, 0.62], [7.42, y, -4.27], materials.steel);
+  }
+  workshopBox([0.055, 1.15, 0.035], [7.84, 1.9, -3.78], materials.blue);
+
+  // RC work accessories: battery charger, battery packs, motor, and a small monitor.
+  workshopBox([0.88, 0.32, 0.62], [3.30, 1.29, -4.06], materials.cabinetDark, true);
+  workshopBox([0.72, 0.19, 0.035], [3.30, 1.31, -3.73], materials.darkGlass);
+  workshopBox([0.24, 0.055, 0.028], [3.30, 1.32, -3.705], materials.coolGlow);
+  for (let i = 0; i < 3; i++) {
+    workshopBox([0.42, 0.17, 0.32], [2.35 + i * 0.49, 1.22, -4.05], i === 1 ? materials.orange : materials.battery);
+    workshopBox([0.23, 0.025, 0.018], [2.35 + i * 0.49, 1.32, -3.87], materials.statusGlow);
+  }
+  workshopBox([1.02, 0.70, 0.10], [4.28, 1.72, -4.58], materials.cabinetDark, true);
+  workshopBox([0.88, 0.55, 0.035], [4.28, 1.74, -4.515], materials.darkGlass);
+  workshopBox([0.72, 0.025, 0.025], [4.28, 1.77, -4.49], materials.coolGlow);
+  workshopBox([0.38, 0.07, 0.40], [4.28, 1.30, -4.34], materials.steel);
+
+  // Small desk lamp at the left end of the workbench.
+  workshopCylinder(0.21, 0.23, 0.065, [-4.12, 1.18, -4.03], materials.steel);
+  workshopCylinder(0.035, 0.035, 0.72, [-4.12, 1.53, -4.03], materials.metal, [0, 0, -0.12]);
+  workshopBox([0.43, 0.12, 0.31], [-4.17, 1.88, -4.04], materials.cabinetDark);
+  workshopBox([0.34, 0.025, 0.22], [-4.17, 1.81, -3.86], materials.warmGlow);
+
+  // Overhead crossbeams and bright LED panels frame the truck without hiding it.
+  workshopBox([18.0, 0.16, 0.20], [0, 5.05, -3.05], materials.wallDark);
+  for (const x of [-4.4, 0, 4.4]) {
+    workshopBox([2.25, 0.07, 0.72], [x, 4.72, -2.95], materials.cabinetDark);
+    workshopBox([2.02, 0.025, 0.53], [x, 4.665, -2.95], materials.warmGlow);
+    workshopBox([2.15, 0.035, 0.035], [x, 4.61, -2.95], materials.coolGlow);
+  }
+  workshopBox([11.8, 0.045, 0.045], [0, 4.35, -4.76], materials.coolGlow);
+  workshopBox([11.8, 0.035, 0.035], [0, 4.18, -4.76], materials.warmGlow);
+
+  // Subtle workshop floor markings along the edges of the display pad.
+  const floorMark = new THREE.MeshBasicMaterial({ color: 0x32627f });
+  for (const x of [-4.75, 4.75]) {
+    workshopBox([0.035, 0.008, 5.7], [x, -0.022, 0.75], floorMark);
+    workshopBox([1.1, 0.008, 0.035], [x, -0.022, -2.10], floorMark);
+  }
+
+  // Soft practical fill from the ceiling and workbench. No added shadow maps.
+  const leftWorkshopLight = new THREE.PointLight(0xffd7a6, 8, 10, 2);
+  leftWorkshopLight.position.set(-3.8, 4.45, -2.85);
+  workshopGroup.add(leftWorkshopLight);
+  const rightWorkshopLight = new THREE.PointLight(0x7dbfff, 7, 10, 2);
+  rightWorkshopLight.position.set(3.8, 4.25, -3.05);
+  workshopGroup.add(rightWorkshopLight);
+  const benchWorkshopLight = new THREE.PointLight(0xffbd75, 4, 6, 2);
+  benchWorkshopLight.position.set(-3.7, 2.15, -3.35);
+  workshopGroup.add(benchWorkshopLight);
+
+  garageGroup.add(workshopGroup);
+} catch (error) {
+  // Keep the original simple showroom visible if optional workshop details fail.
+  console.warn("Optional workshop decorations could not be created; using the basic showroom:", error);
+}
+
 garageGroup.visible = true;
 for (const item of arenaVisuals) item.visible = false;
 
