@@ -1,5 +1,20 @@
 import { RoundedBoxGeometry } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/geometries/RoundedBoxGeometry.js";
 
+// All cars share one parsed Concept4 asset. Each vehicle gets a cloned scene
+// graph while the underlying detailed geometries and materials stay shared.
+let sharedConcept4ShellPromise = null;
+function getSharedConcept4Shell(THREE) {
+  if (!sharedConcept4ShellPromise) {
+    sharedConcept4ShellPromise = import("./concept4-shell-loader.js")
+      .then(({ loadConcept4Shell }) => loadConcept4Shell(THREE))
+      .catch((error) => {
+        sharedConcept4ShellPromise = null;
+        throw error;
+      });
+  }
+  return sharedConcept4ShellPromise;
+}
+
 // Builds the detailed chassis, wheels, and the separately removable shell.
 export function createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellGeometry = null }) {
 function makeCarVisual(color, playerName = "") {
@@ -16,6 +31,17 @@ function makeCarVisual(color, playerName = "") {
   chassisGroup.scale.set(1, 1, chassisLengthScale);
   shellGroup.scale.set(1, 1, shellGeometry ? 1 : VISUAL_CHASSIS_LENGTH_SCALE);
   shellGroup.visible = true;
+
+  // Keep the existing body intact as the default option. The second body is
+  // loaded only when selected in the garage, so it does not add startup cost.
+  const currentShellVariant = new THREE.Group();
+  currentShellVariant.name = "current-shell-variant";
+  const concept4ShellVariant = new THREE.Group();
+  concept4ShellVariant.name = "concept4-shell-variant";
+  concept4ShellVariant.visible = false;
+  shellGroup.add(currentShellVariant, concept4ShellVariant);
+  let activeShellVariant = "current";
+  let concept4LoadPromise = null;
 
   const carbon = new THREE.MeshStandardMaterial({ color: 0x171e24, roughness: 0.78, metalness: 0.18 });
   const carbonEdge = new THREE.MeshStandardMaterial({ color: 0x303b43, roughness: 0.62, metalness: 0.24 });
@@ -668,7 +694,7 @@ function makeCarVisual(color, playerName = "") {
     const shellGeometryGroup = new THREE.Group();
     shellGeometryGroup.name = "shell-geometry";
     shellGeometryGroup.scale.z = 0.75;
-    shellGroup.add(shellGeometryGroup);
+    currentShellVariant.add(shellGeometryGroup);
 
     const orange = new THREE.MeshStandardMaterial({
       color: 0xff4b0b,
@@ -1050,10 +1076,10 @@ function makeCarVisual(color, playerName = "") {
 
   if (shellGeometry) {
     const importedShell = makePart(
-      shellGroup,
+      currentShellVariant,
       "scx30-single-cab-shell",
-      "SCX30 single-cab Ranger body shell",
-      "The repaired supplied Ranger shell. Its original proportions are preserved and the chassis wheelbase is fitted to its wheel openings."
+      "Existing SCX30 single-cab Ranger body shell",
+      "The existing body shell that was already in the game before the Concept4 option was added."
     );
     const importedShellMaterial = new THREE.MeshStandardMaterial({
       color: 0xff581a,
@@ -1062,7 +1088,7 @@ function makeCarVisual(color, playerName = "") {
       side: THREE.DoubleSide
     });
     const importedShellMesh = addMesh(importedShell, shellGeometry, importedShellMaterial);
-    importedShellMesh.name = "SCX30 Ranger test shell";
+    importedShellMesh.name = "Existing SCX30 Ranger shell";
     importedShellMesh.castShadow = false;
     importedShellMesh.receiveShadow = false;
   } else {
@@ -1072,20 +1098,60 @@ function makeCarVisual(color, playerName = "") {
   // All internal chassis components remain present and retain their original
   // dimensions. The shell mesh is lifted to provide the required clearance.
 
-  // All painted shell surfaces share one garage hover identity. The chassis
-  // retains its own individual component labels when the shell is removed.
-  shellGroup.userData.partInfo = {
-    id: "short-course-body-shell",
-    label: shellGeometry ? "SCX30 single-cab Ranger body shell" : "Short-course truck body shell",
-    description: shellGeometry
-      ? "Repaired imported SCX30 Ranger shell, kept at its original dimensions and fitted to the adjusted chassis."
-      : "Complete orange, black and graphite-gray short-course body shell, including the hood, cab, windows, rear bed, fenders and exterior trim."
-  };
+  // The complete shell is one hover target regardless of which design is active.
+  function updateShellPartInfo() {
+    const concept4 = activeShellVariant === "concept4";
+    shellGroup.userData.partInfo = {
+      id: "short-course-body-shell",
+      label: concept4
+        ? "FF SC Concept4 body shell"
+        : (shellGeometry ? "Existing SCX30 Ranger body shell" : "Original short-course truck body shell"),
+      description: concept4
+        ? "The newly imported FF SC Concept4 shell. Its proportions are kept uniform, and the existing chassis is aligned to its wheel openings."
+        : (shellGeometry
+          ? "The existing SCX30 Ranger shell that was already in the game."
+          : "The original orange, black and graphite-gray short-course shell with hood, cab, windows, rear bed, fenders and exterior trim.")
+    };
+  }
+  updateShellPartInfo();
   shellGroup.traverse((object) => {
-    if (object !== shellGroup && object.userData) {
-      delete object.userData.partInfo;
-    }
+    if (object !== shellGroup && object.userData) delete object.userData.partInfo;
   });
+
+  async function loadShellVariant(variant) {
+    if (variant === "current") return true;
+    if (variant !== "concept4") throw new Error("Unknown body shell option.");
+    if (concept4ShellVariant.children.length) return true;
+    if (!concept4LoadPromise) {
+      concept4LoadPromise = getSharedConcept4Shell(THREE)
+        .then((result) => {
+          concept4ShellVariant.add(result.group.clone(true));
+          concept4ShellVariant.userData.meshCount = result.meshCount;
+          concept4ShellVariant.visible = activeShellVariant === "concept4";
+          console.info("Concept4 shell loaded at full detail:", result.meshCount, "mesh objects");
+          return true;
+        })
+        .catch((error) => {
+          concept4LoadPromise = null;
+          throw error;
+        });
+    }
+    return concept4LoadPromise;
+  }
+
+  function setShellVariant(variant) {
+    if (variant !== "current" && variant !== "concept4") return false;
+    if (variant === "concept4" && !concept4ShellVariant.children.length) return false;
+    activeShellVariant = variant;
+    currentShellVariant.visible = variant === "current";
+    concept4ShellVariant.visible = variant === "concept4";
+    updateShellPartInfo();
+    return true;
+  }
+
+  function getShellVariant() {
+    return activeShellVariant;
+  }
 
   let playerNameSprite = null;
   function setPlayerName(name, visible = true) {
@@ -1162,6 +1228,9 @@ function makeCarVisual(color, playerName = "") {
     shellGroup,
     chassisGroup,
     setShellVisible(visible) { shellGroup.visible = !!visible; },
+    loadShellVariant,
+    setShellVariant,
+    getShellVariant,
     setPlayerName
   };
 }
