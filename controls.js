@@ -223,7 +223,7 @@ function updateDrivingControls(delta) {
     (forwardSpeed * forwardSpeed * Math.abs(Math.tan(steeringAngleState))) /
     activeWheelbase;
   const corneringLoad = THREE.MathUtils.clamp(
-    (expectedLateralAcceleration - 5.5) / 10.0,
+    (expectedLateralAcceleration - 4.9) / 9.5,
     0,
     1
   );
@@ -275,13 +275,13 @@ function updateDrivingControls(delta) {
       1
     ) * tireSlipSpeedGate;
 
-    const axleCorneringLoad = corneringLoad * (wheel.isFrontWheel ? 0.45 : 0.90);
-    const totalGripLoad = Math.max(tireSlipLoad * 0.45, axleCorneringLoad);
+    const axleCorneringLoad = corneringLoad * (wheel.isFrontWheel ? 0.48 : 0.94);
+    const totalGripLoad = Math.max(tireSlipLoad * 0.50, axleCorneringLoad);
     const baseGrip = wheel.isFrontWheel
       ? FRONT_TIRE_BASE_GRIP
       : REAR_TIRE_BASE_GRIP;
-    const gripReduction = wheel.isFrontWheel ? 0.10 : 0.28;
-    const minimumGrip = wheel.isFrontWheel ? 2.55 : 2.18;
+    const gripReduction = wheel.isFrontWheel ? 0.12 : 0.32;
+    const minimumGrip = wheel.isFrontWheel ? 2.38 : 2.02;
     wheel.frictionSlip = Math.max(
       minimumGrip,
       baseGrip - totalGripLoad * gripReduction
