@@ -148,11 +148,20 @@ function updateDrivingControls(delta) {
   throttleState += (throttle - throttleState) * throttleResponse;
 
   const speed = chassisBody.velocity.length();
-  // Reduce steering as speed rises, then ease the steering rack toward the
-  // target angle rather than snapping the front wheels to it in one frame.
-  const speedSteerScale = THREE.MathUtils.clamp(1 - speed / 24, 0.42, 1);
+  // Scale steering using forward travel speed, not total velocity. When the
+  // truck is sideways, its lateral speed must not remove steering authority;
+  // the front tires need to remain responsive for counter-steering.
+  chassisBody.quaternion.vmult(localForwardAxis, worldForwardAxis);
+  const headingLength = Math.hypot(worldForwardAxis.x, worldForwardAxis.z) || 1;
+  const forwardTravelSpeed = Math.abs(
+    (chassisBody.velocity.x * worldForwardAxis.x +
+      chassisBody.velocity.z * worldForwardAxis.z) / headingLength
+  );
+  const speedSteerScale = THREE.MathUtils.clamp(1 - forwardTravelSpeed / 26, 0.58, 1);
   const targetSteeringAngle = steerState * 0.34 * speedSteerScale;
-  const steeringResponse = 1 - Math.exp(-7.0 * delta);
+  // Respond slightly quicker so counter-steer is available as soon as the
+  // driver changes direction during an existing slide.
+  const steeringResponse = 1 - Math.exp(-8.5 * delta);
   steeringAngleState += (targetSteeringAngle - steeringAngleState) * steeringResponse;
   vehicle.setSteeringValue(steeringAngleState, 0);
   vehicle.setSteeringValue(steeringAngleState, 1);
@@ -207,19 +216,21 @@ function updateDrivingControls(delta) {
     0
   );
 
-  // Estimate the lateral force each tire is being asked to produce.
-  // Tight, fast cornering raises demand even before a large slide develops.
+  // Predict lateral load from speed and steering. The threshold is higher
+  // than before so ordinary turns retain grip; only harder cornering begins
+  // to use up the rear tire traction.
   const expectedLateralAcceleration =
     (forwardSpeed * forwardSpeed * Math.abs(Math.tan(steeringAngleState))) /
     activeWheelbase;
   const corneringLoad = THREE.MathUtils.clamp(
-    (expectedLateralAcceleration - 3.0) / 6.5,
+    (expectedLateralAcceleration - 5.5) / 10.0,
     0,
     1
   );
 
-  // Evaluate slip at each tire's contact patch, including the yaw velocity
-  // contributed by the chassis rotating around its centre of mass.
+  // Estimate each tire's own slip at its contact patch, including yaw motion.
+  // Front tires keep most of their grip so counter-steering can recover the
+  // truck; rear grip reduces a little more to allow a progressive rotation.
   for (let i = 0; i < 4; i++) {
     const wheel = vehicle.wheelInfos[i];
     const wheelSteeringAngle = wheel.isFrontWheel ? wheel.steering : 0;
@@ -251,29 +262,26 @@ function updateDrivingControls(delta) {
     const tireSpeed = Math.hypot(tireForwardSpeed, tireLateralSpeed);
     const tireSlipAngle = Math.atan2(
       Math.abs(tireLateralSpeed),
-      Math.abs(tireForwardSpeed) + 0.85
+      Math.abs(tireForwardSpeed) + 1.0
     );
     const tireSlipSpeedGate = THREE.MathUtils.clamp(
-      (tireSpeed - 1.25) / 3.75,
+      (tireSpeed - 2.0) / 5.0,
       0,
       1
     );
     const tireSlipLoad = THREE.MathUtils.clamp(
-      (tireSlipAngle - 0.075) / 0.42,
+      (tireSlipAngle - 0.10) / 0.50,
       0,
       1
     ) * tireSlipSpeedGate;
 
-    // The rear axle reaches its dirt-grip limit a little earlier, allowing
-    // the truck to rotate into a slide. Front grip remains stronger so the
-    // driver can catch that slide with counter-steer.
-    const axleCorneringLoad = corneringLoad * (wheel.isFrontWheel ? 0.72 : 1.0);
-    const totalGripLoad = Math.max(tireSlipLoad, axleCorneringLoad);
+    const axleCorneringLoad = corneringLoad * (wheel.isFrontWheel ? 0.45 : 0.90);
+    const totalGripLoad = Math.max(tireSlipLoad * 0.45, axleCorneringLoad);
     const baseGrip = wheel.isFrontWheel
       ? FRONT_TIRE_BASE_GRIP
       : REAR_TIRE_BASE_GRIP;
-    const gripReduction = wheel.isFrontWheel ? 0.28 : 0.36;
-    const minimumGrip = wheel.isFrontWheel ? 0.77 : 0.57;
+    const gripReduction = wheel.isFrontWheel ? 0.10 : 0.28;
+    const minimumGrip = wheel.isFrontWheel ? 2.55 : 2.18;
     wheel.frictionSlip = Math.max(
       minimumGrip,
       baseGrip - totalGripLoad * gripReduction
