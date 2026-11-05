@@ -206,7 +206,7 @@ function loadAlternateShellModel() {
     alternateShellLoadPromise = new GLTFLoader()
       .loadAsync("./assets/FF_SC_Concept4.gltf")
       .then((gltf) => {
-        makeCarVisual.setAlternateShellObject(gltf.scene);
+        localCar.setAlternateShellObject(gltf.scene);
         console.info("Concept4 alternate shell loaded.");
         return true;
       })
