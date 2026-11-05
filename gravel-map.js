@@ -282,8 +282,8 @@ export function createGravelBasinSystem({ THREE, scene }) {
   );
   for (const x of [47.5, 84.5]) {
     for (const z of [-94.0, -67.0]) {
-      addConcreteBox("concrete-deck-support-pier", 1.15, 4.15, 1.15,
-        x, 2.075, z, concreteEdgeMaterial);
+      addConcreteBox("concrete-deck-support-pier", 1.15, 4.54, 1.15,
+        x, 2.27, z, concreteEdgeMaterial);
     }
   }
   addConcreteBox("deck-back-retaining-edge", 44, 0.42, 0.55,
