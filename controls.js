@@ -297,8 +297,10 @@ function updateDrivingControls(delta) {
 
   // Do not apply flight controls while the truck is merely settling at spawn.
   const airborne = groundedWheels <= 1 && chassisBody.position.y > 0.42;
+  const thrusterState = game.sandbox?.getThrusterState?.();
+  const sandboxThrustersActive = Boolean(thrusterState?.lift || thrusterState?.forward);
 
-  if (airborne) {
+  if (airborne && !sandboxThrustersActive) {
     // RC-style attitude control while airborne:
     // W raises the nose, S lowers it, A/D yaw the truck, and a small roll
     // component banks it into turns.
@@ -319,7 +321,7 @@ function updateDrivingControls(delta) {
       chassisBody.vectorToWorldFrame(localAirTorque, worldAirTorque);
       chassisBody.applyTorque(worldAirTorque);
     }
-  } else if (groundedWheels >= 2) {
+  } else if (groundedWheels >= 2 && !sandboxThrustersActive) {
     // Measure longitudinal acceleration and turning acceleration in the
     // chassis frame. These values drive a damped roll/pitch response, letting
     // the individual raycast springs compress naturally under load transfer.
