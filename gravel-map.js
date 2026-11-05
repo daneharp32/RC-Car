@@ -415,7 +415,7 @@ export function createGravelBasinSystem({ THREE, scene }) {
   // Three irregular rows of tall pines surround the basin naturally, with gaps around parked cars.
   const treeSpots = [];
   const treeSpacing = 9.0;
-  const treeEdges = [96, 103, 110];
+  const treeEdges = [91, 97, 103];
   for (let row = 0; row < treeEdges.length; row++) {
     const edge = treeEdges[row];
     const offset = row * 3.0;
