@@ -174,7 +174,6 @@ export function createSandboxSystem(game) {
     }
     const countLabel = $("sandboxPlayerCount");
     if (countLabel) countLabel.textContent = playerCount + " / 8 DRIVERS CONNECTED";
-    renderControlHints();
   }
 
   function renderControlHints() {
@@ -212,6 +211,7 @@ export function createSandboxSystem(game) {
     if (localAttachmentGroup) localAttachmentGroup.visible = true;
     for (const pad of pads) pad.group.visible = false;
     renderBuilder();
+    renderControlHints();
   }
 
   function beginSession() {
@@ -542,6 +542,7 @@ export function createSandboxSystem(game) {
       applyLoadout(localCar, getLoadout());
       if (localAttachmentGroup) localAttachmentGroup.visible = active;
       renderBuilder();
+      renderControlHints();
     });
   });
   $("sandboxEnterMapButton").addEventListener("click", enterMap);
