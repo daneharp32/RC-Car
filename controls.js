@@ -49,7 +49,7 @@ window.addEventListener("keydown", (event) => {
     event.preventDefault();
     keys[key] = true;
   }
-  if (key === "r" && !event.repeat && game.multiplayer?.joined) {
+  if (key === "r" && !event.repeat && (game.multiplayer?.joined || game.sandbox?.active)) {
     resetCar();
     game.race?.onCarReset();
   }
@@ -118,13 +118,15 @@ let previousGroundedForwardSpeed = null;
 let smoothedLongitudinalAcceleration = 0;
 
 function updateDrivingControls(delta) {
-  const raceAllowsDriving = !game.race || game.race.phase === "racing" || game.race.phase === "free-drive";
-  if (!game.multiplayer?.joined || !raceAllowsDriving) {
+  const drivingSessionActive = Boolean(game.multiplayer?.joined || game.sandbox?.active);
+  const raceAllowsDriving = game.sandbox?.active ||
+    !game.race || game.race.phase === "racing" || game.race.phase === "free-drive";
+  if (!drivingSessionActive || !raceAllowsDriving) {
     // Race cars stay parked on the grid until GO. Free Drive has no staging
     // phase, so normal throttle, steering, braking and air control stay active.
     for (let i = 0; i < 4; i++) {
       vehicle.applyEngineForce(0, i);
-      vehicle.setBrake(game.multiplayer?.joined ? 12 : 0, i);
+      vehicle.setBrake(drivingSessionActive ? 12 : 0, i);
     }
     throttleState = 0;
     steerState = 0;
