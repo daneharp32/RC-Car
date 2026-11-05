@@ -6,6 +6,7 @@ import { createControlsSystem } from "./controls.js";
 import { createMultiplayerSystem } from "./multiplayer.js";
 import { createGarageSystem } from "./garage.js";
 import { createTrackSystem } from "./track.js";
+import { createGravelBasinSystem } from "./gravel-map.js";
 import { createRaceSystem } from "./race.js";
 
 import { cleanRangerShellGeometry } from "./shell-cleanup.js";
@@ -47,7 +48,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x83c5ef);
 scene.fog = new THREE.Fog(0x83c5ef, 135, 265);
 
-const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 180);
+const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 320);
 camera.position.set(0, 3.1, 5.8);
 
 const hemi = new THREE.HemisphereLight(0xe7f1f4, 0x6b5943, 1.45);
@@ -57,10 +58,10 @@ const sun = new THREE.DirectionalLight(0xffe2bd, 2.15);
 sun.position.set(-8, 15, 8);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
-sun.shadow.camera.left = -76;
-sun.shadow.camera.right = 76;
-sun.shadow.camera.top = 76;
-sun.shadow.camera.bottom = -76;
+sun.shadow.camera.left = -116;
+sun.shadow.camera.right = 116;
+sun.shadow.camera.top = 116;
+sun.shadow.camera.bottom = -116;
 sun.shadow.bias = -0.00015;
 scene.add(sun);
 
@@ -70,7 +71,15 @@ scene.add(fill);
 
 // The track module owns the complete closed-course scenery and its shared layout.
 const trackSystem = createTrackSystem({ THREE, scene });
-const { arenaVisuals, trackLayout } = trackSystem;
+const gravelBasinSystem = createGravelBasinSystem({ THREE, scene });
+const arenaVisuals = [...trackSystem.arenaVisuals, ...gravelBasinSystem.arenaVisuals];
+let trackLayout = trackSystem.trackLayout;
+trackLayout.id = "closed-course";
+trackLayout.name = "Club Dirt Circuit";
+const mapLayouts = {
+  "closed-course": trackLayout,
+  "gravel-basin": gravelBasinSystem.trackLayout
+};
 
 // Decode the optional Ranger body before creating physics. If the model cannot
 // be decoded, the game automatically uses the original procedural truck instead.
@@ -180,7 +189,13 @@ try {
 // Physics: Cannon's RaycastVehicle applies suspension and tire impulses only
 // when each wheel ray has actually found a surface to touch.
 
-const physicsSystem = createPhysicsSystem({ CANNON, trackLayout, shellFit: !!shellGeometry, shellGeometry });
+const physicsSystem = createPhysicsSystem({
+  CANNON,
+  trackLayout,
+  additionalLayouts: { "gravel-basin": gravelBasinSystem.trackLayout },
+  shellFit: !!shellGeometry,
+  shellGeometry
+});
 const {
   world,
   chassisBody,
@@ -259,7 +274,10 @@ const game = {
   vehicle,
   wheelPositions,
   VISUAL_CHASSIS_LENGTH_SCALE,
+  physicsSystem,
   trackLayout,
+  activeMapId: "closed-course",
+  mapLayouts,
   spawnX,
   spawnZ,
   spawnYaw,
@@ -268,6 +286,28 @@ const game = {
   makeCarVisual,
   updateLocalVisual,
   showToast
+};
+
+game.setActiveMap = (mapId, options = {}) => {
+  if (!Object.prototype.hasOwnProperty.call(mapLayouts, mapId)) return false;
+  if (game.activeMapId === mapId) return true;
+  if (!physicsSystem.setActiveMap(mapId)) return false;
+
+  game.activeMapId = mapId;
+  trackLayout = mapLayouts[mapId];
+  game.trackLayout = trackLayout;
+  if (game.race?.setTrackLayout) game.race.setTrackLayout(trackLayout);
+  // Keep the showroom vehicle parked in the garage while the player is still
+  // choosing a map. Multiplayer entry performs the actual arena spawn reset.
+  if (game.garage?.viewMode === "drive" && game.controls?.resetCar) {
+    game.controls.resetCar();
+    game.race?.onCarReset?.();
+  }
+  updateLocalVisual();
+  if (!options.silent) {
+    showToast("DRIVING AREA: " + (trackLayout.name || mapId.toUpperCase()));
+  }
+  return true;
 };
 
 const controls = createControlsSystem(game);
@@ -337,7 +377,28 @@ game.garage = garage;
 // Drive opens the live lobby browser. Users can join an existing lobby
 // or open the separate Create Lobby panel.
 $("menuDriveButton").addEventListener("click", () => garage.showModeSelect());
-$("openCreateLobbyButton").addEventListener("click", () => garage.showCreateLobby());
+const arenaSelect = $("arenaSelect");
+const arenaDescription = $("arenaDescription");
+const arenaDescriptions = {
+  "closed-course": "A closed dirt circuit with marked corners, jumps and red/white curbs.",
+  "gravel-basin": "A huge open gravel area with rolling terrain, natural jumps, parked full-size vehicles and a tree-lined edge."
+};
+if (arenaSelect) {
+  arenaSelect.value = game.activeMapId;
+  if (arenaDescription) arenaDescription.textContent = arenaDescriptions[game.activeMapId];
+  arenaSelect.addEventListener("change", () => {
+    if (game.setActiveMap(arenaSelect.value)) {
+      game.multiplayer?.updateAvailableModes?.();
+      if (arenaDescription) arenaDescription.textContent = arenaDescriptions[game.activeMapId];
+    } else {
+      arenaSelect.value = game.activeMapId;
+    }
+  });
+}
+$("openCreateLobbyButton").addEventListener("click", () => {
+  multiplayer.updateAvailableModes();
+  garage.showCreateLobby();
+});
 $("modeBackButton").addEventListener("click", () => garage.showMainMenu());
 $("menuGarageButton").addEventListener("click", () => garage.showGarage());
 $("garageBackButton").addEventListener("click", () => garage.showMainMenu());

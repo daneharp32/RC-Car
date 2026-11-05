@@ -89,6 +89,7 @@ export function createMultiplayerSystem(game) {
 
   function currentLobbyAcceptsPlayers() {
     if (!hostingLobby || !currentLobby) return false;
+    if (currentLobby.mapId === "gravel-basin" && currentLobby.mode !== "free-drive") return false;
     return currentLobby.mode === "free-drive"
       ? game.race?.phase === "free-drive"
       : game.race?.phase === "waiting";
@@ -96,6 +97,7 @@ export function createMultiplayerSystem(game) {
 
   function lobbyCanBeJoined(lobby) {
     if (!lobby) return false;
+    if (lobby.mapId === "gravel-basin" && lobby.mode !== "free-drive") return false;
     return lobby.mode === "free-drive"
       ? lobby.phase === "free-drive"
       : !lobby.phase || lobby.phase === "waiting";
@@ -108,6 +110,66 @@ export function createMultiplayerSystem(game) {
         ? "TIME TRIAL"
         : "RACE";
     return "CREATE " + label + " LOBBY";
+  }
+
+  let lastNonGravelLobbyMode = "race";
+  function renderSelectedLobbyMode() {
+    const isGravelBasin = game.activeMapId === "gravel-basin";
+    const modeButtons = [...document.querySelectorAll(".lobby-mode-choice[data-lobby-mode]")];
+
+    for (const button of modeButtons) {
+      const mode = button.dataset.lobbyMode;
+      const restricted = isGravelBasin && (mode === "race" || mode === "time-trial");
+      button.disabled = restricted || mode === "sandbox";
+      button.classList.toggle("unavailable", restricted || mode === "sandbox");
+      button.setAttribute("aria-disabled", button.disabled ? "true" : "false");
+      const small = button.querySelector("small");
+      if (small) {
+        if (restricted) small.textContent = "ONLY ON CLUB DIRT CIRCUIT";
+        else if (mode === "race") small.textContent = "LAPS & CHECKPOINTS";
+        else if (mode === "time-trial") small.textContent = "FASTEST LAP WINS · CHECKPOINTS";
+        else if (mode === "free-drive") small.textContent = "OPEN DRIVING SESSION";
+        else if (mode === "sandbox") small.textContent = "COMING SOON";
+      }
+      button.title = restricted ? "Race and Time Trial are only available on Club Dirt Circuit." : "";
+    }
+
+    const selectedButton = modeButtons.find((button) =>
+      button.dataset.lobbyMode === selectedLobbyMode && !button.disabled
+    );
+    if (!selectedButton) selectedLobbyMode = isGravelBasin ? "free-drive" : "race";
+    for (const button of modeButtons) {
+      button.classList.toggle("selected", button.dataset.lobbyMode === selectedLobbyMode);
+    }
+
+    const lapField = $("raceLapField");
+    if (lapField) lapField.style.display = selectedLobbyMode === "free-drive" ? "none" : "block";
+    const lapLabel = lapField?.querySelector("span");
+    if (lapLabel) lapLabel.textContent = selectedLobbyMode === "time-trial" ? "Number of timed laps" : "Number of laps";
+    joinButton.textContent = createLobbyButtonLabel();
+    const hint = $("lobbyModeHint");
+    if (hint) hint.style.display = selectedLobbyMode === "time-trial" ? "block" : "none";
+    const mapNotice = $("lobbyMapModeNotice");
+    if (mapNotice) mapNotice.style.display = isGravelBasin ? "block" : "none";
+    const description = joinPanel.querySelector(".menu-description");
+    if (description) description.textContent = isGravelBasin
+      ? "Gravel Basin is an open practice area. Create a Free Drive session to explore it with other drivers."
+      : selectedLobbyMode === "time-trial"
+        ? "Complete the selected laps and compete for the fastest valid lap time."
+        : selectedLobbyMode === "free-drive"
+          ? "Create an open session with no race timer or checkpoints."
+          : "Choose a lap count and race through every checkpoint.";
+  }
+
+  function updateAvailableModes() {
+    const isGravelBasin = game.activeMapId === "gravel-basin";
+    if (isGravelBasin) {
+      if (selectedLobbyMode !== "free-drive") lastNonGravelLobbyMode = selectedLobbyMode;
+      selectedLobbyMode = "free-drive";
+    } else if (selectedLobbyMode === "free-drive") {
+      selectedLobbyMode = lastNonGravelLobbyMode || "race";
+    }
+    renderSelectedLobbyMode();
   }
 
   function updatePlayerCount() {
@@ -198,10 +260,11 @@ export function createMultiplayerSystem(game) {
       name.textContent = lobby.name;
       const mode = document.createElement("div");
       mode.className = "lobby-row-mode";
-      mode.textContent = lobby.mode === "free-drive"
+      const mapLabel = lobby.mapId === "gravel-basin" ? "GRAVEL BASIN" : "CLUB DIRT CIRCUIT";
+      mode.textContent = (lobby.mode === "free-drive"
         ? "FREE DRIVE · OPEN SESSION"
         : (lobby.mode === "time-trial" ? "TIME TRIAL · " : "RACE · ") +
-          lobby.laps + (lobby.laps === 1 ? " LAP" : " LAPS");
+          lobby.laps + (lobby.laps === 1 ? " LAP" : " LAPS")) + " · " + mapLabel;
       main.append(name, mode);
 
       const count = document.createElement("div");
@@ -215,9 +278,11 @@ export function createMultiplayerSystem(game) {
       const lobbyLocked = !lobbyCanBeJoined(lobby);
       join.textContent = lobby.playerCount >= MAX_PLAYERS
         ? "FULL"
-        : lobbyLocked
-          ? (lobby.mode === "free-drive" ? "CLOSED" : "IN SESSION")
-          : "JOIN";
+        : lobby.mapId === "gravel-basin" && lobby.mode !== "free-drive"
+          ? "MODE UNAVAILABLE"
+          : lobbyLocked
+            ? (lobby.mode === "free-drive" ? "CLOSED" : "IN SESSION")
+            : "JOIN";
       join.disabled = lobby.playerCount >= MAX_PLAYERS || lobbyLocked;
 
       row.append(main, count, join);
@@ -245,6 +310,7 @@ export function createMultiplayerSystem(game) {
       id: currentLobby.id,
       name: currentLobby.name,
       mode: currentLobby.mode,
+      mapId: currentLobby.mapId || "closed-course",
       laps: currentLobby.laps,
       phase: game.race?.phase || "waiting",
       playerCount: currentPlayerCount(),
@@ -325,6 +391,7 @@ export function createMultiplayerSystem(game) {
           id: message.id,
           name: name || "Untitled Lobby",
           mode,
+          mapId: message.mapId === "gravel-basin" ? "gravel-basin" : "closed-course",
           laps: Number.isFinite(message.laps) ? Math.max(1, Math.min(20, Math.floor(message.laps))) : 3,
           phase: ["waiting", "countdown", "racing", "finished", "free-drive"].includes(message.phase) ? message.phase : "waiting",
           playerCount,
@@ -387,6 +454,13 @@ export function createMultiplayerSystem(game) {
     if (joined || room) return;
     startDirectory();
 
+    const selectedMapId = lobby.mapId === "gravel-basin" ? "gravel-basin" : "closed-course";
+    if (selectedMapId === "gravel-basin" && lobby.mode !== "free-drive") {
+      showToast("Race and Time Trial are only available on Club Dirt Circuit.");
+      refreshLobbyList();
+      return;
+    }
+    game.setActiveMap?.(selectedMapId, { silent: true });
     const typedName = $("driverName").value;
     setDriverName(typedName);
     currentLobby = {
@@ -395,6 +469,7 @@ export function createMultiplayerSystem(game) {
       mode: lobby.mode === "free-drive"
         ? "free-drive"
         : lobby.mode === "time-trial" ? "time-trial" : "race",
+      mapId: selectedMapId,
       laps: Number.isFinite(lobby.laps) ? Math.max(1, Math.min(20, Math.floor(lobby.laps))) : 3,
       hostPeerId: isHost ? selfId : lobby.peerId
     };
@@ -557,8 +632,14 @@ export function createMultiplayerSystem(game) {
   }
 
   function createLobby() {
+    updateAvailableModes();
     const selectedButton = document.querySelector(".lobby-mode-choice.selected");
     const mode = selectedButton?.dataset.lobbyMode || selectedLobbyMode;
+    if (game.activeMapId === "gravel-basin" && mode !== "free-drive") {
+      joinError.textContent = "Race and Time Trial are only available on Club Dirt Circuit. Select Free Drive for Gravel Basin.";
+      joinError.style.display = "block";
+      return;
+    }
     const name = cleanLobbyName($("lobbyName").value) ||
       (mode === "free-drive"
         ? "Free Drive Lobby"
@@ -576,12 +657,14 @@ export function createMultiplayerSystem(game) {
       mode,
       laps,
       phase: "waiting",
-      playerCount: 1
+      playerCount: 1,
+      mapId: game.activeMapId || "closed-course"
     }, true);
   }
 
   function startRace() {
-    if (!hostingLobby || !joined || !["race", "time-trial"].includes(currentLobby?.mode) ||
+    if (!hostingLobby || !joined || currentLobby?.mapId === "gravel-basin" ||
+        !["race", "time-trial"].includes(currentLobby?.mode) ||
         game.race?.phase !== "waiting" || !raceControlAction) return false;
     const message = {
       type: "start-race",
@@ -736,29 +819,19 @@ export function createMultiplayerSystem(game) {
     button.addEventListener("click", () => {
       if (button.disabled) return;
       selectedLobbyMode = button.dataset.lobbyMode || "race";
-      document.querySelectorAll(".lobby-mode-choice").forEach((item) => {
-        item.classList.toggle("selected", item === button);
-      });
-      const lapField = $("raceLapField");
-      if (lapField) lapField.style.display = selectedLobbyMode === "free-drive" ? "none" : "block";
-      const lapLabel = lapField?.querySelector("span");
-      if (lapLabel) lapLabel.textContent = selectedLobbyMode === "time-trial" ? "Number of timed laps" : "Number of laps";
-      joinButton.textContent = createLobbyButtonLabel();
-      const hint = $("lobbyModeHint");
-      if (hint) hint.style.display = selectedLobbyMode === "time-trial" ? "block" : "none";
-      const description = joinPanel.querySelector(".menu-description");
-      if (description) description.textContent = selectedLobbyMode === "time-trial"
-        ? "Complete the selected laps and compete for the fastest valid lap time."
-        : selectedLobbyMode === "free-drive"
-          ? "Create an open session with no race timer or checkpoints."
-          : "Choose a lap count and race through every checkpoint.";
+      if (game.activeMapId !== "gravel-basin") {
+        lastNonGravelLobbyMode = selectedLobbyMode;
+      }
+      renderSelectedLobbyMode();
     });
   }
+  updateAvailableModes();
 
   return {
     createLobby,
     joinLobby,
     openLobbyBrowser,
+    updateAvailableModes,
     refreshLobbyList,
     updateRemoteVisuals,
     updatePlayerCount,

@@ -2,10 +2,10 @@
 export function createRaceSystem(game) {
   const $ = game.$;
   const showToast = game.showToast;
-  const gates = game.trackLayout.raceGates || [];
-  const trackHalfWidth = Math.max(1, (game.trackLayout.trackHalfWidth || 5.75) - 0.65);
+  let gates = game.trackLayout.raceGates || [];
+  let trackHalfWidth = Math.max(1, (game.trackLayout.trackHalfWidth || 5.75) - 0.65);
   const remoteStates = new Map();
-  const samples = game.trackLayout.centerlineSamples || [];
+  let samples = game.trackLayout.centerlineSamples || [];
 
   let phase = "idle";
   let sessionMode = "race";
@@ -30,6 +30,16 @@ export function createRaceSystem(game) {
   let spectatorRenderKey = "";
   let resultsAnnounced = false;
   let resultsRenderKey = "";
+
+  function setTrackLayout(layout) {
+    gates = layout?.raceGates || [];
+    trackHalfWidth = Math.max(1, (layout?.trackHalfWidth || 5.75) - 0.65);
+    samples = layout?.centerlineSamples || [];
+    checkpointCount = Math.max(0, gates.length - 1);
+    nextGateIndex = 0;
+    previousPosition = getPosition();
+    progress = nearestTrackProgress(previousPosition);
+  }
 
   function clampLapCount(value) {
     const number = Number(value);
@@ -608,6 +618,7 @@ export function createRaceSystem(game) {
 
   return {
     update,
+    setTrackLayout,
     enterLobby,
     beginCountdown,
     enterResults,

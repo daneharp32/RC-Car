@@ -352,7 +352,10 @@ function updateGaragePartHover(event) {
 renderer.domElement.addEventListener("pointermove", updateGaragePartHover);
 renderer.domElement.addEventListener("pointerleave", clearGaragePartHover);
 function setArenaVisible(visible) {
-  for (const item of arenaVisuals) item.visible = visible;
+  for (const item of arenaVisuals) {
+    const itemMapId = item.userData?.mapId || "closed-course";
+    item.visible = !!visible && itemMapId === (game.activeMapId || "closed-course");
+  }
   garageGroup.visible = !visible;
 }
 function parkCarForShowroom() {

@@ -11,7 +11,7 @@ export const REAR_TIRE_BASE_GRIP = 2.40;
 
 // Builds the Cannon-es world, terrain colliders, chassis, and four-wheel
 // raycast vehicle. The returned objects are shared by the driving systems.
-export function createPhysicsSystem({ CANNON, trackLayout, shellFit = false, shellGeometry = null }) {
+export function createPhysicsSystem({ CANNON, trackLayout, additionalLayouts = {}, shellFit = false, shellGeometry = null }) {
 const world = new CANNON.World({
   gravity: new CANNON.Vec3(0, -9.82, 0)
 });
@@ -25,6 +25,9 @@ const groundBody = new CANNON.Body({ mass: 0, material: new CANNON.Material("dir
 groundBody.addShape(new CANNON.Plane());
 groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
 world.addBody(groundBody);
+const closedCourseBodies = [groundBody];
+const alternateMapLayouts = new Map(Object.entries(additionalLayouts || {}));
+const alternateMapBodies = new Map();
 
 // Cannon heightfields use a local XY grid with height along local Z.
 // Rotate that grid upright, then align it to the same track frame as the mesh.
@@ -57,6 +60,7 @@ for (const jump of trackLayout.jumps) {
   rampYaw.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), jump.yaw);
   rampYaw.mult(heightfieldTilt, rampBody.quaternion);
   world.addBody(rampBody);
+  closedCourseBodies.push(rampBody);
 }
 
 const chassisMaterial = new CANNON.Material("chassis");
@@ -71,17 +75,48 @@ for (let i = 0; i < selfId.length; i++) spawnHash = (spawnHash * 31 + selfId.cha
 const spawnSlot = Math.abs(spawnHash) % 8;
 const acrossOffset = ((spawnSlot % 4) - 1.5) * 1.15;
 const backOffset = -Math.floor(spawnSlot / 4) * 1.8;
-const spawn = trackLayout.spawn;
-const spawnX = spawn.x + spawn.normalX * acrossOffset + spawn.tangentX * backOffset;
-const spawnZ = spawn.z + spawn.normalZ * acrossOffset + spawn.tangentZ * backOffset;
-const spawnYaw = spawn.yaw;
+function makeSpawnState(layout) {
+  const spawn = layout.spawn;
+  return {
+    x: spawn.x + spawn.normalX * acrossOffset + spawn.tangentX * backOffset,
+    y: (Number.isFinite(spawn.y) ? spawn.y : 0) + 0.24,
+    z: spawn.z + spawn.normalZ * acrossOffset + spawn.tangentZ * backOffset,
+    yaw: spawn.yaw
+  };
+}
+let activeLayout = trackLayout;
+let spawnState = makeSpawnState(trackLayout);
+function setActiveMap(mapId) {
+  const layout = mapId === (trackLayout.id || "closed-course")
+    ? trackLayout
+    : alternateMapLayouts.get(mapId);
+  if (!layout) return false;
+
+  const useClosedCourse = layout === trackLayout;
+  for (const body of closedCourseBodies) body.collisionFilterMask = useClosedCourse ? -1 : 0;
+  for (const [id, bodies] of alternateMapBodies) {
+    const enabled = id === mapId;
+    for (const body of bodies) body.collisionFilterMask = enabled ? -1 : 0;
+  }
+
+  activeLayout = layout;
+  spawnState = makeSpawnState(layout);
+  world.broadphase.dirty = true;
+  return true;
+}
+function getSpawn() {
+  return { ...spawnState };
+}
+const spawnX = spawnState.x;
+const spawnZ = spawnState.z;
+const spawnYaw = spawnState.yaw;
 
 const chassisBody = new CANNON.Body({
   // Higher mass and a slightly broader collision tub give the truck a more
   // substantial feel without changing the visual shell or wheelbase.
   mass: 10.5,
   material: chassisMaterial,
-  position: new CANNON.Vec3(spawnX, 0.24, spawnZ),
+  position: new CANNON.Vec3(spawnState.x, spawnState.y, spawnState.z),
   linearDamping: 0.12,
   // Moderate yaw damping prevents a slide from turning into an uncontrolled spin.
   // Tire contact forces still provide most of the grip and recovery.
@@ -241,6 +276,65 @@ for (const barrier of trackLayout.barriers) {
     barrier.yaw
   );
   world.addBody(barrierBody);
+  closedCourseBodies.push(barrierBody);
+}
+
+// Build optional map collision bodies once, then switch collision masks when
+// the player changes arenas. The gravel map uses one continuous heightfield
+// for its bumps and jump faces plus simple boxes for parked full-size cars.
+for (const [mapId, layout] of alternateMapLayouts) {
+  const bodies = [];
+  if (layout.heightfield?.heights?.length) {
+    const terrainBody = new CANNON.Body({ mass: 0, material: groundBody.material });
+    terrainBody.addShape(new CANNON.Heightfield(layout.heightfield.heights, {
+      elementSize: layout.heightfield.elementSize
+    }));
+    terrainBody.position.set(
+      layout.heightfield.originX || 0,
+      layout.heightfield.originY || 0,
+      layout.heightfield.originZ || 0
+    );
+    terrainBody.quaternion.copy(heightfieldTilt);
+    world.addBody(terrainBody);
+    bodies.push(terrainBody);
+  }
+
+  for (const obstacle of layout.obstacles || []) {
+    const obstacleBody = new CANNON.Body({ mass: 0, material: groundBody.material });
+    obstacleBody.addShape(new CANNON.Box(new CANNON.Vec3(
+      obstacle.halfWidth,
+      obstacle.halfHeight,
+      obstacle.halfLength
+    )));
+    obstacleBody.position.set(obstacle.x, obstacle.y, obstacle.z);
+    obstacleBody.quaternion.setFromAxisAngle(
+      new CANNON.Vec3(0, 1, 0), obstacle.yaw || 0
+    );
+    world.addBody(obstacleBody);
+    bodies.push(obstacleBody);
+  }
+
+  // Static concrete deck, inclined ramp, support piers, curbs, and stair
+  // tiers are represented as individual boxes for stable wheel contact.
+  for (const box of layout.staticBoxes || []) {
+    const boxBody = new CANNON.Body({ mass: 0, material: groundBody.material });
+    boxBody.addShape(new CANNON.Box(new CANNON.Vec3(
+      box.halfWidth,
+      box.halfHeight,
+      box.halfLength
+    )));
+    boxBody.position.set(box.x, box.y, box.z);
+    const pitch = new CANNON.Quaternion();
+    pitch.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), box.rotationX || 0);
+    const yaw = new CANNON.Quaternion();
+    yaw.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), box.yaw || 0);
+    yaw.mult(pitch, boxBody.quaternion);
+    world.addBody(boxBody);
+    bodies.push(boxBody);
+  }
+
+  for (const body of bodies) body.collisionFilterMask = 0;
+  alternateMapBodies.set(mapId, bodies);
 }
 
   return {
@@ -253,6 +347,8 @@ for (const barrier of trackLayout.barriers) {
     VISUAL_CHASSIS_LENGTH_SCALE,
     spawnX,
     spawnZ,
-    spawnYaw
+    spawnYaw,
+    getSpawn,
+    setActiveMap
   };
 }
