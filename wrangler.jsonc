@@ -1,8 +1,25 @@
 {
   "name": "rc-car",
+  "main": "./worker.js",
   "compatibility_date": "2026-11-02",
   "assets": {
-    "directory": "./"
+    "directory": "./",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
   },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "LOBBY_DIRECTORY",
+        "class_name": "LobbyDirectory"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["LobbyDirectory"]
+    }
+  ],
   "previews": {}
 }
