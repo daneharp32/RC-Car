@@ -1,6 +1,6 @@
 # RC Car Multiplayer
 
-A browser-based 3D RC car driving game with peer-to-peer multiplayer.
+A browser-based 3D RC car driving game with cross-device multiplayer rooms.
 
 ## Project layout
 
@@ -22,13 +22,9 @@ The game uses native JavaScript ES modules. `index.html` still loads only `main.
 
 ## Run and deploy
 
-This is a static web app. For Cloudflare Pages:
-- Framework preset: **None**
-- Build command: leave blank
-- Build output directory: **.**
-- Entry file: `index.html`
+The game is served by a Cloudflare Worker with static assets and two Durable Objects: one shared lobby directory and one WebSocket relay per active room. The existing `wrangler.jsonc` defines the Worker entry point, static asset binding, Durable Object bindings, and migrations.
 
-The project imports Three.js, Cannon-es, and Trystero from CDNs, so an internet connection is required. Serve it over HTTPS when deployed; localhost is suitable for local testing.
+The project imports Three.js, Cannon-es, and Trystero from CDNs, so an internet connection is required. Deploy through the connected Cloudflare Worker integration or Wrangler, and serve the game over HTTPS. The multiplayer lobby directory and room relay require the Cloudflare Worker environment; a basic static file server can render the game but cannot provide cross-device multiplayer.
 
 ## Controls
 
