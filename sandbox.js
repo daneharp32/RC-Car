@@ -208,7 +208,6 @@ export function createSandboxSystem(game) {
         flame.scale.setScalar(state.forward ? 0.90 + Math.sin(now * 0.045) * 0.12 : 1);
       }
     }
-    renderControlHints();
   }
 
   function renderBuilder() {
@@ -260,6 +259,7 @@ export function createSandboxSystem(game) {
     held.lift = false;
     held.forward = false;
     updateThrusterVisuals(performance.now());
+    renderControlHints();
   }
 
   function showBuilder() {
