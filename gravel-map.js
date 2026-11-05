@@ -262,27 +262,72 @@ export function createGravelBasinSystem({ THREE, scene }) {
     return a * (1 - tz) + b * tz;
   }
 
+  // Keep the collision heightfield at its established 108 x 108 resolution,
+  // but render the visible surface at 1.5x resolution so jump faces and mounds
+  // have smoother silhouettes without increasing physics sampling cost.
+  const visualSegments = Math.round(segments * 1.5);
+  const visualElementSize = size / visualSegments;
   const positions = [];
   const uvs = [];
+  const colors = [];
   const indices = [];
-  for (let xIndex = 0; xIndex <= segments; xIndex++) {
-    const x = -half + xIndex * elementSize;
-    for (let zIndex = 0; zIndex <= segments; zIndex++) {
-      const z = half - zIndex * elementSize;
-      positions.push(x, heights[xIndex][zIndex], z);
-      uvs.push(xIndex / segments * 34, zIndex / segments * 34);
-      if (xIndex < segments && zIndex < segments) {
-        const a = xIndex * (segments + 1) + zIndex;
-        const b = a + segments + 1;
+  const sunDirection = new THREE.Vector3(-8, 15, 8).normalize();
+  const slopeSampleDistance = 1.35;
+
+  for (let xIndex = 0; xIndex <= visualSegments; xIndex++) {
+    const x = -half + xIndex * visualElementSize;
+    for (let zIndex = 0; zIndex <= visualSegments; zIndex++) {
+      const z = half - zIndex * visualElementSize;
+      const height = terrainHeight(x, z);
+      positions.push(x, height, z);
+      uvs.push(xIndex / visualSegments * 34, zIndex / visualSegments * 34);
+
+      // A subtle baked contour tint emphasizes sun-facing crests and darkens
+      // steep faces and troughs. This keeps terrain shape readable even where
+      // real-time shadows are soft or hidden by the camera angle.
+      const slopeX = (
+        terrainHeight(x + slopeSampleDistance, z) -
+        terrainHeight(x - slopeSampleDistance, z)
+      ) / (slopeSampleDistance * 2);
+      const slopeZ = (
+        terrainHeight(x, z + slopeSampleDistance) -
+        terrainHeight(x, z - slopeSampleDistance)
+      ) / (slopeSampleDistance * 2);
+      const normalLength = Math.hypot(slopeX, 1, slopeZ) || 1;
+      const normalX = -slopeX / normalLength;
+      const normalY = 1 / normalLength;
+      const normalZ = -slopeZ / normalLength;
+      const sunFactor = Math.max(
+        0,
+        normalX * sunDirection.x +
+        normalY * sunDirection.y +
+        normalZ * sunDirection.z
+      );
+      const broadTone = smoothValueNoise(x / 17, z / 17, 89) * 0.045;
+      const fineTone = smoothValueNoise(x / 4.4, z / 4.4, 101) * 0.022;
+      const heightTone = THREE.MathUtils.clamp((height - 0.18) * 0.035, -0.018, 0.045);
+      const slopeTone = Math.min(0.9, Math.hypot(slopeX, slopeZ)) * 0.055;
+      const shade = THREE.MathUtils.clamp(
+        0.89 + sunFactor * 0.13 + broadTone + fineTone + heightTone - slopeTone,
+        0.76,
+        1.10
+      );
+      colors.push(shade, shade * 0.985, shade * 0.96);
+
+      if (xIndex < visualSegments && zIndex < visualSegments) {
+        const a = xIndex * (visualSegments + 1) + zIndex;
+        const b = a + visualSegments + 1;
         const c = a + 1;
         const d = b + 1;
         indices.push(a, b, c, b, d, c);
       }
     }
   }
+
   const terrainGeometry = new THREE.BufferGeometry();
   terrainGeometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   terrainGeometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  terrainGeometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
   terrainGeometry.setIndex(indices);
   terrainGeometry.computeVertexNormals();
 
@@ -291,14 +336,19 @@ export function createGravelBasinSystem({ THREE, scene }) {
     terrainGeometry,
     new THREE.MeshStandardMaterial({
       map: gravelTexture,
-      color: 0xd2c8b7,
+      bumpMap: gravelTexture,
+      bumpScale: 0.018,
+      vertexColors: true,
+      color: 0xffffff,
       roughness: 1,
       metalness: 0
     })
   );
   terrain.name = "uneven-gravel-heightfield";
   terrain.receiveShadow = true;
-  terrain.castShadow = false;
+  // Let the heightfield cast onto itself so jump faces and mound shoulders
+  // create readable directional shadows on the lower gravel around them.
+  terrain.castShadow = true;
   mapGroup.add(terrain);
 
   // Raised concrete overlook, a long driveable descent, and a broad staircase.
