@@ -242,7 +242,65 @@ for (const item of arenaVisuals) item.visible = false;
 let viewMode = "menu";
 let garageShellInstalled = true;
 let garageShellAnimation = null;
+let selectedShellVariant = 0;
+let alternateShellReady = false;
+let alternateShellLoadStarted = false;
 const garageShellDuration = 520;
+const shellVariantButton = $("shellVariantButton");
+
+function shellGroups() {
+  return [localCar.shellGroup, localCar.alternateShellGroup];
+}
+
+function activeShellGroup() {
+  return localCar.activeShellGroup || localCar.shellGroup;
+}
+
+function refreshShellVariantButton() {
+  if (!shellVariantButton) return;
+  shellVariantButton.disabled = !alternateShellReady || !!garageShellAnimation || !garageShellInstalled;
+  if (!alternateShellReady) {
+    shellVariantButton.textContent = alternateShellLoadStarted ? "LOADING NEW BODY..." : "NEW BODY MODEL UNAVAILABLE";
+  } else if (!garageShellInstalled) {
+    shellVariantButton.textContent = "INSTALL A SHELL TO SWITCH";
+  } else {
+    shellVariantButton.textContent = selectedShellVariant === 0
+      ? "SWITCH TO CONCEPT4 BODY"
+      : "SWITCH TO ORIGINAL BODY";
+  }
+}
+
+function beginAlternateShellLoad() {
+  if (alternateShellReady || alternateShellLoadStarted) return;
+  alternateShellLoadStarted = true;
+  refreshShellVariantButton();
+
+  if (typeof game.loadAlternateShellModel !== "function") {
+    alternateShellLoadStarted = false;
+    const detail = "The Garage was not connected to the model loader.";
+    console.error(detail);
+    if (shellVariantButton) {
+      shellVariantButton.disabled = true;
+      shellVariantButton.textContent = "MODEL LOADER NOT CONNECTED";
+      shellVariantButton.title = detail;
+    }
+    return;
+  }
+
+  game.loadAlternateShellModel().then(() => {
+    alternateShellReady = true;
+    refreshShellVariantButton();
+  }).catch((error) => {
+    const detail = error instanceof Error ? error.message : String(error);
+    console.warn("Concept4 shell could not be loaded:", detail);
+    alternateShellLoadStarted = false;
+    if (shellVariantButton) {
+      shellVariantButton.disabled = true;
+      shellVariantButton.textContent = `MODEL LOAD FAILED: ${detail.slice(0, 32)}`;
+      shellVariantButton.title = `Could not load assets/FF_SC_Concept4.gltf. ${detail}`;
+    }
+  });
+}
 const garageShellAttachedPosition = new THREE.Vector3(0, 0, 0);
 const garageShellRemovedPosition = new THREE.Vector3(0.08, 1.12, -0.16);
 const garageShellAttachedRotation = new THREE.Euler(0, 0, 0);
@@ -250,24 +308,32 @@ const garageShellRemovedRotation = new THREE.Euler(-0.12, 0, 0.09);
 const garageShellAttachedScale = new THREE.Vector3(1, 1, 1);
 const garageShellRemovedScale = new THREE.Vector3(1.012, 1.012, 1.012);
 
-function applyGarageShellPose(progress) {
+function applyGarageShellPose(progress, group = activeShellGroup()) {
   const t = THREE.MathUtils.clamp(progress, 0, 1);
-  localCar.shellGroup.position.lerpVectors(garageShellAttachedPosition, garageShellRemovedPosition, t);
-  localCar.shellGroup.rotation.set(
+  group.position.lerpVectors(garageShellAttachedPosition, garageShellRemovedPosition, t);
+  group.rotation.set(
     THREE.MathUtils.lerp(garageShellAttachedRotation.x, garageShellRemovedRotation.x, t),
     THREE.MathUtils.lerp(garageShellAttachedRotation.y, garageShellRemovedRotation.y, t),
     THREE.MathUtils.lerp(garageShellAttachedRotation.z, garageShellRemovedRotation.z, t)
   );
-  localCar.shellGroup.scale.lerpVectors(garageShellAttachedScale, garageShellRemovedScale, t);
+  group.scale.lerpVectors(garageShellAttachedScale, garageShellRemovedScale, t);
 }
 
 function resetGarageShellState(visible = true) {
   garageShellAnimation = null;
   garageShellInstalled = !!visible;
-  applyGarageShellPose(0);
+  const groups = shellGroups();
+  for (const group of groups) {
+    group.position.copy(garageShellAttachedPosition);
+    group.rotation.copy(garageShellAttachedRotation);
+    group.scale.copy(garageShellAttachedScale);
+    group.visible = false;
+  }
+  localCar.setShellVariant(selectedShellVariant);
   localCar.setShellVisible(garageShellInstalled);
   const button = $("shellToggleButton");
   if (button) button.textContent = garageShellInstalled ? "REMOVE BODY SHELL" : "INSTALL BODY SHELL";
+  refreshShellVariantButton();
 }
 
 function updateGarageShellAnimation(now) {
@@ -275,6 +341,22 @@ function updateGarageShellAnimation(now) {
   const animation = garageShellAnimation;
   const linear = THREE.MathUtils.clamp((now - animation.startTime) / garageShellDuration, 0, 1);
   const eased = linear * linear * (3 - 2 * linear);
+
+  if (animation.kind === "switch") {
+    const groups = shellGroups();
+    applyGarageShellPose(eased, groups[animation.fromVariant]);
+    applyGarageShellPose(1 - eased, groups[animation.toVariant]);
+    if (linear >= 1) {
+      selectedShellVariant = animation.toVariant;
+      localCar.setShellVariant(selectedShellVariant);
+      for (const group of groups) applyGarageShellPose(0, group);
+      localCar.setShellVisible(true);
+      garageShellAnimation = null;
+      refreshShellVariantButton();
+    }
+    return;
+  }
+
   const progress = THREE.MathUtils.lerp(animation.from, animation.to, eased);
   applyGarageShellPose(progress);
 
@@ -282,6 +364,7 @@ function updateGarageShellAnimation(now) {
     garageShellAnimation = null;
     applyGarageShellPose(0);
     if (animation.to === 1) localCar.setShellVisible(false);
+    refreshShellVariantButton();
   }
 }
 
@@ -305,6 +388,7 @@ function clearGaragePartHover() {
 }
 
 function updateGaragePartHover(event) {
+  if (garageShellAnimation) return;
   if (viewMode !== "garage" || !localCar.root.visible) {
     if (activeGaragePart) clearGaragePartHover();
     return;
@@ -314,8 +398,9 @@ function updateGaragePartHover(event) {
   garagePointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   garagePointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   garageRaycaster.setFromCamera(garagePointer, camera);
-  // Do not raycast the shell at all when it has been removed.
-  const hoverTarget = garageShellInstalled ? localCar.root : localCar.chassisGroup;
+  // Raycast only the currently selected, visible shell. The root also
+  // contains the inactive shell variant, which must never receive hover hits.
+  const hoverTarget = garageShellInstalled ? activeShellGroup() : localCar.chassisGroup;
   const intersections = garageRaycaster.intersectObject(hoverTarget, true);
   let found = null;
   let foundObject = null;
@@ -415,6 +500,7 @@ function showCreateLobby() {
 function showGarage() {
   clearGaragePartHover();
   resetGarageShellState(true);
+  beginAlternateShellLoad();
   viewMode = "garage";
   mainMenuPanel.style.display = "none";
   modeSelectPanel.style.display = "none";
@@ -433,20 +519,50 @@ function setGarageShellVisible(visible) {
   const from = installing ? 1 : 0;
   const to = installing ? 0 : 1;
 
-  // Keep the shell visible while it lifts away or settles back onto the chassis.
+  // Keep the selected shell visible while it lifts away or settles into place.
   localCar.setShellVisible(true);
   applyGarageShellPose(from);
   garageShellInstalled = installing;
   $("shellToggleButton").textContent = installing ? "REMOVE BODY SHELL" : "INSTALL BODY SHELL";
   garageShellAnimation = {
+    kind: "install-remove",
     from,
     to,
     startTime: performance.now()
   };
+  refreshShellVariantButton();
 }
+
+function switchGarageShellVariant() {
+  if (!alternateShellReady || garageShellAnimation || !garageShellInstalled) return;
+  clearGaragePartHover();
+  const fromVariant = selectedShellVariant;
+  const toVariant = fromVariant === 0 ? 1 : 0;
+  const groups = shellGroups();
+
+  // The outgoing shell rises and tilts away as the incoming shell settles in.
+  // Both are kept visible only during this brief transition.
+  groups[fromVariant].visible = true;
+  groups[toVariant].visible = true;
+  applyGarageShellPose(0, groups[fromVariant]);
+  applyGarageShellPose(1, groups[toVariant]);
+
+  garageShellAnimation = {
+    kind: "switch",
+    fromVariant,
+    toVariant,
+    startTime: performance.now()
+  };
+  refreshShellVariantButton();
+}
+
 $("shellToggleButton").addEventListener("click", () => {
   setGarageShellVisible(!garageShellInstalled);
 });
+if (shellVariantButton) {
+  shellVariantButton.addEventListener("click", switchGarageShellVariant);
+  refreshShellVariantButton();
+}
 
 function showDriveScreen() {
   viewMode = "drive";
