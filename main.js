@@ -62,12 +62,18 @@ sun.shadow.camera.left = -116;
 sun.shadow.camera.right = 116;
 sun.shadow.camera.top = 116;
 sun.shadow.camera.bottom = -116;
-sun.shadow.bias = -0.00015;
+sun.shadow.camera.near = 0.5;
+sun.shadow.camera.far = 250;
+sun.shadow.bias = -0.00022;
+sun.shadow.normalBias = 0.035;
+sun.shadow.radius = 2.5;
 scene.add(sun);
+scene.add(sun.target);
 
 // Gravel Basin is a much larger view with dense scenery, so cap render
-// resolution and shadow-map size only while that map is active. The circuit
-// keeps the original quality settings.
+// resolution and shadow-map size only while that map is active. Its shadow
+// frustum follows the RC truck to give nearby terrain shadows more detail
+// without increasing the shadow-map resolution or redraw cost.
 const DEFAULT_PIXEL_RATIO_CAP = 1.7;
 function applyMapRenderQuality(mapId) {
   const isGravelBasin = mapId === "gravel-basin";
@@ -81,8 +87,24 @@ function applyMapRenderQuality(mapId) {
     sun.shadow.map?.dispose();
     sun.shadow.map = null;
     sun.shadow.mapSize.set(shadowSize, shadowSize);
-    sun.shadow.needsUpdate = true;
   }
+
+  const shadowExtent = isGravelBasin ? 58 : 116;
+  sun.shadow.camera.left = -shadowExtent;
+  sun.shadow.camera.right = shadowExtent;
+  sun.shadow.camera.top = shadowExtent;
+  sun.shadow.camera.bottom = -shadowExtent;
+  sun.shadow.camera.near = 0.5;
+  sun.shadow.camera.far = isGravelBasin ? 145 : 250;
+  sun.shadow.camera.updateProjectionMatrix();
+
+  if (!isGravelBasin) {
+    sun.target.position.set(0, 0, 0);
+    sun.position.set(-8, 15, 8);
+  }
+  sun.target.updateMatrixWorld();
+  sun.updateMatrixWorld();
+  sun.shadow.needsUpdate = true;
 }
 
 const fill = new THREE.DirectionalLight(0xb8d8e9, 0.65);
@@ -564,6 +586,17 @@ function animate(now) {
   }
 
   multiplayer.sendSnapshotIfReady(delta);
+
+  // Keep the Gravel Basin shadow frustum centered near the truck. Snapping the
+  // focus in small increments prevents visible shadow-map shimmer while driving.
+  if (game.activeMapId === "gravel-basin") {
+    const focusX = Math.round(chassisBody.position.x / 3) * 3;
+    const focusZ = Math.round(chassisBody.position.z / 3) * 3;
+    sun.target.position.set(focusX, 0, focusZ);
+    sun.position.set(focusX - 8, 15, focusZ + 8);
+    sun.target.updateMatrixWorld();
+    sun.updateMatrixWorld();
+  }
 
   renderer.render(scene, camera);
 }
