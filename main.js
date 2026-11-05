@@ -297,7 +297,9 @@ game.setActiveMap = (mapId, options = {}) => {
   trackLayout = mapLayouts[mapId];
   game.trackLayout = trackLayout;
   if (game.race?.setTrackLayout) game.race.setTrackLayout(trackLayout);
-  if (game.controls?.resetCar) {
+  // Keep the showroom vehicle parked in the garage while the player is still
+  // choosing a map. Multiplayer entry performs the actual arena spawn reset.
+  if (game.garage?.viewMode === "drive" && game.controls?.resetCar) {
     game.controls.resetCar();
     game.race?.onCarReset?.();
   }
