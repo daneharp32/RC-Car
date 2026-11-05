@@ -5,6 +5,7 @@ import { createCarVisualFactory } from "./car.js";
 import { createControlsSystem } from "./controls.js";
 import { createMultiplayerSystem } from "./multiplayer.js";
 import { createGarageSystem } from "./garage.js";
+import { createSandboxSystem } from "./sandbox.js";
 import { createTrackSystem } from "./track.js";
 import { createGravelBasinSystem } from "./gravel-map.js";
 import { createRaceSystem } from "./race.js";
@@ -472,7 +473,7 @@ game.setActiveMap = (mapId, options = {}) => {
   if (game.race?.setTrackLayout) game.race.setTrackLayout(trackLayout);
   // Keep the showroom vehicle parked in the garage while the player is still
   // choosing a map. Multiplayer entry performs the actual arena spawn reset.
-  if (game.garage?.viewMode === "drive" && game.controls?.resetCar) {
+  if ((game.garage?.viewMode === "drive" || game.garage?.viewMode === "sandbox-drive") && game.controls?.resetCar) {
     game.controls.resetCar();
     game.race?.onCarReset?.();
   }
@@ -522,7 +523,7 @@ for (const button of document.querySelectorAll("[data-camera-mode]")) {
 // interferes with typing a driver name or lobby name.
 window.addEventListener("keydown", (event) => {
   if (event.repeat || event.ctrlKey || event.metaKey || event.altKey ||
-      event.key.toLowerCase() !== "c" || !multiplayer?.joined) return;
+      event.key.toLowerCase() !== "c" || (!multiplayer?.joined && !sandbox.active)) return;
   const activeElement = document.activeElement;
   if (activeElement && (
     ["INPUT", "TEXTAREA", "SELECT"].includes(activeElement.tagName) ||
@@ -546,10 +547,12 @@ const multiplayer = createMultiplayerSystem(game);
 game.multiplayer = multiplayer;
 const garage = createGarageSystem(game);
 game.garage = garage;
+const sandbox = createSandboxSystem(game);
+game.sandbox = sandbox;
 
 let isPaused = false;
 function setPaused(nextPaused) {
-  const shouldPause = Boolean(nextPaused) && multiplayer.joined;
+  const shouldPause = Boolean(nextPaused) && (multiplayer.joined || sandbox.active);
   if (isPaused === shouldPause) return;
   isPaused = shouldPause;
 
@@ -558,6 +561,14 @@ function setPaused(nextPaused) {
   pauseOverlay.style.display = isPaused ? "grid" : "none";
   pauseButton.setAttribute("aria-expanded", isPaused ? "true" : "false");
   pauseButton.textContent = isPaused ? "PAUSED" : "PAUSE · ESC";
+  const pauseCopy = pauseOverlay.querySelector(".pause-copy");
+  const sandboxReturnButton = $("sandboxReturnButton");
+  if (pauseCopy) {
+    pauseCopy.textContent = sandbox.active
+      ? "Your truck and arcade effects are paused."
+      : "Your truck is paused locally. Other drivers remain in the room.";
+  }
+  if (sandboxReturnButton) sandboxReturnButton.style.display = isPaused && sandbox.active ? "block" : "none";
 
   // Clear held keys when entering or leaving the menu so a key held while
   // paused cannot unexpectedly accelerate the truck after resuming.
@@ -578,6 +589,11 @@ game.setPaused = setPaused;
 $("pauseButton").addEventListener("click", () => setPaused(!isPaused));
 $("resumeButton").addEventListener("click", () => setPaused(false));
 $("leaveButton").addEventListener("click", () => setPaused(false));
+$("sandboxReturnButton").addEventListener("click", () => {
+  if (!sandbox.active) return;
+  setPaused(false);
+  sandbox.returnToBuilder();
+});
 
 const timeOfDaySelect = $("timeOfDaySelect");
 timeOfDaySelect.value = activeTimeOfDay;
@@ -589,7 +605,7 @@ timeOfDaySelect.addEventListener("change", () => {
 });
 
 window.addEventListener("keydown", (event) => {
-  if (event.repeat || event.key !== "Escape" || !multiplayer.joined) return;
+  if (event.repeat || event.key !== "Escape" || (!multiplayer.joined && !sandbox.active)) return;
   // Let Escape close the native select dropdown first when it has focus.
   if (event.target === timeOfDaySelect && isPaused) return;
   event.preventDefault();
@@ -599,6 +615,7 @@ window.addEventListener("keydown", (event) => {
 // Drive opens the live lobby browser. Users can join an existing lobby
 // or open the separate Create Lobby panel.
 $("menuDriveButton").addEventListener("click", () => garage.showModeSelect());
+$("menuSandboxButton").addEventListener("click", () => sandbox.openBuilder());
 const arenaSelect = $("arenaSelect");
 const arenaDescription = $("arenaDescription");
 const arenaDescriptions = {
@@ -666,6 +683,7 @@ function animate(now) {
   updateLocalVisual();
   race.update(delta, now);
   multiplayer.updateRemoteVisuals(delta);
+  sandbox.update(delta, now);
 
   const speedMph = chassisBody.velocity.length() * 2.236936;
   $("speedValue").textContent = String(Math.round(speedMph));
@@ -673,10 +691,10 @@ function animate(now) {
   $("wheelStatus").textContent = touching + " / 4 TIRES IN CONTACT";
 
   // The showroom camera presents the parked truck in menu and garage views.
-  if (garage.viewMode === "menu" || garage.viewMode === "mode-select" || garage.viewMode === "create-lobby" || garage.viewMode === "garage") {
+  if (garage.viewMode === "menu" || garage.viewMode === "mode-select" || garage.viewMode === "create-lobby" || garage.viewMode === "garage" || garage.viewMode === "sandbox-builder") {
     easeCameraFov(58, delta, 4.0);
-    const distance = garage.viewMode === "garage" ? 2.35 : 5.1;
-    const height = garage.viewMode === "garage" ? 1.18 : 2.15;
+    const distance = garage.viewMode === "garage" ? 2.35 : (garage.viewMode === "sandbox-builder" ? 3.65 : 5.1);
+    const height = garage.viewMode === "garage" ? 1.18 : (garage.viewMode === "sandbox-builder" ? 1.55 : 2.15);
     const orbitDirection = new THREE.Vector3(0, 0, 1)
       .applyAxisAngle(new THREE.Vector3(0, 1, 0), controls.cameraOrbitYaw + (garage.viewMode === "menu" ? -0.18 : 0));
     const showroomCamera = localCar.root.position.clone()
