@@ -157,7 +157,7 @@ export class MultiplayerRoom {
       const event = message.event;
       if (peer.mode !== "sandbox" || !event ||
           typeof event.id !== "string" || event.id.length > 80 ||
-          !["spring-bounce", "jump-pad"].includes(event.type) ||
+          event.type !== "impulse-beacon" ||
           ![event.x, event.y, event.z, event.yaw].every(Number.isFinite)) return;
       if ([event.x, event.y, event.z].some((value) => Math.abs(value) > 300) ||
           Math.abs(event.yaw) > Math.PI * 4) return;
