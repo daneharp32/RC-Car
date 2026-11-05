@@ -62,6 +62,7 @@ window.addEventListener("keyup", (event) => {
 });
 window.addEventListener("blur", () => {
   for (const key of Object.keys(keys)) keys[key] = false;
+  game.sandbox?.clearHeldControls?.();
 });
 
 function resetCar() {

@@ -660,6 +660,7 @@ function prepareMapGraphics(mapId = game.activeMapId) {
 game.prepareMapGraphics = prepareMapGraphics;
 
 let isPaused = false;
+game.isPaused = () => isPaused;
 function setPaused(nextPaused) {
   const shouldPause = Boolean(nextPaused) && multiplayer.joined;
   if (isPaused === shouldPause) return;
@@ -681,6 +682,7 @@ function setPaused(nextPaused) {
   for (const key of Object.keys(controls.keys)) controls.keys[key] = false;
 
   if (isPaused) {
+    sandbox.clearHeldControls?.();
     chassisBody.velocity.set(0, 0, 0);
     chassisBody.angularVelocity.set(0, 0, 0);
     for (let i = 0; i < 4; i++) {

@@ -1,24 +1,25 @@
-// Multiplayer stunt builder, spring fields, jump pads, and RC-car boost effects.
+// Multiplayer Sandbox builder, continuous thrusters, and shared impulse beacons.
 export function createSandboxSystem(game) {
   const { THREE, CANNON, scene, chassisBody, localCar, $ } = game;
   const builderPanel = $("sandboxBuilderPanel");
   const controlsPanel = $("sandboxControlsCard");
   const loadout = new Set();
   const attachmentCache = new WeakMap();
-  const pads = [];
+  const beacons = [];
   const waves = [];
   const seenEvents = new Set();
-  const cooldowns = { spring: 0, pad: 0, boost: 0 };
+  const held = { lift: false, forward: false };
+  const cooldowns = { beacon: 0 };
   const PARTS = [
-    { id: "spring", title: "SPRING BUMPER FIELD" },
-    { id: "pad", title: "FOLD-OUT JUMP PAD" },
-    { id: "boost", title: "TWIN BOOST VENTS" }
+    { id: "lift", title: "JUMP THRUSTERS" },
+    { id: "forward", title: "FORWARD THRUSTERS" },
+    { id: "beacon", title: "IMPULSE BEACON" }
   ];
 
   let active = false;
   let inMap = false;
   let playerCount = 1;
-  let localAttachmentGroup = null;
+  let localAttachment = null;
   const standardAngularDamping = chassisBody.angularDamping;
 
   function dispose(root) {
@@ -41,8 +42,11 @@ export function createSandboxSystem(game) {
     return mesh;
   }
 
-  function addCylinder(parent, radius, height, position, material, rotation = [0, 0, 0]) {
-    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, height, 16), material);
+  function addCylinder(parent, radiusTop, radiusBottom, height, position, material, rotation = [0, 0, 0]) {
+    const mesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(radiusTop, radiusBottom, height, 16),
+      material
+    );
     mesh.position.set(...position);
     mesh.rotation.set(...rotation);
     mesh.castShadow = true;
@@ -51,76 +55,93 @@ export function createSandboxSystem(game) {
     return mesh;
   }
 
-  function addBeam(parent, start, end, width, material) {
-    const a = new THREE.Vector3(...start);
-    const b = new THREE.Vector3(...end);
-    const direction = b.clone().sub(a);
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, direction.length(), width), material);
-    mesh.position.copy(a).add(b).multiplyScalar(0.5);
-    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    parent.add(mesh);
-    return mesh;
-  }
-
-  function makeSpringBumper(root) {
+  function makeJumpThrusters(root) {
     const group = new THREE.Group();
-    const rubber = new THREE.MeshStandardMaterial({ color: 0x202a31, roughness: 0.92 });
-    const orange = new THREE.MeshStandardMaterial({ color: 0xf07832, roughness: 0.45, metalness: 0.18 });
-    const metal = new THREE.MeshStandardMaterial({ color: 0x8d9ba3, roughness: 0.35, metalness: 0.72 });
-    addBox(group, [0.72, 0.12, 0.12], [0, 0.20, -0.57], rubber);
-    for (const side of [-1, 1]) {
-      addBox(group, [0.10, 0.18, 0.14], [side * 0.32, 0.20, -0.57], orange);
-      addCylinder(group, 0.045, 0.16, [side * 0.24, 0.20, -0.45], metal, [Math.PI / 2, 0, 0]);
-      for (let turn = 0; turn < 4; turn++) {
-        const loop = new THREE.Mesh(new THREE.TorusGeometry(0.052, 0.009, 7, 18), orange);
-        loop.position.set(side * 0.24, 0.20, -0.52 + turn * 0.035);
-        loop.rotation.x = Math.PI / 2;
-        group.add(loop);
+    group.name = "sandbox-jump-thrusters";
+    const housing = new THREE.MeshStandardMaterial({
+      color: 0x202c36, roughness: 0.45, metalness: 0.76
+    });
+    const nozzle = new THREE.MeshStandardMaterial({
+      color: 0x7d909c, roughness: 0.32, metalness: 0.84
+    });
+    const flames = [];
+
+    for (const x of [-0.25, 0.25]) {
+      for (const z of [-0.34, 0.34]) {
+        addBox(group, [0.16, 0.075, 0.19], [x, 0.12, z], housing);
+        addCylinder(group, 0.055, 0.085, 0.14, [x, 0.045, z], nozzle);
+        const flameMaterial = new THREE.MeshBasicMaterial({
+          color: 0x58d9ff, transparent: true, opacity: 0.88,
+          depthWrite: false, toneMapped: false
+        });
+        const flame = new THREE.Mesh(
+          new THREE.ConeGeometry(0.075, 0.30, 12),
+          flameMaterial
+        );
+        flame.rotation.z = Math.PI;
+        flame.position.set(x, -0.16, z);
+        flame.visible = false;
+        group.add(flame);
+        flames.push(flame);
       }
     }
     root.add(group);
+    return flames;
   }
 
-  function makeFoldOutJumpPad(root) {
+  function makeForwardThrusters(root) {
     const group = new THREE.Group();
-    group.name = "fold-out-jump-pad";
-    group.position.set(0, 0.17, 0.34);
-    const frame = new THREE.MeshStandardMaterial({ color: 0x303a43, roughness: 0.54, metalness: 0.72 });
-    const deck = new THREE.MeshStandardMaterial({ color: 0x6a7d8c, roughness: 0.62, metalness: 0.24 });
-    const blue = new THREE.MeshStandardMaterial({
-      color: 0x38baff, emissive: 0x0878d8, emissiveIntensity: 1.25
+    group.name = "sandbox-forward-thrusters";
+    const housing = new THREE.MeshStandardMaterial({
+      color: 0x18242e, roughness: 0.42, metalness: 0.78
     });
-    addBox(group, [0.42, 0.055, 0.34], [0, 0, 0.08], frame);
-    addBox(group, [0.36, 0.028, 0.30], [0, 0.042, 0.08], deck);
-    for (const side of [-1, 1]) {
-      addBeam(group, [side * 0.16, 0.08, 0.18], [side * 0.16, 0.30, -0.30], 0.035, frame);
-      addCylinder(group, 0.025, 0.20, [side * 0.17, 0.15, -0.06], blue);
+    const nozzle = new THREE.MeshStandardMaterial({
+      color: 0x8799a3, roughness: 0.3, metalness: 0.82
+    });
+    const flames = [];
+
+    for (const x of [-0.22, 0.22]) {
+      addBox(group, [0.17, 0.095, 0.22], [x, 0.22, 0.36], housing);
+      addCylinder(group, 0.065, 0.09, 0.14, [x, 0.22, 0.48], nozzle, [Math.PI / 2, 0, 0]);
+      const flameMaterial = new THREE.MeshBasicMaterial({
+        color: 0x47baff, transparent: true, opacity: 0.88,
+        depthWrite: false, toneMapped: false
+      });
+      const flame = new THREE.Mesh(
+        new THREE.ConeGeometry(0.078, 0.34, 12),
+        flameMaterial
+      );
+      flame.rotation.x = Math.PI / 2;
+      flame.position.set(x, 0.22, 0.66);
+      flame.visible = false;
+      group.add(flame);
+      flames.push(flame);
     }
-    addBox(group, [0.38, 0.025, 0.08], [0, 0.30, -0.30], blue, [-0.35, 0, 0]);
     root.add(group);
+    return flames;
   }
 
-  function makeBoostVents(root) {
+  function makeImpulseBeaconModule(root) {
     const group = new THREE.Group();
-    const dark = new THREE.MeshStandardMaterial({ color: 0x18232b, roughness: 0.46, metalness: 0.72 });
-    const blue = new THREE.MeshStandardMaterial({
-      color: 0x39baff, emissive: 0x0878d8, emissiveIntensity: 1.5,
-      roughness: 0.34, metalness: 0.24
+    group.name = "sandbox-impulse-beacon-module";
+    const dark = new THREE.MeshStandardMaterial({
+      color: 0x202b35, roughness: 0.46, metalness: 0.72
     });
-    for (const side of [-1, 1]) {
-      const x = side * 0.205;
-      addBox(group, [0.16, 0.08, 0.30], [x, 0.25, 0.30], dark);
-      addBox(group, [0.13, 0.018, 0.22], [x, 0.297, 0.30], blue);
-      for (let slat = 0; slat < 4; slat++) {
-        addBox(group, [0.12, 0.012, 0.018], [x, 0.31, 0.20 + slat * 0.055], dark);
-      }
-      const outlet = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.012, 8, 24), blue);
-      outlet.position.set(x, 0.26, 0.13);
-      outlet.rotation.x = Math.PI / 2;
-      group.add(outlet);
-    }
+    const glow = new THREE.MeshBasicMaterial({
+      color: 0x62dcff, toneMapped: false
+    });
+    addBox(group, [0.34, 0.08, 0.27], [0, 0.18, 0.37], dark);
+    addCylinder(group, 0.085, 0.10, 0.10, [0, 0.25, 0.37], dark);
+    const orb = new THREE.Mesh(new THREE.SphereGeometry(0.105, 16, 12), glow);
+    orb.position.set(0, 0.34, 0.37);
+    group.add(orb);
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(0.15, 0.012, 8, 24),
+      glow
+    );
+    ring.position.set(0, 0.34, 0.37);
+    ring.rotation.x = Math.PI / 2;
+    group.add(ring);
     root.add(group);
   }
 
@@ -133,25 +154,60 @@ export function createSandboxSystem(game) {
     const previous = attachmentCache.get(visual);
     if (previous?.key === key) {
       previous.group.visible = visual === localCar ? active : true;
+      if (visual === localCar) localAttachment = previous;
       return;
     }
     if (previous) {
       visual.root.remove(previous.group);
       dispose(previous.group);
     }
+
     const group = new THREE.Group();
-    group.name = "sandbox-stunt-parts";
-    if (ids.includes("spring")) makeSpringBumper(group);
-    if (ids.includes("pad")) makeFoldOutJumpPad(group);
-    if (ids.includes("boost")) makeBoostVents(group);
+    group.name = "sandbox-thruster-and-beacon-parts";
+    const liftFlames = ids.includes("lift") ? makeJumpThrusters(group) : [];
+    const forwardFlames = ids.includes("forward") ? makeForwardThrusters(group) : [];
+    if (ids.includes("beacon")) makeImpulseBeaconModule(group);
     group.visible = visual === localCar ? active : true;
     visual.root.add(group);
-    attachmentCache.set(visual, { key, group });
-    if (visual === localCar) localAttachmentGroup = group;
+
+    const entry = { key, group, liftFlames, forwardFlames };
+    attachmentCache.set(visual, entry);
+    if (visual === localCar) localAttachment = entry;
   }
 
   function getLoadout() {
-    return [...loadout];
+    return [...loadout].sort();
+  }
+
+  function getThrusterState() {
+    const enabled = active && inMap && !game.isPaused?.();
+    return {
+      lift: enabled && held.lift && loadout.has("lift"),
+      forward: enabled && held.forward && loadout.has("forward")
+    };
+  }
+
+  function applyRemoteThrusterState(visual, state) {
+    const entry = attachmentCache.get(visual);
+    if (!entry) return;
+    const lift = state?.lift === true;
+    const forward = state?.forward === true;
+    for (const flame of entry.liftFlames) flame.visible = lift;
+    for (const flame of entry.forwardFlames) flame.visible = forward;
+  }
+
+  function updateThrusterVisuals(now) {
+    const state = getThrusterState();
+    if (localAttachment) {
+      for (const flame of localAttachment.liftFlames) {
+        flame.visible = state.lift;
+        flame.scale.setScalar(state.lift ? 0.88 + Math.sin(now * 0.035) * 0.10 : 1);
+      }
+      for (const flame of localAttachment.forwardFlames) {
+        flame.visible = state.forward;
+        flame.scale.setScalar(state.forward ? 0.90 + Math.sin(now * 0.045) * 0.12 : 1);
+      }
+    }
   }
 
   function renderBuilder() {
@@ -166,7 +222,7 @@ export function createSandboxSystem(game) {
     if (equippedLabel) {
       equippedLabel.textContent = loadout.size
         ? getLoadout().map((id) => PARTS.find((part) => part.id === id).title).join(" · ")
-        : "NO STUNT PARTS EQUIPPED";
+        : "NO THRUSTER OR BEACON PARTS EQUIPPED";
     }
     const mapLabel = $("sandboxBuilderMapLabel");
     if (mapLabel) {
@@ -179,11 +235,18 @@ export function createSandboxSystem(game) {
   function renderControlHints() {
     if (!controlsPanel) return;
     controlsPanel.style.display = active && inMap ? "flex" : "none";
+    const status = getThrusterState();
     document.querySelectorAll("[data-sandbox-control]").forEach((item) => {
-      const equipped = loadout.has(item.dataset.sandboxControl);
+      const id = item.dataset.sandboxControl;
+      const equipped = loadout.has(id);
       item.classList.toggle("equipped", equipped);
-      const state = item.querySelector("small");
-      if (state) state.textContent = equipped ? "READY" : "NOT EQUIPPED";
+      const label = item.querySelector("small");
+      if (!label) return;
+      if (!equipped) label.textContent = "NOT EQUIPPED";
+      else if (id === "lift") label.textContent = status.lift ? "ACTIVE" : "HOLD Q";
+      else if (id === "forward") label.textContent = status.forward ? "ACTIVE" : "HOLD E";
+      else label.textContent = "PRESS F";
+      item.classList.toggle("active", (id === "lift" && status.lift) || (id === "forward" && status.forward));
     });
   }
 
@@ -192,7 +255,15 @@ export function createSandboxSystem(game) {
     renderBuilder();
   }
 
+  function clearHeldControls() {
+    held.lift = false;
+    held.forward = false;
+    updateThrusterVisuals(performance.now());
+    renderControlHints();
+  }
+
   function showBuilder() {
+    clearHeldControls();
     active = true;
     inMap = false;
     game.race?.leaveLobby?.();
@@ -208,45 +279,47 @@ export function createSandboxSystem(game) {
     $("topStatus").style.display = "flex";
     localCar.setPlayerName?.("", false);
     applyLoadout(localCar, getLoadout());
-    if (localAttachmentGroup) localAttachmentGroup.visible = true;
-    for (const pad of pads) pad.group.visible = false;
+    if (localAttachment) localAttachment.group.visible = true;
+    for (const beacon of beacons) beacon.group.visible = false;
     renderBuilder();
     renderControlHints();
   }
 
   function beginSession() {
     showBuilder();
-    game.showToast("Sandbox joined — build first, then enter whenever you're ready");
+    game.showToast("Sandbox joined — equip your thrusters and beacon before entering");
   }
 
   function enterMap() {
     if (!active || inMap) return;
+    clearHeldControls();
     chassisBody.angularDamping = 0.32;
     inMap = true;
     builderPanel.style.display = "none";
-    for (const pad of pads) pad.group.visible = true;
+    for (const beacon of beacons) beacon.group.visible = true;
     game.garage.showDriveScreen();
     localCar.setPlayerName?.(game.multiplayer?.driverName || "Driver", true);
     renderControlHints();
-    game.showToast("Sandbox: Q spring field · E jump pad · F boost vents");
+    game.showToast("Sandbox: hold Q to fly · hold E to boost · F to place an impulse beacon");
   }
 
   function endSession() {
+    clearHeldControls();
     active = false;
     inMap = false;
     chassisBody.angularDamping = standardAngularDamping;
     builderPanel.style.display = "none";
-    for (const pad of pads) {
-      scene.remove(pad.group);
-      dispose(pad.group);
+    for (const beacon of beacons) {
+      scene.remove(beacon.group);
+      dispose(beacon.group);
     }
-    pads.length = 0;
+    beacons.length = 0;
     for (const wave of waves) {
       scene.remove(wave.group);
       dispose(wave.group);
     }
     waves.length = 0;
-    if (localAttachmentGroup) localAttachmentGroup.visible = false;
+    if (localAttachment) localAttachment.group.visible = false;
     renderControlHints();
     seenEvents.clear();
   }
@@ -258,7 +331,7 @@ export function createSandboxSystem(game) {
 
   function validStuntEvent(event) {
     return event && typeof event.id === "string" && event.id.length <= 80 &&
-      ["spring-bounce", "jump-pad"].includes(event.type) &&
+      event.type === "impulse-beacon" &&
       [event.x, event.y, event.z, event.yaw].every(Number.isFinite);
   }
 
@@ -316,13 +389,13 @@ export function createSandboxSystem(game) {
     const group = new THREE.Group();
     group.position.copy(position);
     const coreMaterial = new THREE.MeshBasicMaterial({
-      color, transparent: true, opacity: 0.78, depthWrite: false
+      color, transparent: true, opacity: 0.78, depthWrite: false, toneMapped: false
     });
     const waveMaterial = new THREE.MeshBasicMaterial({
-      color, transparent: true, opacity: 0.92, depthWrite: false
+      color, transparent: true, opacity: 0.92, depthWrite: false, toneMapped: false
     });
     const outerMaterial = new THREE.MeshBasicMaterial({
-      color: 0xb4edff, transparent: true, opacity: 0.65, depthWrite: false
+      color: 0xb4edff, transparent: true, opacity: 0.65, depthWrite: false, toneMapped: false
     });
     const core = new THREE.Mesh(new THREE.SphereGeometry(0.28, 18, 14), coreMaterial);
     const innerRing = new THREE.Mesh(new THREE.TorusGeometry(0.68, 0.045, 9, 56), waveMaterial);
@@ -334,10 +407,13 @@ export function createSandboxSystem(game) {
     group.add(core, innerRing, outerRing);
     group.scale.setScalar(scale);
     scene.add(group);
-    waves.push({ group, age: 0, duration: 1.15, core, innerRing, outerRing, coreMaterial, waveMaterial, outerMaterial });
+    waves.push({
+      group, age: 0, duration: 1.15, core, innerRing, outerRing,
+      coreMaterial, waveMaterial, outerMaterial
+    });
   }
 
-  function applySpringImpulse(origin, radius = 9) {
+  function applyImpulseField(origin, radius = 12) {
     const offset = new THREE.Vector3(
       chassisBody.position.x - origin.x,
       chassisBody.position.y - origin.y,
@@ -345,16 +421,20 @@ export function createSandboxSystem(game) {
     );
     const distance = offset.length();
     if (distance >= radius) return false;
+
     const falloff = 1 - THREE.MathUtils.clamp(distance / radius, 0, 1);
     const horizontal = new THREE.Vector3(offset.x, 0, offset.z);
     if (horizontal.lengthSq() < 0.0001) horizontal.set(0.25, 0, -0.35);
     horizontal.normalize();
-    const impulse = 54 + 42 * falloff;
+
+    const horizontalImpulse = 20 + 15 * falloff;
+    const verticalImpulse = 68 + 42 * falloff;
     chassisBody.applyImpulse(new CANNON.Vec3(
-      horizontal.x * 12 * falloff,
-      impulse,
-      horizontal.z * 12 * falloff
+      horizontal.x * horizontalImpulse * falloff,
+      verticalImpulse,
+      horizontal.z * horizontalImpulse * falloff
     ));
+
     const spin = 3.0 + 6.0 * falloff;
     chassisBody.angularVelocity.x = THREE.MathUtils.clamp(
       chassisBody.angularVelocity.x + (offset.z >= 0 ? 1 : -1) * spin * 1.15, -13, 13
@@ -369,140 +449,210 @@ export function createSandboxSystem(game) {
     return true;
   }
 
-  function activateSpringField() {
-    const position = new THREE.Vector3(chassisBody.position.x, chassisBody.position.y, chassisBody.position.z);
-    const event = { id: makeEventId(), type: "spring-bounce", x: position.x, y: position.y, z: position.z, yaw: 0 };
-    applySpringImpulse(position);
-    createBounceWave(position, 0xffad54, 1.15);
-    game.multiplayer.sendSandboxEvent?.(event);
-  }
+  function createImpulseBeacon(event) {
+    if (!validStuntEvent(event) || !rememberEvent(event.id)) return false;
 
-  function createJumpPad(event) {
-    if (!validStuntEvent(event)) return false;
-    if (!rememberEvent(event.id)) return false;
     const group = new THREE.Group();
-    group.name = "multiplayer-sandbox-jump-pad";
-    const frame = new THREE.MeshStandardMaterial({ color: 0x26333d, roughness: 0.55, metalness: 0.68 });
-    const deck = new THREE.MeshStandardMaterial({ color: 0x738796, roughness: 0.65, metalness: 0.18 });
-    const blue = new THREE.MeshStandardMaterial({
-      color: 0x39bbff, emissive: 0x0878d8, emissiveIntensity: 1.4
+    group.name = "shared-impulse-beacon";
+    const baseMaterial = new THREE.MeshStandardMaterial({
+      color: 0x26343f, roughness: 0.44, metalness: 0.72
     });
-    addBox(group, [1.65, 0.15, 2.15], [0, 0.08, 0], frame);
-    addBox(group, [1.46, 0.05, 1.92], [0, 0.18, 0], deck);
-    for (const side of [-1, 1]) {
-      addBox(group, [0.12, 0.11, 1.72], [side * 0.72, 0.24, 0], blue);
-      for (const z of [-0.68, 0.68]) {
-        addCylinder(group, 0.105, 0.23, [side * 0.58, 0.28, z], frame);
-        addCylinder(group, 0.075, 0.25, [side * 0.58, 0.39, z], blue);
-      }
-    }
-    group.position.set(event.x, sampleGroundHeight(event.x, event.z), event.z);
-    group.rotation.y = event.yaw;
+    const glowMaterial = new THREE.MeshBasicMaterial({
+      color: 0x5cddff, toneMapped: false
+    });
+    const orbMaterial = new THREE.MeshBasicMaterial({
+      color: 0xb5f4ff, toneMapped: false
+    });
+
+    const base = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.16, 0.19, 0.09, 20),
+      baseMaterial
+    );
+    base.position.y = 0.05;
+    base.castShadow = true;
+    group.add(base);
+
+    const stem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.035, 0.045, 0.18, 12),
+      baseMaterial
+    );
+    stem.position.y = 0.17;
+    group.add(stem);
+
+    const orb = new THREE.Mesh(new THREE.SphereGeometry(0.15, 18, 14), orbMaterial);
+    orb.position.y = 0.31;
+    group.add(orb);
+
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(0.28, 0.018, 8, 32),
+      glowMaterial
+    );
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 0.10;
+    group.add(ring);
+
+    group.position.set(event.x, event.y, event.z);
     group.visible = inMap;
     scene.add(group);
-    pads.push({
+
+    const createdAt = performance.now();
+    beacons.push({
       id: event.id,
       group,
-      x: event.x,
-      z: event.z,
-      yaw: event.yaw,
-      createdAt: performance.now(),
-      nextTriggerAt: 0
+      orb,
+      ring,
+      origin: new THREE.Vector3(event.x, event.y, event.z),
+      createdAt,
+      pulseAt: createdAt + 1350,
+      triggered: false
     });
     return true;
   }
 
-  function triggerJumpPad(pad, now) {
-    const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(
-      new THREE.Vector3(0, 1, 0), pad.yaw
-    );
-    chassisBody.applyImpulse(new CANNON.Vec3(
-      forward.x * 38,
-      72,
-      forward.z * 38
-    ));
-    chassisBody.angularVelocity.x = THREE.MathUtils.clamp(chassisBody.angularVelocity.x + 3.8, -13, 13);
-    chassisBody.angularVelocity.y = THREE.MathUtils.clamp(chassisBody.angularVelocity.y + 2.4, -13, 13);
-    chassisBody.angularVelocity.z = THREE.MathUtils.clamp(chassisBody.angularVelocity.z - 4.4, -13, 13);
-    chassisBody.wakeUp();
-    pad.nextTriggerAt = now + 1800;
-    createBounceWave(new THREE.Vector3(pad.x, chassisBody.position.y, pad.z), 0x42c5ff, 0.9);
-  }
-
-  function deployJumpPad() {
-    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(localCar.root.quaternion).normalize();
-    const position = new THREE.Vector3(chassisBody.position.x, 0, chassisBody.position.z)
-      .addScaledVector(forward, 2.0);
+  function deployImpulseBeacon() {
+    const forward = new THREE.Vector3(0, 0, -1)
+      .applyQuaternion(localCar.root.quaternion)
+      .normalize();
+    const position = new THREE.Vector3(
+      chassisBody.position.x,
+      0,
+      chassisBody.position.z
+    ).addScaledVector(forward, 3.5);
     position.y = sampleGroundHeight(position.x, position.z);
+
     const event = {
       id: makeEventId(),
-      type: "jump-pad",
+      type: "impulse-beacon",
       x: position.x,
       y: position.y,
       z: position.z,
-      yaw: Math.atan2(-forward.x, -forward.z)
+      yaw: 0
     };
-    createJumpPad(event);
-    game.multiplayer.sendSandboxEvent?.(event);
+    if (!createImpulseBeacon(event)) return false;
+    game.multiplayer?.sendSandboxEvent?.(event);
+    game.showToast("Impulse beacon placed — its spring pulse is charging");
+    return true;
   }
 
-  function activateBoost() {
-    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(localCar.root.quaternion).normalize();
-    chassisBody.applyImpulse(new CANNON.Vec3(forward.x * 46, 4.5, forward.z * 46));
+  function levelVehicleForLift() {
+    const current = new THREE.Quaternion(
+      chassisBody.quaternion.x,
+      chassisBody.quaternion.y,
+      chassisBody.quaternion.z,
+      chassisBody.quaternion.w
+    );
+    const worldUp = new THREE.Vector3(0, 1, 0);
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(current);
+    forward.y = 0;
+    if (forward.lengthSq() < 0.0001) forward.set(0, 0, -1);
+    forward.normalize();
+
+    const right = new THREE.Vector3().crossVectors(forward, worldUp).normalize();
+    const up = new THREE.Vector3().crossVectors(right, forward).normalize();
+    const backward = forward.clone().negate();
+    const targetMatrix = new THREE.Matrix4().makeBasis(right, up, backward);
+    const target = new THREE.Quaternion().setFromRotationMatrix(targetMatrix);
+    const correction = target.clone().multiply(current.clone().invert()).normalize();
+    if (correction.w < 0) {
+      correction.set(-correction.x, -correction.y, -correction.z, -correction.w);
+    }
+
+    const sinHalf = Math.hypot(correction.x, correction.y, correction.z);
+    if (sinHalf < 0.00001) return;
+
+    const angle = 2 * Math.atan2(sinHalf, Math.max(0, correction.w));
+    const axis = new THREE.Vector3(
+      correction.x / sinHalf,
+      correction.y / sinHalf,
+      correction.z / sinHalf
+    );
+    const angularVelocity = new THREE.Vector3(
+      chassisBody.angularVelocity.x,
+      chassisBody.angularVelocity.y,
+      chassisBody.angularVelocity.z
+    );
+    // Preserve yaw while damping unwanted pitch and roll.
+    angularVelocity.addScaledVector(
+      worldUp,
+      -angularVelocity.dot(worldUp)
+    );
+    const torque = axis.multiplyScalar(angle * 88)
+      .addScaledVector(angularVelocity, -20);
+    if (torque.lengthSq() > 110 * 110) torque.setLength(110);
+    chassisBody.applyTorque(new CANNON.Vec3(torque.x, torque.y, torque.z));
+  }
+
+  function applyJumpThrusters() {
+    const mass = chassisBody.mass || 10.5;
+    const verticalSpeed = chassisBody.velocity.y;
+    const liftAcceleration = THREE.MathUtils.clamp((18 - verticalSpeed) * 2.2, 0, 17);
+    const liftForce = mass * (9.82 + liftAcceleration);
+    chassisBody.applyForce(
+      new CANNON.Vec3(0, liftForce, 0),
+      chassisBody.position
+    );
+    levelVehicleForLift();
     chassisBody.wakeUp();
-    const position = new THREE.Vector3(chassisBody.position.x, chassisBody.position.y + 0.16, chassisBody.position.z)
-      .addScaledVector(forward, 0.58);
-    createBounceWave(position, 0x40baff, 0.42);
   }
 
-  function activatePart(id) {
-    if (!active || !inMap || !game.multiplayer?.joined) return false;
-    if (!loadout.has(id)) {
-      const part = PARTS.find((item) => item.id === id);
-      game.showToast("Equip " + (part?.title || "that part") + " in the builder first");
-      return false;
-    }
-    const now = performance.now();
-    if (now < cooldowns[id]) return false;
-    cooldowns[id] = now + (id === "spring" ? 2200 : id === "pad" ? 1700 : 950);
-    if (id === "spring") activateSpringField();
-    else if (id === "pad") deployJumpPad();
-    else if (id === "boost") activateBoost();
-    return true;
+  function applyForwardThrusters() {
+    const current = new THREE.Quaternion(
+      chassisBody.quaternion.x,
+      chassisBody.quaternion.y,
+      chassisBody.quaternion.z,
+      chassisBody.quaternion.w
+    );
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(current);
+    forward.y = 0;
+    if (forward.lengthSq() < 0.0001) forward.set(0, 0, -1);
+    forward.normalize();
+
+    const forwardCannon = new CANNON.Vec3(forward.x, 0, forward.z);
+    const forwardSpeed = chassisBody.velocity.dot(forwardCannon);
+    if (forwardSpeed >= 34) return;
+
+    const forceScale = THREE.MathUtils.clamp((34 - forwardSpeed) / 12, 0.2, 1);
+    const force = 260 * forceScale;
+    chassisBody.applyForce(
+      new CANNON.Vec3(forward.x * force, 0, forward.z * force),
+      chassisBody.position
+    );
+    chassisBody.wakeUp();
   }
 
-  function receiveRemoteStuntEvent(peerId, event) {
-    if (!active || typeof peerId !== "string" || !validStuntEvent(event)) return false;
-    if (event.type === "jump-pad") return createJumpPad(event);
-    if (!rememberEvent(event.id)) return false;
-    if (inMap) {
-      const position = new THREE.Vector3(event.x, event.y, event.z);
-      applySpringImpulse(position);
-      createBounceWave(position, 0xffad54, 1.15);
-    }
-    return true;
-  }
-
-  function update(delta) {
-    const now = performance.now();
+  function triggerBeacon(beacon) {
+    if (beacon.triggered) return;
+    beacon.triggered = true;
     if (active && inMap) {
-      for (const pad of pads) {
-        if (now < pad.nextTriggerAt) continue;
-        const dx = chassisBody.position.x - pad.x;
-        const dz = chassisBody.position.z - pad.z;
-        if (Math.hypot(dx, dz) < 1.15 &&
-            chassisBody.position.y < pad.group.position.y + 1.45) {
-          triggerJumpPad(pad, now);
-        }
-      }
+      applyImpulseField(beacon.origin);
+      createBounceWave(
+        new THREE.Vector3(beacon.origin.x, beacon.origin.y + 0.12, beacon.origin.z),
+        0x57d8ff,
+        1.12
+      );
     }
+    beacon.group.visible = true;
+    beacon.orb.material.color.setHex(0xe5fbff);
+  }
 
-    for (let i = pads.length - 1; i >= 0; i--) {
-      const pad = pads[i];
-      if (now - pad.createdAt > 40_000) {
-        scene.remove(pad.group);
-        dispose(pad.group);
-        pads.splice(i, 1);
+  function update(delta, now = performance.now()) {
+    const canDrive = active && inMap && !game.isPaused?.();
+    if (canDrive && held.lift && loadout.has("lift")) applyJumpThrusters();
+    if (canDrive && held.forward && loadout.has("forward")) applyForwardThrusters();
+
+    updateThrusterVisuals(now);
+
+    for (let i = beacons.length - 1; i >= 0; i--) {
+      const beacon = beacons[i];
+      if (!beacon.triggered) {
+        const pulse = 1 + Math.sin((now - beacon.createdAt) * 0.012) * 0.12;
+        beacon.orb.scale.setScalar(pulse);
+        if (canDrive && now >= beacon.pulseAt) triggerBeacon(beacon);
+      }
+      if (now - beacon.createdAt > 12_000) {
+        scene.remove(beacon.group);
+        dispose(beacon.group);
+        beacons.splice(i, 1);
       }
     }
 
@@ -525,13 +675,45 @@ export function createSandboxSystem(game) {
   }
 
   function handleKeyDown(key, event) {
-    if (!active || !inMap || !game.multiplayer?.joined) return false;
+    if (!active || !inMap || !game.multiplayer?.joined || game.isPaused?.()) return false;
     if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return false;
-    const part = ({ q: "spring", e: "pad", f: "boost" })[key];
+
+    const part = ({ q: "lift", e: "forward", f: "beacon" })[key];
     if (!part) return false;
     event?.preventDefault?.();
-    activatePart(part);
+
+    if (!loadout.has(part)) {
+      if (!event?.repeat) {
+        const title = PARTS.find((item) => item.id === part)?.title || "that part";
+        game.showToast("Equip " + title + " in the builder first");
+      }
+      return true;
+    }
+
+    if (part === "lift") held.lift = true;
+    else if (part === "forward") held.forward = true;
+    else if (part === "beacon" && !event?.repeat) {
+      const now = performance.now();
+      if (now < cooldowns.beacon) return true;
+      cooldowns.beacon = now + 2200;
+      deployImpulseBeacon();
+    }
+
+    renderControlHints();
     return true;
+  }
+
+  function handleKeyUp(key) {
+    let handled = false;
+    if (key === "q") {
+      held.lift = false;
+      handled = true;
+    } else if (key === "e") {
+      held.forward = false;
+      handled = true;
+    }
+    if (handled) renderControlHints();
+    return handled;
   }
 
   document.querySelectorAll("[data-sandbox-part]").forEach((button) => {
@@ -539,8 +721,9 @@ export function createSandboxSystem(game) {
       const id = button.dataset.sandboxPart;
       if (loadout.has(id)) loadout.delete(id);
       else loadout.add(id);
+      clearHeldControls();
       applyLoadout(localCar, getLoadout());
-      if (localAttachmentGroup) localAttachmentGroup.visible = active;
+      if (localAttachment) localAttachment.group.visible = active;
       renderBuilder();
       renderControlHints();
     });
@@ -558,9 +741,16 @@ export function createSandboxSystem(game) {
     endSession,
     update,
     handleKeyDown,
-    receiveRemoteStuntEvent,
+    handleKeyUp,
+    clearHeldControls,
+    receiveRemoteStuntEvent(peerId, event) {
+      if (!active || typeof peerId !== "string" || !validStuntEvent(event)) return false;
+      return createImpulseBeacon(event);
+    },
     getLoadout,
+    getThrusterState,
     applyRemoteLoadout: applyLoadout,
+    applyRemoteThrusterState,
     updatePlayerCount,
     get active() { return active; },
     get inMap() { return inMap; }

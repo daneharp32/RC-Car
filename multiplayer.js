@@ -58,7 +58,8 @@ export function createMultiplayerSystem(game) {
       race: game.race ? game.race.getNetworkState() : null,
       ...(currentLobby?.mode === "sandbox" ? {
         inMap: game.sandbox?.inMap === true,
-        loadout: game.sandbox?.getLoadout?.() || []
+        loadout: game.sandbox?.getLoadout?.() || [],
+        thrusters: game.sandbox?.getThrusterState?.() || { lift: false, forward: false }
       } : {})
     };
   }
@@ -265,6 +266,7 @@ export function createMultiplayerSystem(game) {
       if (currentLobby?.mode === "sandbox") {
         remote.visual.root.visible = data.inMap === true;
         game.sandbox?.applyRemoteLoadout?.(remote.visual, data.loadout);
+        game.sandbox?.applyRemoteThrusterState?.(remote.visual, data.thrusters);
       }
     }
   }
