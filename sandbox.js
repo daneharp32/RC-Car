@@ -14,6 +14,7 @@ export function createSandboxSystem(game) {
   const BEACON_TRIGGER_RADIUS = 8;
   const MAX_THRUSTER_ALTITUDE = 8;
   const ALTITUDE_FADE_RANGE = 2.5;
+  const MAX_THRUSTER_YAW_RATE = 1.15;
   const PARTS = [
     { id: "lift", title: "JUMP THRUSTERS" },
     { id: "forward", title: "FORWARD THRUSTERS" },
@@ -25,6 +26,10 @@ export function createSandboxSystem(game) {
   let playerCount = 1;
   let localAttachment = null;
   const standardAngularDamping = chassisBody.angularDamping;
+  let thrusterHeadingYaw = null;
+  const chassisForwardAxis = new CANNON.Vec3(0, 0, 1);
+  const chassisWorldForward = new CANNON.Vec3();
+  const chassisWorldUp = new CANNON.Vec3(0, 1, 0);
 
   function dispose(root) {
     root.traverse((object) => {
@@ -539,55 +544,6 @@ export function createSandboxSystem(game) {
     return true;
   }
 
-  function stabilizeVehicleAttitude() {
-    const current = new THREE.Quaternion(
-      chassisBody.quaternion.x,
-      chassisBody.quaternion.y,
-      chassisBody.quaternion.z,
-      chassisBody.quaternion.w
-    );
-    const worldUp = new THREE.Vector3(0, 1, 0);
-    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(current);
-    forward.y = 0;
-    if (forward.lengthSq() < 0.0001) forward.set(0, 0, -1);
-    forward.normalize();
-
-    const right = new THREE.Vector3().crossVectors(forward, worldUp).normalize();
-    const up = new THREE.Vector3().crossVectors(right, forward).normalize();
-    const backward = forward.clone().negate();
-    const targetMatrix = new THREE.Matrix4().makeBasis(right, up, backward);
-    const target = new THREE.Quaternion().setFromRotationMatrix(targetMatrix);
-    const correction = target.clone().multiply(current.clone().invert()).normalize();
-    if (correction.w < 0) {
-      correction.set(-correction.x, -correction.y, -correction.z, -correction.w);
-    }
-
-    const sinHalf = Math.hypot(correction.x, correction.y, correction.z);
-    if (sinHalf < 0.00001) return;
-
-    const angle = 2 * Math.atan2(sinHalf, Math.max(0, correction.w));
-    const axis = new THREE.Vector3(
-      correction.x / sinHalf,
-      correction.y / sinHalf,
-      correction.z / sinHalf
-    );
-    const angularVelocity = new THREE.Vector3(
-      chassisBody.angularVelocity.x,
-      chassisBody.angularVelocity.y,
-      chassisBody.angularVelocity.z
-    );
-    // Preserve yaw while damping unwanted pitch and roll.
-    angularVelocity.addScaledVector(
-      worldUp,
-      -angularVelocity.dot(worldUp)
-    );
-    // Use a gentle correction so the truck levels smoothly instead of snapping.
-    const torque = axis.multiplyScalar(angle * 24)
-      .addScaledVector(angularVelocity, -8);
-    if (torque.lengthSq() > 32 * 32) torque.setLength(32);
-    chassisBody.applyTorque(new CANNON.Vec3(torque.x, torque.y, torque.z));
-  }
-
   function applyJumpThrusters() {
     const mass = chassisBody.mass || 10.5;
     const verticalSpeed = chassisBody.velocity.y;
@@ -605,7 +561,6 @@ export function createSandboxSystem(game) {
       new CANNON.Vec3(0, liftForce, 0),
       chassisBody.position
     );
-    stabilizeVehicleAttitude();
     chassisBody.wakeUp();
   }
 
@@ -616,12 +571,12 @@ export function createSandboxSystem(game) {
       chassisBody.quaternion.z,
       chassisBody.quaternion.w
     );
-    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(current);
+    // RaycastVehicle uses local +Z as forward; match the physics vehicle axis.
+    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(current);
     forward.y = 0;
-    if (forward.lengthSq() < 0.0001) forward.set(0, 0, -1);
+    if (forward.lengthSq() < 0.0001) forward.set(0, 0, 1);
     forward.normalize();
 
-    stabilizeVehicleAttitude();
     const forwardCannon = new CANNON.Vec3(forward.x, 0, forward.z);
     const forwardSpeed = chassisBody.velocity.dot(forwardCannon);
     const maxForwardSpeed = 12;
@@ -635,6 +590,64 @@ export function createSandboxSystem(game) {
       chassisBody.position
     );
     chassisBody.wakeUp();
+  }
+
+  function postPhysicsUpdate(delta) {
+    const state = getThrusterState();
+    const thrustersActive = state.lift || state.forward;
+    if (!thrustersActive) {
+      thrusterHeadingYaw = null;
+      return;
+    }
+
+    // The physics vehicle drives along local +Z. Preserve its heading, but
+    // remove pitch and roll after every physics step so booster forces,
+    // airborne controls, or wheel contacts cannot accumulate a flip.
+    chassisBody.quaternion.vmult(chassisForwardAxis, chassisWorldForward);
+    const horizontalLength = Math.hypot(chassisWorldForward.x, chassisWorldForward.z);
+    const q = chassisBody.quaternion;
+    const measuredYaw = horizontalLength > 0.05
+      ? Math.atan2(chassisWorldForward.x, chassisWorldForward.z)
+      : Math.atan2(
+          2 * (q.w * q.y + q.x * q.z),
+          1 - 2 * (q.y * q.y + q.z * q.z)
+        );
+
+    if (thrusterHeadingYaw === null || !Number.isFinite(thrusterHeadingYaw)) {
+      thrusterHeadingYaw = Number.isFinite(measuredYaw) ? measuredYaw : 0;
+    } else if (Number.isFinite(measuredYaw)) {
+      const yawDifference = Math.atan2(
+        Math.sin(measuredYaw - thrusterHeadingYaw),
+        Math.cos(measuredYaw - thrusterHeadingYaw)
+      );
+      const maxYawChange = MAX_THRUSTER_YAW_RATE * Math.max(0, delta);
+      thrusterHeadingYaw += THREE.MathUtils.clamp(
+        yawDifference,
+        -maxYawChange,
+        maxYawChange
+      );
+    }
+
+    chassisBody.quaternion.setFromAxisAngle(chassisWorldUp, thrusterHeadingYaw);
+    // Keep normal steering available, but limit yaw spin and completely remove
+    // pitch/roll angular velocity while either thruster is held.
+    chassisBody.angularVelocity.set(
+      0,
+      THREE.MathUtils.clamp(
+        chassisBody.angularVelocity.y,
+        -MAX_THRUSTER_YAW_RATE,
+        MAX_THRUSTER_YAW_RATE
+      ),
+      0
+    );
+    if (chassisBody.previousQuaternion) {
+      chassisBody.previousQuaternion.copy(chassisBody.quaternion);
+    }
+    if (chassisBody.interpolatedQuaternion) {
+      chassisBody.interpolatedQuaternion.copy(chassisBody.quaternion);
+    }
+    chassisBody.aabbNeedsUpdate = true;
+    chassisBody.updateInertiaWorld?.(true);
   }
 
   function isLocalCarNearBeacon(beacon) {
@@ -769,6 +782,7 @@ export function createSandboxSystem(game) {
     enterMap,
     endSession,
     update,
+    postPhysicsUpdate,
     handleKeyDown,
     handleKeyUp,
     clearHeldControls,
