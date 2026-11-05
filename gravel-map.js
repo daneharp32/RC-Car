@@ -92,16 +92,29 @@ export function createGravelBasinSystem({ THREE, scene }) {
   const elementSize = size / segments;
   const random = makeSeededRandom(90617);
 
+  // A spread of broad, driveable jump faces. Their footprints are long enough
+  // to give the short-course truck a progressive approach and landing.
   const jumpFeatures = [
     { x: -27, z: -24, yaw: -0.38, width: 19, length: 24, height: 1.18, plateau: 0.28 },
     { x: 25, z: -38, yaw: 0.62, width: 17, length: 20, height: 0.92, plateau: 0.20 },
     { x: 40, z: 18, yaw: -0.50, width: 15, length: 18, height: 0.82, plateau: 0.16 },
-    { x: -34, z: 48, yaw: 0.32, width: 16, length: 19, height: 0.88, plateau: 0.18 }
+    { x: -34, z: 48, yaw: 0.32, width: 16, length: 19, height: 0.88, plateau: 0.18 },
+    { x: -68, z: -8, yaw: -0.55, width: 22, length: 27, height: 1.25, plateau: 0.24 },
+    { x: 3, z: 18, yaw: 0.24, width: 22, length: 27, height: 1.35, plateau: 0.30 },
+    { x: 54, z: 49, yaw: -0.58, width: 21, length: 26, height: 1.18, plateau: 0.24 },
+    { x: -63, z: 70, yaw: 0.30, width: 20, length: 24, height: 1.08, plateau: 0.20 },
+    { x: 7, z: -83, yaw: 0.64, width: 22, length: 27, height: 1.32, plateau: 0.27 },
+    { x: -61, z: -68, yaw: -0.22, width: 21, length: 25, height: 1.12, plateau: 0.22 }
   ];
 
+  // Large rolling mounds sit between the shaped jumps so the whole basin
+  // feels irregular rather than like a flat field with isolated ramps.
   const broadHills = [
     [-54, -5, 0.52, 16], [54, -17, 0.62, 19], [8, 53, 0.42, 15],
-    [-48, 54, 0.48, 18], [43, 57, 0.36, 14], [2, -66, 0.30, 17]
+    [-48, 54, 0.48, 18], [43, 57, 0.36, 14], [2, -66, 0.30, 17],
+    [-72, 31, 0.92, 14], [4, -2, 1.02, 16], [71, 37, 0.82, 14],
+    [-59, 82, 0.90, 14], [24, -72, 0.72, 13], [-9, -53, 0.84, 15],
+    [-7, 78, 0.58, 13], [42, -5, 0.64, 12]
   ];
 
   function terrainHeight(x, z) {
@@ -204,6 +217,140 @@ export function createGravelBasinSystem({ THREE, scene }) {
   terrain.receiveShadow = true;
   terrain.castShadow = false;
   mapGroup.add(terrain);
+
+  // Raised concrete overlook, a long driveable descent, and a broad staircase.
+  // The terrain remains gravel underneath; separate static collision boxes
+  // provide the deck/ramp/stair surfaces without turning the whole map into a track.
+  const concreteMaterial = new THREE.MeshStandardMaterial({
+    color: 0x92918c, roughness: 0.92, metalness: 0.015
+  });
+  const concreteEdgeMaterial = new THREE.MeshStandardMaterial({
+    color: 0x686b6c, roughness: 0.88, metalness: 0.035
+  });
+  const concreteMarkMaterial = new THREE.MeshStandardMaterial({
+    color: 0x4b5051, roughness: 0.96, metalness: 0
+  });
+  const staticBoxes = [];
+  const concreteFeature = {
+    centerX: 66,
+    deckY: 4.9,
+    deckZ: -80.5,
+    deckWidth: 44,
+    deckLength: 35,
+    rampX: 66,
+    rampStartZ: -63,
+    rampEndZ: -13,
+    rampWidth: 18,
+    rampLength: 50,
+    stairX: 80.7,
+    stairWidth: 6.8,
+    stairCount: 20
+  };
+  const rampDrop = concreteFeature.deckY - 0.25;
+  const rampAngle = Math.asin(rampDrop / concreteFeature.rampLength);
+  const rampCenterZ = (concreteFeature.rampStartZ + concreteFeature.rampEndZ) * 0.5;
+  const rampTopCenterY = (concreteFeature.deckY + 0.25) * 0.5;
+  const rampThickness = 0.52;
+  const rampCenterY = rampTopCenterY - rampThickness * 0.5 * Math.cos(rampAngle);
+
+  function addConcreteBox(name, width, height, length, x, y, z, material, rotationX = 0, collidable = true) {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, length), material);
+    mesh.name = name;
+    mesh.position.set(x, y, z);
+    mesh.rotation.x = rotationX;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mapGroup.add(mesh);
+    if (collidable) {
+      staticBoxes.push({
+        x, y, z,
+        halfWidth: width * 0.5,
+        halfHeight: height * 0.5,
+        halfLength: length * 0.5,
+        rotationX
+      });
+    }
+    return mesh;
+  }
+
+  // Large, flat concrete pad with a visible thick edge and six supporting piers.
+  addConcreteBox(
+    "elevated-concrete-deck",
+    concreteFeature.deckWidth, 0.72, concreteFeature.deckLength,
+    concreteFeature.centerX, concreteFeature.deckY - 0.36, concreteFeature.deckZ,
+    concreteMaterial
+  );
+  for (const x of [47.5, 84.5]) {
+    for (const z of [-94.0, -67.0]) {
+      addConcreteBox("concrete-deck-support-pier", 1.15, 4.15, 1.15,
+        x, 2.075, z, concreteEdgeMaterial);
+    }
+  }
+  addConcreteBox("deck-back-retaining-edge", 44, 0.42, 0.55,
+    concreteFeature.centerX, concreteFeature.deckY + 0.21, -97.7, concreteEdgeMaterial);
+  addConcreteBox("deck-west-safety-edge", 0.48, 0.48, 33,
+    44.0, concreteFeature.deckY + 0.24, -80.5, concreteEdgeMaterial);
+
+  // Long concrete ramp: its top plane meets the deck exactly and descends
+  // smoothly to the gravel at the foot. Low side curbs follow the same slope.
+  addConcreteBox(
+    "long-concrete-descent-ramp",
+    concreteFeature.rampWidth, rampThickness, concreteFeature.rampLength,
+    concreteFeature.rampX, rampCenterY, rampCenterZ,
+    concreteMaterial, rampAngle
+  );
+  for (const side of [-1, 1]) {
+    addConcreteBox(
+      "concrete-ramp-side-curb",
+      0.42, 0.68, concreteFeature.rampLength - 0.4,
+      concreteFeature.rampX + side * (concreteFeature.rampWidth * 0.5 + 0.28),
+      rampTopCenterY + 0.34, rampCenterZ,
+      concreteEdgeMaterial, rampAngle
+    );
+  }
+
+  // Expansion joints on the deck and narrow transverse grip seams on the ramp.
+  for (let i = 1; i < 7; i++) {
+    const x = 45.5 + i * 6.0;
+    addConcreteBox("deck-expansion-joint", 0.035, 0.012, 33,
+      x, concreteFeature.deckY + 0.367, concreteFeature.deckZ,
+      concreteMarkMaterial, 0, false);
+  }
+  for (let i = 1; i < 24; i++) {
+    const z = concreteFeature.rampStartZ + i * (concreteFeature.rampLength / 24);
+    const progress = (z - concreteFeature.rampStartZ) / concreteFeature.rampLength;
+    const y = concreteFeature.deckY - rampDrop * progress + 0.015;
+    addConcreteBox("concrete-ramp-grip-seam", concreteFeature.rampWidth - 2.0, 0.024, 0.095,
+      concreteFeature.rampX, y, z, concreteMarkMaterial, rampAngle, false);
+  }
+
+  // Full-width block steps run beside the ramp from deck height down to grade.
+  // Each tier has a matching collision box so the staircase is physically solid.
+  const stairBaseY = 0.25;
+  const stairRise = rampDrop / concreteFeature.stairCount;
+  const stairDepth = concreteFeature.rampLength / concreteFeature.stairCount;
+  for (let i = 0; i < concreteFeature.stairCount; i++) {
+    const topY = concreteFeature.deckY - (i + 1) * stairRise;
+    const blockHeight = Math.max(0.06, topY - stairBaseY);
+    const z = concreteFeature.rampStartZ + (i + 0.5) * stairDepth;
+    addConcreteBox(
+      "broad-concrete-stair-step-" + (i + 1),
+      concreteFeature.stairWidth, blockHeight, stairDepth - 0.04,
+      concreteFeature.stairX, stairBaseY + blockHeight * 0.5, z,
+      i % 4 === 0 ? concreteEdgeMaterial : concreteMaterial
+    );
+    addConcreteBox(
+      "stair-tread-nosing-" + (i + 1),
+      concreteFeature.stairWidth - 0.12, 0.025, 0.10,
+      concreteFeature.stairX, topY + 0.014, z - (stairDepth - 0.04) * 0.5 + 0.10,
+      concreteMarkMaterial, 0, false
+    );
+  }
+
+  // A small concrete apron at the bottom joins the ramp to the surrounding gravel.
+  addConcreteBox("ramp-bottom-apron", 20, 0.32, 5.5,
+    concreteFeature.rampX, 0.12, concreteFeature.rampEndZ + 2.7,
+    concreteMaterial);
 
   // A darker loose-gravel skirt blends the terrain into the tree line without a wall or curb.
   const outerGround = new THREE.Mesh(
@@ -434,7 +581,9 @@ export function createGravelBasinSystem({ THREE, scene }) {
           const dz = z - car.z;
           return dx * dx + dz * dz < 17 * 17;
         });
-        if (!nearCar) {
+        const nearConcreteStructure =
+          x > 39 && x < 94 && z > -104 && z < -8;
+        if (!nearCar && !nearConcreteStructure) {
           treeSpots.push({
             x, z,
             yaw: random() * Math.PI * 2,
@@ -568,15 +717,26 @@ export function createGravelBasinSystem({ THREE, scene }) {
     yaw: Math.atan2(-spawnTangent.x, -spawnTangent.z)
   };
 
-  const obstacles = parkedCars.map((car) => ({
-    x: car.x,
-    z: car.z,
-    y: car.centerY,
-    yaw: car.yaw,
-    halfWidth: car.halfWidth,
-    halfHeight: car.halfHeight,
-    halfLength: car.halfLength
-  }));
+  const obstacles = [
+    ...parkedCars.map((car) => ({
+      x: car.x,
+      z: car.z,
+      y: car.centerY,
+      yaw: car.yaw,
+      halfWidth: car.halfWidth,
+      halfHeight: car.halfHeight,
+      halfLength: car.halfLength
+    })),
+    ...staticBoxes.map((box) => ({
+      x: box.x,
+      y: box.y,
+      z: box.z,
+      yaw: 0,
+      halfWidth: box.halfWidth,
+      halfHeight: box.halfHeight,
+      halfLength: box.halfLength
+    }))
+  ];
 
   return {
     arenaVisuals: [mapGroup],
@@ -595,6 +755,7 @@ export function createGravelBasinSystem({ THREE, scene }) {
         originZ: half
       },
       obstacles,
+      staticBoxes,
       spawn,
       standCamera: { x: 0, y: 13.5, z: 20 },
       raceGates,
