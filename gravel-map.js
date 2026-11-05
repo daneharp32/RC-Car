@@ -75,8 +75,91 @@ function makeGravelTexture(THREE) {
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
   texture.repeat.set(34, 34);
-  texture.anisotropy = 8;
+  texture.anisotropy = 4;
   return texture;
+}
+
+
+// Static environmental pieces are grouped into a handful of material batches.
+// This keeps detailed parked cars and the concrete architecture while avoiding
+// hundreds of individual draw calls every frame.
+function mergeStaticMeshes(THREE, group, namePrefix) {
+  const sourceMeshes = group.children.filter((child) => child.isMesh);
+  if (sourceMeshes.length < 2) return;
+
+  const buckets = new Map();
+  const sourceGeometries = new Set();
+
+  for (const mesh of sourceMeshes) {
+    mesh.updateMatrix();
+    let geometry = mesh.geometry.clone();
+    sourceGeometries.add(mesh.geometry);
+    geometry.applyMatrix4(mesh.matrix);
+    if (geometry.index) {
+      const expanded = geometry.toNonIndexed();
+      geometry.dispose();
+      geometry = expanded;
+    }
+
+    const key = mesh.material.uuid;
+    let bucket = buckets.get(key);
+    if (!bucket) {
+      bucket = {
+        material: mesh.material,
+        attributes: new Map(),
+        castShadow: false,
+        receiveShadow: false
+      };
+      buckets.set(key, bucket);
+    }
+    bucket.castShadow = bucket.castShadow || mesh.castShadow;
+    bucket.receiveShadow = bucket.receiveShadow || mesh.receiveShadow;
+
+    for (const [attributeName, attribute] of Object.entries(geometry.attributes)) {
+      let target = bucket.attributes.get(attributeName);
+      if (!target) {
+        target = {
+          itemSize: attribute.itemSize,
+          normalized: attribute.normalized,
+          typedArray: attribute.array.constructor,
+          arrays: [],
+          length: 0
+        };
+        bucket.attributes.set(attributeName, target);
+      }
+      target.arrays.push(attribute.array);
+      target.length += attribute.array.length;
+    }
+    geometry.dispose();
+  }
+
+  for (const mesh of sourceMeshes) group.remove(mesh);
+  for (const geometry of sourceGeometries) geometry.dispose();
+
+  let batchIndex = 0;
+  for (const bucket of buckets.values()) {
+    const geometry = new THREE.BufferGeometry();
+    for (const [attributeName, data] of bucket.attributes) {
+      const merged = new data.typedArray(data.length);
+      let offset = 0;
+      for (const array of data.arrays) {
+        merged.set(array, offset);
+        offset += array.length;
+      }
+      geometry.setAttribute(
+        attributeName,
+        new THREE.BufferAttribute(merged, data.itemSize, data.normalized)
+      );
+    }
+    geometry.computeBoundingBox();
+    geometry.computeBoundingSphere();
+
+    const batch = new THREE.Mesh(geometry, bucket.material);
+    batch.name = namePrefix + "-batch-" + batchIndex++;
+    batch.castShadow = bucket.castShadow;
+    batch.receiveShadow = bucket.receiveShadow;
+    group.add(batch);
+  }
 }
 
 export function createGravelBasinSystem({ THREE, scene }) {
@@ -231,6 +314,8 @@ export function createGravelBasinSystem({ THREE, scene }) {
     color: 0x4b5051, roughness: 0.96, metalness: 0
   });
   const staticBoxes = [];
+  const concreteGroup = new THREE.Group();
+  concreteGroup.name = "batched-concrete-architecture";
   const concreteFeature = {
     centerX: 66,
     deckY: 4.9,
@@ -260,7 +345,7 @@ export function createGravelBasinSystem({ THREE, scene }) {
     mesh.rotation.x = rotationX;
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-    mapGroup.add(mesh);
+    concreteGroup.add(mesh);
     if (collidable) {
       staticBoxes.push({
         x, y, z,
@@ -351,6 +436,8 @@ export function createGravelBasinSystem({ THREE, scene }) {
   addConcreteBox("ramp-bottom-apron", 20, 0.32, 5.5,
     concreteFeature.rampX, 0.12, concreteFeature.rampEndZ + 2.7,
     concreteMaterial);
+  mergeStaticMeshes(THREE, concreteGroup, "concrete");
+  mapGroup.add(concreteGroup);
 
   // A darker loose-gravel skirt blends the terrain into the tree line without a wall or curb.
   const outerGround = new THREE.Mesh(
@@ -363,7 +450,7 @@ export function createGravelBasinSystem({ THREE, scene }) {
   mapGroup.add(outerGround);
 
   // Scattered low rocks sit directly on the sculpted surface as visual gravel detail.
-  const rockCount = 720;
+  const rockCount = 380;
   const rockGeometry = new THREE.DodecahedronGeometry(0.15, 0);
   const rockMaterial = new THREE.MeshStandardMaterial({
     color: 0x8a857b, roughness: 1, metalness: 0
@@ -388,8 +475,8 @@ export function createGravelBasinSystem({ THREE, scene }) {
     rockDummy.updateMatrix();
     rocks.setMatrixAt(rockIndex++, rockDummy.matrix);
   }
-  rocks.castShadow = true;
-  rocks.receiveShadow = true;
+  rocks.castShadow = false;
+  rocks.receiveShadow = false;
   rocks.instanceMatrix.needsUpdate = true;
   rocks.computeBoundingSphere();
   mapGroup.add(rocks);
@@ -490,9 +577,9 @@ export function createGravelBasinSystem({ THREE, scene }) {
 
     // Four full-size all-terrain tyres with alloy rims, hubs, and lug detail.
     const wheelZ = definition.type === "pickup" ? [-4.75, 4.75] : [-4.65, 4.65];
-    const wheelGeometry = new THREE.CylinderGeometry(1.12, 1.12, 0.66, 24, 1);
-    const rimGeometry = new THREE.CylinderGeometry(0.70, 0.70, 0.69, 20, 1);
-    const hubGeometry = new THREE.CylinderGeometry(0.30, 0.30, 0.72, 16, 1);
+    const wheelGeometry = new THREE.CylinderGeometry(1.12, 1.12, 0.66, 16, 1);
+    const rimGeometry = new THREE.CylinderGeometry(0.70, 0.70, 0.69, 14, 1);
+    const hubGeometry = new THREE.CylinderGeometry(0.30, 0.30, 0.72, 12, 1);
     for (const x of [-2.63, 2.63]) {
       for (const z of wheelZ) {
         const wheel = new THREE.Mesh(wheelGeometry, rubber);
@@ -512,7 +599,7 @@ export function createGravelBasinSystem({ THREE, scene }) {
         car.add(hub);
         for (let lug = 0; lug < 6; lug++) {
           const angle = lug / 6 * Math.PI * 2;
-          const bolt = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6), blackPlastic);
+          const bolt = new THREE.Mesh(new THREE.SphereGeometry(0.055, 6, 4), blackPlastic);
           bolt.position.set(
             x + Math.sign(x) * 0.43,
             1.15 + Math.sin(angle) * 0.44,
@@ -545,6 +632,25 @@ export function createGravelBasinSystem({ THREE, scene }) {
         box(0.11, 0.16, 0.18, side * 2.15, 4.48, cabinZ + z, darkPaint);
       }
     }
+
+    mergeStaticMeshes(THREE, car, "parked-" + definition.type);
+    // A soft decal-like contact shadow replaces three cars' many shadow casters.
+    const contactShadow = new THREE.Mesh(
+      new THREE.CircleGeometry(1, 24),
+      new THREE.MeshBasicMaterial({
+        color: 0x171716,
+        transparent: true,
+        opacity: 0.22,
+        depthWrite: false,
+        toneMapped: false
+      })
+    );
+    contactShadow.name = "parked-car-contact-shadow";
+    contactShadow.rotation.x = -Math.PI / 2;
+    contactShadow.position.set(definition.x, car.position.y + 0.035, definition.z);
+    contactShadow.scale.set(3.05, 7.25, 1);
+    contactShadow.renderOrder = 1;
+    mapGroup.add(contactShadow);
 
     parkedCars.push({
       x: definition.x,
@@ -641,8 +747,10 @@ export function createGravelBasinSystem({ THREE, scene }) {
   }
 
   for (const mesh of [trunks, lower, middle, upper]) {
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
+    // Dense perimeter instancing looks good under directional lighting;
+    // disabling per-instance shadows avoids four expensive shadow draws.
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
     mesh.instanceMatrix.needsUpdate = true;
     mesh.computeBoundingSphere();
     treeGroup.add(mesh);
