@@ -196,22 +196,45 @@ const {
 const makeCarVisual = createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellGeometry });
 const localCar = makeCarVisual(0xffa33d);
 
-// Load the optional Concept4 shell only when the Garage is opened. This keeps
-// the initial menu fast and leaves the current body available if the asset is
-// absent or cannot be decoded.
+// Load the optional Concept4 shell only when the Garage is opened. Resolve
+// the asset against this module (not the current page URL), check the HTTP
+// response explicitly, then parse the downloaded GLTF so failures are clear.
+const alternateShellModelUrl = new URL("./assets/FF_SC_Concept4.gltf", import.meta.url);
 let alternateShellLoadPromise = null;
 function loadAlternateShellModel() {
   if (makeCarVisual.hasAlternateShell()) return Promise.resolve(true);
   if (!alternateShellLoadPromise) {
-    alternateShellLoadPromise = new GLTFLoader()
-      .loadAsync("./assets/FF_SC_Concept4.gltf")
+    alternateShellLoadPromise = fetch(alternateShellModelUrl.href, { cache: "no-store" })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Model request failed: HTTP ${response.status} ${response.statusText}`);
+        }
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.toLowerCase().includes("text/html")) {
+          throw new Error("The model URL returned the game page instead of the GLTF file.");
+        }
+        return response.arrayBuffer();
+      })
+      .then((data) => {
+        if (!data || data.byteLength < 1024) {
+          throw new Error("The model response was empty or unexpectedly small.");
+        }
+        const loader = new GLTFLoader();
+        return loader.parseAsync(data, new URL("./", alternateShellModelUrl).href);
+      })
       .then((gltf) => {
+        if (!gltf || !gltf.scene) {
+          throw new Error("The GLTF file loaded but did not contain a usable scene.");
+        }
         localCar.setAlternateShellObject(gltf.scene);
-        console.info("Concept4 alternate shell loaded.");
+        console.info("Concept4 alternate shell loaded.", {
+          url: alternateShellModelUrl.href
+        });
         return true;
       })
       .catch((error) => {
         alternateShellLoadPromise = null;
+        console.error("Concept4 alternate shell load failed:", error);
         throw error;
       });
   }
