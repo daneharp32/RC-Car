@@ -754,7 +754,9 @@ export function createGravelBasinSystem({ THREE, scene }) {
   treeGroup.name = "gravel-basin-perimeter-trees";
   const treeDummy = new THREE.Object3D();
   const treeCount = treeSpots.length;
-  const trunkGeometry = new THREE.CylinderGeometry(0.095, 0.18, 1, 7, 1);
+  // Give the tall perimeter pines substantial, tapered trunks rather than
+  // the very thin stems used in the first pass.
+  const trunkGeometry = new THREE.CylinderGeometry(0.14, 0.31, 1, 10, 1);
   const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x51402e, roughness: 1 });
   const lowerMaterial = new THREE.MeshStandardMaterial({ color: 0x1d3b2b, roughness: 1 });
   const middleMaterial = new THREE.MeshStandardMaterial({ color: 0x28513a, roughness: 1 });
@@ -773,7 +775,7 @@ export function createGravelBasinSystem({ THREE, scene }) {
     const scale = tree.scale;
     treeDummy.position.set(tree.x, ground + 0.72 * scale, tree.z);
     treeDummy.rotation.set(0, tree.yaw, 0);
-    treeDummy.scale.set(0.17 * scale, 1.45 * scale, 0.17 * scale);
+    treeDummy.scale.set(0.42 * scale, 1.45 * scale, 0.42 * scale);
     treeDummy.updateMatrix();
     trunks.setMatrixAt(i, treeDummy.matrix);
 
