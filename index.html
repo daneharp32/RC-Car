@@ -77,6 +77,131 @@
     }
     .menu-description { margin: 0 0 22px; color: #aebfce; font-size: 12px; letter-spacing: .035em; }
     .menu-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+    #menuSandboxButton { grid-column: 1 / -1; }
+    .sandbox-builder-screen {
+      position: fixed; z-index: 4; inset: 0; display: none; pointer-events: none;
+      background: linear-gradient(90deg, rgba(5,12,21,.28), transparent 34%, transparent 66%, rgba(5,12,21,.30));
+    }
+    .sandbox-builder-heading {
+      position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
+      width: min(620px, calc(100vw - 32px)); text-align: center; pointer-events: none;
+      text-shadow: 0 3px 18px rgba(0,0,0,.4);
+    }
+    .sandbox-builder-heading h1 {
+      margin: 8px 0 5px; color: #f4f9ff;
+      font: 900 clamp(23px, 4vw, 37px)/1.05 "Orbitron",ui-sans-serif,sans-serif;
+      letter-spacing: -.035em;
+    }
+    .sandbox-builder-heading p {
+      margin: 0; color: #c5d2de; font-size: 10px; letter-spacing: .08em;
+    }
+    .sandbox-builder-card {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      width: min(310px, calc(29vw - 16px)); max-height: min(74vh, 650px);
+      overflow-y: auto; padding: 17px;
+      border: 1px solid rgba(155,205,255,.24); border-radius: 16px;
+      background: rgba(8,18,30,.91); backdrop-filter: blur(15px);
+      box-shadow: 0 20px 65px rgba(0,0,0,.34); pointer-events: auto;
+    }
+    .sandbox-builder-left { left: 18px; }
+    .sandbox-builder-right { right: 18px; }
+    .sandbox-card-kicker {
+      color: #78c2ff; font-size: 9px; font-weight: 900; letter-spacing: .17em;
+    }
+    .sandbox-card-title {
+      margin: 7px 0 8px; color: #f1f7fc;
+      font: 800 17px "Orbitron",ui-sans-serif,sans-serif; letter-spacing: -.02em;
+    }
+    .sandbox-card-copy {
+      margin: 0 0 13px; color: #aebfce; font-size: 10px; line-height: 1.5;
+    }
+    #sandboxPartsList { display: grid; gap: 9px; }
+    .sandbox-part-option {
+      display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 9px;
+      padding: 10px; border: 1px solid rgba(155,205,255,.17); border-radius: 11px;
+      background: rgba(255,255,255,.045);
+    }
+    .sandbox-part-option.selected {
+      border-color: rgba(91,190,255,.68);
+      background: linear-gradient(145deg, rgba(35,125,197,.28), rgba(12,27,43,.82));
+      box-shadow: inset 0 0 0 1px rgba(91,190,255,.12);
+    }
+    .sandbox-part-copy { min-width: 0; }
+    .sandbox-part-type {
+      margin-bottom: 5px; color: #75bdff; font-size: 8px;
+      font-weight: 900; letter-spacing: .15em;
+    }
+    .sandbox-part-copy strong {
+      display: block; color: #f5f9fd; font: 800 10px "Orbitron",ui-sans-serif,sans-serif;
+      line-height: 1.35;
+    }
+    .sandbox-part-copy p { margin: 5px 0 0; color: #aebfce; font-size: 9px; line-height: 1.45; }
+    .sandbox-part-toggle {
+      min-width: 55px; min-height: 31px; padding: 0 8px; border-radius: 7px;
+      border: 1px solid rgba(115,190,255,.32); background: rgba(37,143,233,.2);
+      color: #eaf5ff; font: 900 8px "Orbitron",ui-sans-serif,sans-serif;
+    }
+    .sandbox-build-summary {
+      min-height: 62px; margin: 0 0 14px; padding: 11px;
+      border: 1px solid rgba(155,205,255,.16); border-radius: 10px;
+      background: rgba(255,255,255,.04); color: #c4d3df; font-size: 10px; line-height: 1.55;
+    }
+    .sandbox-map-field { display: grid; gap: 7px; margin: 0 0 13px; }
+    .sandbox-map-field span {
+      color: #9ecfff; font-size: 9px; font-weight: 900; letter-spacing: .15em;
+    }
+    #sandboxMapSelect {
+      height: 42px; border: 1px solid rgba(155,205,255,.24); border-radius: 9px;
+      background: #142638; color: #f4f8fc; font: 800 10px "Orbitron",ui-sans-serif,sans-serif;
+    }
+    #sandboxStartButton, #sandboxBuilderBackButton {
+      width: 100%; min-height: 43px; margin-top: 8px;
+      font: 900 9px "Orbitron",ui-sans-serif,sans-serif; letter-spacing: .08em;
+    }
+    #sandboxStartButton {
+      background: linear-gradient(145deg,#258fe9,#1456bd); color: #f7fbff;
+      box-shadow: 0 8px 22px rgba(16,102,202,.22);
+    }
+    #sandboxBuilderBackButton {
+      border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.07);
+      color: #dcecff;
+    }
+    .sandbox-builder-footer {
+      position: absolute; left: 50%; bottom: 17px; transform: translateX(-50%);
+      color: #d2e2ef; font-size: 9px; font-weight: 800;
+      letter-spacing: .1em; text-align: center; pointer-events: none;
+      text-shadow: 0 2px 8px rgba(0,0,0,.65);
+    }
+    #sandboxHudCard {
+      display: none; position: absolute; z-index: 3; left: 50%; bottom: 18px;
+      transform: translateX(-50%); min-width: 300px; padding: 9px 10px;
+      text-align: center; pointer-events: auto;
+    }
+    .sandbox-hud-actions { display: flex; gap: 6px; margin-top: 7px; }
+    .sandbox-hud-button {
+      flex: 1; min-height: 31px; padding: 0 8px; border-radius: 7px;
+      border: 1px solid rgba(105,180,255,.3); background: rgba(37,143,233,.2);
+      color: #eaf5ff; font: 900 8px "Orbitron",ui-sans-serif,sans-serif;
+      pointer-events: auto;
+    }
+    #sandboxReturnButton { width: 100%; min-height: 38px; margin-bottom: 9px; }
+    @media (max-width: 760px) {
+      .sandbox-builder-heading { top: 10px; }
+      .sandbox-builder-heading h1 { margin: 5px 0 3px; font-size: 21px; }
+      .sandbox-builder-heading p { font-size: 8px; }
+      .sandbox-builder-card {
+        top: auto; bottom: 12px; transform: none; width: calc(50% - 18px);
+        max-height: 38vh; padding: 11px; border-radius: 12px;
+      }
+      .sandbox-builder-left { left: 10px; }
+      .sandbox-builder-right { right: 10px; }
+      .sandbox-card-title { font-size: 13px; }
+      .sandbox-part-option { grid-template-columns: minmax(0,1fr); padding: 8px; gap: 6px; }
+      .sandbox-part-toggle { width: 100%; min-height: 27px; }
+      .sandbox-part-copy p { font-size: 8px; }
+      .sandbox-builder-footer { bottom: calc(38vh + 20px); width: calc(100% - 24px); }
+      #sandboxHudCard { bottom: 12px; min-width: 270px; }
+    }
     .menu-button {
       min-height: 48px; padding: 0 15px; color: #f5faff;
       border: 1px solid rgba(115,190,255,.34);
@@ -517,6 +642,7 @@
       <div class="menu-actions">
         <button id="menuDriveButton" class="menu-button" type="button">DRIVE</button>
         <button id="menuGarageButton" class="menu-button secondary" type="button">GARAGE</button>
+        <button id="menuSandboxButton" class="menu-button secondary" type="button">SANDBOX</button>
       </div>
     </div>
   </section>
@@ -568,6 +694,35 @@
     </div>
     <button id="shellToggleButton" class="menu-button secondary" type="button">REMOVE BODY SHELL</button>
     <button id="garageBackButton" type="button">BACK TO MAIN MENU</button>
+  </section>
+
+  <section id="sandboxBuilderPanel" class="sandbox-builder-screen" style="display:none">
+    <div class="sandbox-builder-heading">
+      <div class="menu-kicker">SANDBOX WORKSHOP</div>
+      <h1>BUILD YOUR TRUCK</h1>
+      <p>FIT ARCADE ATTACHMENTS BEFORE ENTERING THE MAP</p>
+    </div>
+
+    <aside class="sandbox-builder-card sandbox-builder-left">
+      <div class="sandbox-card-kicker">PARTS CATALOG</div>
+      <h2 class="sandbox-card-title">AVAILABLE PARTS</h2>
+      <p class="sandbox-card-copy">Add or remove attachments and watch the truck update in the center of the workshop.</p>
+      <div id="sandboxPartsList"></div>
+    </aside>
+
+    <aside class="sandbox-builder-card sandbox-builder-right">
+      <div class="sandbox-card-kicker">YOUR BUILD</div>
+      <h2 class="sandbox-card-title">READY TO RUN?</h2>
+      <div id="sandboxBuildSummary" class="sandbox-build-summary">No attachments selected yet.</div>
+      <label class="sandbox-map-field">
+        <span>CHOOSE A MAP</span>
+        <select id="sandboxMapSelect" aria-label="Sandbox map"></select>
+      </label>
+      <button id="sandboxStartButton" type="button">ENTER SANDBOX</button>
+      <button id="sandboxBuilderBackButton" type="button">BACK TO MAIN MENU</button>
+    </aside>
+
+    <div class="sandbox-builder-footer">DRAG TO ROTATE THE TRUCK · ADD ANY COMBINATION OF ARCADE PARTS</div>
   </section>
 
   <section id="joinPanel" class="menu-screen" style="display:none">
@@ -690,6 +845,7 @@
             <option value="night">NIGHT</option>
           </select>
         </label>
+        <button id="sandboxReturnButton" class="menu-button secondary" type="button" style="display:none">BACK TO BUILDER</button>
         <button id="resumeButton" class="menu-button" type="button">RESUME DRIVING</button>
         <button id="leaveButton" type="button">LEAVE ROOM</button>
       </div>
@@ -707,6 +863,14 @@
         <button class="camera-mode-button" type="button" data-camera-mode="hood" aria-pressed="false" title="Hood camera (C)">HOOD</button>
         <button class="camera-mode-button" type="button" data-camera-mode="interior" aria-pressed="false" title="Interior camera (C)">INTERIOR</button>
         <button class="camera-mode-button" type="button" data-camera-mode="stand" aria-pressed="false" title="Stand POV camera (C)">STAND POV</button>
+      </div>
+    </div>
+    <div id="sandboxHudCard" class="hud-card" aria-label="Sandbox gadget controls">
+      <div class="hud-label">ARCADE PARTS · PRESS 1 / 2 / 3</div>
+      <div class="sandbox-hud-actions">
+        <button id="sandboxBoostButton" class="sandbox-hud-button" type="button">1 · BOOST</button>
+        <button id="sandboxFoamButton" class="sandbox-hud-button" type="button">2 · FOAM</button>
+        <button id="sandboxBounceButton" class="sandbox-hud-button" type="button">3 · BOUNCE</button>
       </div>
     </div>
     <div id="speedCard" class="hud-card">
