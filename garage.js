@@ -271,10 +271,23 @@ function refreshShellVariantButton() {
 }
 
 function beginAlternateShellLoad() {
-  if (alternateShellReady || alternateShellLoadStarted || !game.loadAlternateShell) return;
+  if (alternateShellReady || alternateShellLoadStarted) return;
   alternateShellLoadStarted = true;
   refreshShellVariantButton();
-  game.loadAlternateShell().then(() => {
+
+  if (typeof game.loadAlternateShellModel !== "function") {
+    alternateShellLoadStarted = false;
+    const detail = "The Garage was not connected to the model loader.";
+    console.error(detail);
+    if (shellVariantButton) {
+      shellVariantButton.disabled = true;
+      shellVariantButton.textContent = "MODEL LOADER NOT CONNECTED";
+      shellVariantButton.title = detail;
+    }
+    return;
+  }
+
+  game.loadAlternateShellModel().then(() => {
     alternateShellReady = true;
     refreshShellVariantButton();
   }).catch((error) => {
