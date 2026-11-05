@@ -558,9 +558,9 @@ function prepareMapGraphics(mapId = game.activeMapId) {
   if (warmedMapGraphics.has(mapId)) return true;
   const layout = mapLayouts[mapId];
   const mapVisual = arenaVisuals.find((item) => item.userData?.mapId === mapId);
-  if (!layout?.spawn || !mapVisual || garage.viewMode === "drive") return false;
+  if (!layout?.spawn || !mapVisual ||
+      mapId !== game.activeMapId || garage.viewMode === "drive") return false;
 
-  const previousMapId = game.activeMapId;
   const previousCameraPosition = camera.position.clone();
   const previousCameraQuaternion = camera.quaternion.clone();
   const previousCameraUp = camera.up.clone();
@@ -570,7 +570,6 @@ function prepareMapGraphics(mapId = game.activeMapId) {
   try {
     // Only the selected map is made visible, and the render is sent to a small
     // off-screen target so the player never sees the arena flash over the menu.
-    game.activeMapId = mapId;
     garage.setArenaVisible(true);
 
     const spawn = layout.spawn;
@@ -608,7 +607,21 @@ function prepareMapGraphics(mapId = game.activeMapId) {
     }
     sun.shadow.needsUpdate = true;
 
-    renderer.compile(scene, camera);
+    // Compile every material used by this map, not just meshes inside the
+    // current camera frustum. Restore normal culling before the warm render.
+    const cullingStates = [];
+    mapVisual.traverse((object) => {
+      if (typeof object.frustumCulled !== "boolean") return;
+      cullingStates.push([object, object.frustumCulled]);
+      object.frustumCulled = false;
+    });
+    try {
+      renderer.compile(scene, camera);
+    } finally {
+      for (const [object, wasCulled] of cullingStates) {
+        object.frustumCulled = wasCulled;
+      }
+    }
     prewarmTarget = new THREE.WebGLRenderTarget(384, 216, {
       depthBuffer: true,
       stencilBuffer: false
@@ -623,13 +636,11 @@ function prepareMapGraphics(mapId = game.activeMapId) {
   } finally {
     renderer.setRenderTarget(previousRenderTarget);
     prewarmTarget?.dispose();
-    game.activeMapId = previousMapId;
     garage.setArenaVisible(false);
     camera.position.copy(previousCameraPosition);
     camera.quaternion.copy(previousCameraQuaternion);
     camera.up.copy(previousCameraUp);
     camera.updateMatrixWorld(true);
-    applyMapRenderQuality(previousMapId);
   }
 }
 game.prepareMapGraphics = prepareMapGraphics;
