@@ -58,7 +58,6 @@ export function createRoomRelay({
       ready,
       sendSnapshot: () => false,
       sendControl: () => false,
-      setPlayerName: () => false,
       close: () => {},
       get connected() { return false; },
       get peerId() { return localPeerId; }
@@ -161,9 +160,6 @@ export function createRoomRelay({
     },
     sendControl(message) {
       return send({ type: "control", message });
-    },
-    setPlayerName(name) {
-      return send({ type: "profile", name: String(name || "Driver").slice(0, 18) });
     },
     close() {
       manuallyClosed = true;
