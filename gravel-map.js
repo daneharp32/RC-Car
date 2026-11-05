@@ -717,26 +717,15 @@ export function createGravelBasinSystem({ THREE, scene }) {
     yaw: Math.atan2(-spawnTangent.x, -spawnTangent.z)
   };
 
-  const obstacles = [
-    ...parkedCars.map((car) => ({
-      x: car.x,
-      z: car.z,
-      y: car.centerY,
-      yaw: car.yaw,
-      halfWidth: car.halfWidth,
-      halfHeight: car.halfHeight,
-      halfLength: car.halfLength
-    })),
-    ...staticBoxes.map((box) => ({
-      x: box.x,
-      y: box.y,
-      z: box.z,
-      yaw: 0,
-      halfWidth: box.halfWidth,
-      halfHeight: box.halfHeight,
-      halfLength: box.halfLength
-    }))
-  ];
+  const obstacles = parkedCars.map((car) => ({
+    x: car.x,
+    z: car.z,
+    y: car.centerY,
+    yaw: car.yaw,
+    halfWidth: car.halfWidth,
+    halfHeight: car.halfHeight,
+    halfLength: car.halfLength
+  }));
 
   return {
     arenaVisuals: [mapGroup],
