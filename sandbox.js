@@ -2,6 +2,7 @@
 export function createSandboxSystem(game) {
   const { THREE, CANNON, scene, chassisBody, localCar, $ } = game;
   const builderPanel = $("sandboxBuilderPanel");
+  const controlsPanel = $("sandboxControlsCard");
   const loadout = new Set();
   const attachmentCache = new WeakMap();
   const pads = [];
@@ -173,6 +174,18 @@ export function createSandboxSystem(game) {
     }
     const countLabel = $("sandboxPlayerCount");
     if (countLabel) countLabel.textContent = playerCount + " / 8 DRIVERS CONNECTED";
+    renderControlHints();
+  }
+
+  function renderControlHints() {
+    if (!controlsPanel) return;
+    controlsPanel.style.display = active && inMap ? "flex" : "none";
+    document.querySelectorAll("[data-sandbox-control]").forEach((item) => {
+      const equipped = loadout.has(item.dataset.sandboxControl);
+      item.classList.toggle("equipped", equipped);
+      const state = item.querySelector("small");
+      if (state) state.textContent = equipped ? "READY" : "NOT EQUIPPED";
+    });
   }
 
   function updatePlayerCount(count) {
@@ -214,6 +227,7 @@ export function createSandboxSystem(game) {
     for (const pad of pads) pad.group.visible = true;
     game.garage.showDriveScreen();
     localCar.setPlayerName?.(game.multiplayer?.driverName || "Driver", true);
+    renderControlHints();
     game.showToast("Sandbox: Q spring field · E jump pad · F boost vents");
   }
 
@@ -233,6 +247,7 @@ export function createSandboxSystem(game) {
     }
     waves.length = 0;
     if (localAttachmentGroup) localAttachmentGroup.visible = false;
+    renderControlHints();
     seenEvents.clear();
   }
 
