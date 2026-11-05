@@ -1,8 +1,8 @@
 import { joinRoom, selfId } from "https://esm.sh/trystero@0.26.0";
 import { createRoomRelay } from "./room-relay-client.js";
 
-// Peer-to-peer lobby directory, player snapshots, and remote-car interpolation.
-// Hosts announce active lobbies over a shared directory room.
+// Lobby discovery, Cloudflare-relayed room membership, and remote-car interpolation.
+// Trystero remains as a compatibility fallback for legacy lobby announcements.
 export function createMultiplayerSystem(game) {
   const APP_ID = "io.daneharp32.rcpitlane";
   const DIRECTORY_ROOM_ID = "rc-car-public-lobby-directory-v1";
