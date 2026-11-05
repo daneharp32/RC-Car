@@ -958,11 +958,13 @@ export function createMultiplayerSystem(game) {
 
   function updateRemoteVisuals(delta) {
     const alpha = 1 - Math.exp(-12 * delta);
+    let removedStalePlayer = false;
     for (const [peerId, remote] of remotePlayers) {
       if (performance.now() - remote.lastSeen > 12000) {
         scene.remove(remote.visual.root);
         remotePlayers.delete(peerId);
         game.race?.removeRemoteState(peerId);
+        removedStalePlayer = true;
         continue;
       }
       if (!remote.target) continue;
@@ -981,7 +983,9 @@ export function createMultiplayerSystem(game) {
         pivot.quaternion.copy(steerQ).multiply(spinQ);
       }
     }
-    updatePlayerCount();
+    // Player count is refreshed on join/leave events or when a stale peer
+    // is removed; never rewrite the HUD and hidden Sandbox builder each frame.
+    if (removedStalePlayer) updatePlayerCount();
   }
 
   async function leaveArena() {

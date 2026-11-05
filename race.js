@@ -30,6 +30,8 @@ export function createRaceSystem(game) {
   let spectatorRenderKey = "";
   let resultsAnnounced = false;
   let resultsRenderKey = "";
+  let lastRaceUiRefreshAt = 0;
+  const RACE_UI_REFRESH_INTERVAL_MS = 100;
 
   function setTrackLayout(layout) {
     gates = layout?.raceGates || [];
@@ -510,9 +512,14 @@ export function createRaceSystem(game) {
       game.multiplayer?.announceRaceResults?.();
     }
 
-    updateSpectatorUI();
-    updatePostRaceUI();
-    updateUI();
+    // Race timing and checkpoint checks run every frame, but DOM text/layout
+    // updates only need 10 Hz. This avoids constant UI work during map loading.
+    if (now - lastRaceUiRefreshAt >= RACE_UI_REFRESH_INTERVAL_MS) {
+      lastRaceUiRefreshAt = now;
+      updateSpectatorUI();
+      updatePostRaceUI();
+      updateUI();
+    }
   }
 
   function pruneRemoteStates() {
