@@ -19,11 +19,11 @@ function addAlternateShellToVisual(visual) {
   if (!Number.isFinite(sourceSize.z) || sourceSize.z < 0.001) {
     throw new Error("The alternate shell has invalid dimensions.");
   }
-  // First-fit target: the shell's two wheel-arch centers are approximately
-  // 3.25 source units apart. Matching that span to the current 0.951-unit
-  // wheelbase gives an overall length near 1.54 game units. This is a single
-  // uniform scale; no axis is stretched. The in-game test will confirm fit.
-  const uniformScale = 1.54 / sourceSize.z;
+  // Slightly enlarge the complete shell so its width fills more of the
+  // wheel track. The scale is applied equally on all axes, preserving the
+  // CAD model's proportions rather than stretching it sideways.
+  // A 1.66-unit overall length is a modest increase over the first fit.
+  const uniformScale = 1.66 / sourceSize.z;
   const fitRoot = new THREE.Group();
   fitRoot.name = "Concept4 shell fit and orientation";
   // The supplied CAD body faces +Z; this simulator's truck faces -Z.
