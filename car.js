@@ -19,7 +19,11 @@ function addAlternateShellToVisual(visual) {
   if (!Number.isFinite(sourceSize.z) || sourceSize.z < 0.001) {
     throw new Error("The alternate shell has invalid dimensions.");
   }
-  const uniformScale = 1.35 / sourceSize.z;
+  // First-fit target: the shell's two wheel-arch centers are approximately
+  // 3.25 source units apart. Matching that span to the current 0.951-unit
+  // wheelbase gives an overall length near 1.54 game units. This is a single
+  // uniform scale; no axis is stretched. The in-game test will confirm fit.
+  const uniformScale = 1.54 / sourceSize.z;
   imported.scale.multiplyScalar(uniformScale);
   imported.position.set(
     -sourceCenter.x * uniformScale,
