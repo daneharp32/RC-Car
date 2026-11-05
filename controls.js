@@ -63,8 +63,11 @@ window.addEventListener("blur", () => {
 });
 
 function resetCar() {
-  chassisBody.position.set(spawnX, 0.24, spawnZ);
-  chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), spawnYaw);
+  const spawn = game.physicsSystem?.getSpawn?.() || {
+    x: spawnX, y: 0.24, z: spawnZ, yaw: spawnYaw
+  };
+  chassisBody.position.set(spawn.x, spawn.y, spawn.z);
+  chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), spawn.yaw);
   chassisBody.velocity.set(0, 0, 0);
   chassisBody.angularVelocity.set(0, 0, 0);
   throttleState = 0;
