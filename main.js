@@ -1,4 +1,5 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js";
+import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/loaders/GLTFLoader.js";
 import * as CANNON from "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js";
 import { createPhysicsSystem } from "./physics.js";
 import { createCarVisualFactory } from "./car.js";
@@ -169,6 +170,41 @@ async function loadRangerShellGeometry() {
   return cleanRangerShellGeometry(THREE, geometry);
 }
 
+async function loadConcept4ShellScene() {
+  const paths = [];
+  for (let i = 0; i < 15; i++) {
+    paths.push(`./assets/ffsc-concept4/part-${String(i).padStart(2, "0")}.txt`);
+  }
+  for (let i = 0; i < 20; i++) {
+    paths.push(`./assets/ffsc-concept4/part-15-${String(i).padStart(2, "0")}.txt`);
+  }
+  for (let i = 15; i < 19; i++) {
+    paths.push(`./assets/ffsc-concept4/part-${i}.txt`);
+  }
+
+  const parts = await Promise.all(paths.map(async (path) => {
+    const response = await fetch(new URL(path, import.meta.url));
+    if (!response.ok) {
+      throw new Error(`Could not load body-model segment ${path}: HTTP ${response.status}`);
+    }
+    return response.text();
+  }));
+
+  // Onshape's export places its very large embedded geometry buffer on one
+  // line. That line is split across 20 small files and must be joined without
+  // added characters; the other line-based sections are joined with newlines.
+  const opening = parts.slice(0, 15).join("\n") + "\n" + parts[35];
+  const embeddedBuffer = parts.slice(15, 35).join("");
+  const closing = parts.slice(36).join("\n");
+  const gltfText = opening + "\n" + embeddedBuffer + "\n" + closing;
+
+  const loader = new GLTFLoader();
+  const gltf = await new Promise((resolve, reject) => {
+    loader.parse(gltfText, "", resolve, reject);
+  });
+  return gltf.scene;
+}
+
 let shellGeometry = null;
 try {
   shellGeometry = await loadRangerShellGeometry();
@@ -333,6 +369,15 @@ const multiplayer = createMultiplayerSystem(game);
 game.multiplayer = multiplayer;
 const garage = createGarageSystem(game);
 game.garage = garage;
+
+loadConcept4ShellScene().then((modelScene) => {
+  localCar.setAlternateShell(modelScene);
+  garage.setAlternateShellReady(true);
+  console.info("FF SC Concept4 shell loaded with its original high-detail geometry.");
+}).catch((error) => {
+  garage.setAlternateShellReady(false);
+  console.warn("FF SC Concept4 shell could not be loaded; the current shell remains available:", error);
+});
 
 // Drive opens the live lobby browser. Users can join an existing lobby
 // or open the separate Create Lobby panel.

@@ -1,0 +1,1000 @@
+                {
+                    "attributes": {
+                        "NORMAL": 689,
+                        "POSITION": 688,
+                        "TEXCOORD_0": 690
+                    },
+                    "indices": 691,
+                    "material": 0
+                },
+                {
+                    "attributes": {
+                        "NORMAL": 693,
+                        "POSITION": 692,
+                        "TEXCOORD_0": 694
+                    },
+                    "indices": 695,
+                    "material": 0
+                },
+                {
+                    "attributes": {
+                        "NORMAL": 697,
+                        "POSITION": 696,
+                        "TEXCOORD_0": 698
+                    },
+                    "indices": 699,
+                    "material": 0
+                },
+                {
+                    "attributes": {
+                        "NORMAL": 701,
+                        "POSITION": 700,
+                        "TEXCOORD_0": 702
+                    },
+                    "indices": 703,
+                    "material": 0
+                }
+            ]
+        },
+        {
+            "name": "mesh176_mesh",
+            "primitives": [
+                {
+                    "attributes": {
+                        "NORMAL": 705,
+                        "POSITION": 704,
+                        "TEXCOORD_0": 706
+                    },
+                    "indices": 707,
+                    "material": 0
+                }
+            ]
+        },
+        {
+            "name": "mesh177_mesh",
+            "primitives": [
+                {
+                    "attributes": {
+                        "NORMAL": 709,
+                        "POSITION": 708,
+                        "TEXCOORD_0": 710
+                    },
+                    "indices": 711,
+                    "material": 0
+                }
+            ]
+        }
+    ],
+    "nodes": [
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFzB"
+                    ]
+                }
+            },
+            "mesh": 0,
+            "name": "Surface 29"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFvB"
+                    ]
+                }
+            },
+            "mesh": 1,
+            "name": "Surface 28"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFzE"
+                    ]
+                }
+            },
+            "mesh": 2,
+            "name": "Surface 77"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFzD"
+                    ]
+                }
+            },
+            "mesh": 3,
+            "name": "Surface 61"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFzC"
+                    ]
+                }
+            },
+            "mesh": 4,
+            "name": "Surface 45"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFrB"
+                    ]
+                }
+            },
+            "mesh": 5,
+            "name": "Surface 27"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "JFD"
+                    ]
+                }
+            },
+            "mesh": 6,
+            "name": "Surface 1"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFvE"
+                    ]
+                }
+            },
+            "mesh": 7,
+            "name": "Surface 76"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFvD"
+                    ]
+                }
+            },
+            "mesh": 8,
+            "name": "Surface 60"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFvC"
+                    ]
+                }
+            },
+            "mesh": 9,
+            "name": "Surface 44"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFnB"
+                    ]
+                }
+            },
+            "mesh": 10,
+            "name": "Surface 26"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "JFH"
+                    ]
+                }
+            },
+            "mesh": 11,
+            "name": "Surface 2"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFrE"
+                    ]
+                }
+            },
+            "mesh": 12,
+            "name": "Surface 75"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFrD"
+                    ]
+                }
+            },
+            "mesh": 13,
+            "name": "Surface 59"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFrC"
+                    ]
+                }
+            },
+            "mesh": 14,
+            "name": "Surface 43"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFjB"
+                    ]
+                }
+            },
+            "mesh": 15,
+            "name": "Surface 25"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "JFL"
+                    ]
+                }
+            },
+            "mesh": 16,
+            "name": "Surface 3"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFnE"
+                    ]
+                }
+            },
+            "mesh": 17,
+            "name": "Surface 74"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFnD"
+                    ]
+                }
+            },
+            "mesh": 18,
+            "name": "Surface 58"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFnC"
+                    ]
+                }
+            },
+            "mesh": 19,
+            "name": "Surface 42"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFfB"
+                    ]
+                }
+            },
+            "mesh": 20,
+            "name": "Surface 24"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "JFP"
+                    ]
+                }
+            },
+            "mesh": 21,
+            "name": "Surface 4"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFjE"
+                    ]
+                }
+            },
+            "mesh": 22,
+            "name": "Surface 73"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFjD"
+                    ]
+                }
+            },
+            "mesh": 23,
+            "name": "Surface 57"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFjC"
+                    ]
+                }
+            },
+            "mesh": 24,
+            "name": "Surface 41"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFbB"
+                    ]
+                }
+            },
+            "mesh": 25,
+            "name": "Surface 23"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "JFT"
+                    ]
+                }
+            },
+            "mesh": 26,
+            "name": "Surface 5"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFfE"
+                    ]
+                }
+            },
+            "mesh": 27,
+            "name": "Surface 72"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFfD"
+                    ]
+                }
+            },
+            "mesh": 28,
+            "name": "Surface 56"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFfC"
+                    ]
+                }
+            },
+            "mesh": 29,
+            "name": "Surface 40"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "JFX"
+                    ]
+                }
+            },
+            "mesh": 30,
+            "name": "Surface 6"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFbE"
+                    ]
+                }
+            },
+            "mesh": 31,
+            "name": "Surface 71"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFbD"
+                    ]
+                }
+            },
+            "mesh": 32,
+            "name": "Surface 55"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFbC"
+                    ]
+                }
+            },
+            "mesh": 33,
+            "name": "Surface 39"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KF7C"
+                    ]
+                }
+            },
+            "mesh": 34,
+            "name": "Surface 47"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFXD"
+                    ]
+                }
+            },
+            "mesh": 35,
+            "name": "Surface 54"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KF7B"
+                    ]
+                }
+            },
+            "mesh": 36,
+            "name": "Surface 31"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFXC"
+                    ]
+                }
+            },
+            "mesh": 37,
+            "name": "Surface 38"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFXB"
+                    ]
+                }
+            },
+            "mesh": 38,
+            "name": "Surface 22"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "JFb"
+                    ]
+                }
+            },
+            "mesh": 39,
+            "name": "Surface 7"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KF3C"
+                    ]
+                }
+            },
+            "mesh": 40,
+            "name": "Surface 46"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFTD"
+                    ]
+                }
+            },
+            "mesh": 41,
+            "name": "Surface 53"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KF3B"
+                    ]
+                }
+            },
+            "mesh": 42,
+            "name": "Surface 30"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFTC"
+                    ]
+                }
+            },
+            "mesh": 43,
+            "name": "Surface 37"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFTB"
+                    ]
+                }
+            },
+            "mesh": 44,
+            "name": "Surface 21"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KF7E"
+                    ]
+                }
+            },
+            "mesh": 45,
+            "name": "Surface 79"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "JFf"
+                    ]
+                }
+            },
+            "mesh": 46,
+            "name": "Surface 8"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KF7D"
+                    ]
+                }
+            },
+            "mesh": 47,
+            "name": "Surface 63"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFXE"
+                    ]
+                }
+            },
+            "mesh": 48,
+            "name": "Surface 70"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KF/C"
+                    ]
+                }
+            },
+            "mesh": 49,
+            "name": "Surface 48"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFPD"
+                    ]
+                }
+            },
+            "mesh": 50,
+            "name": "Surface 52"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KF/B"
+                    ]
+                }
+            },
+            "mesh": 51,
+            "name": "Surface 32"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFPC"
+                    ]
+                }
+            },
+            "mesh": 52,
+            "name": "Surface 36"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFPB"
+                    ]
+                }
+            },
+            "mesh": 53,
+            "name": "Surface 20"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KF3E"
+                    ]
+                }
+            },
+            "mesh": 54,
+            "name": "Surface 78"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "JFj"
+                    ]
+                }
+            },
+            "mesh": 55,
+            "name": "Surface 9"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KF3D"
+                    ]
+                }
+            },
+            "mesh": 56,
+            "name": "Surface 62"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFTE"
+                    ]
+                }
+            },
+            "mesh": 57,
+            "name": "Surface 69"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFLD"
+                    ]
+                }
+            },
+            "mesh": 58,
+            "name": "Surface 51"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFLC"
+                    ]
+                }
+            },
+            "mesh": 59,
+            "name": "Surface 35"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFLB"
+                    ]
+                }
+            },
+            "mesh": 60,
+            "name": "Surface 19"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KF/E"
+                    ]
+                }
+            },
+            "mesh": 61,
+            "name": "Surface 80"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "JFn"
+                    ]
+                }
+            },
+            "mesh": 62,
+            "name": "Surface 10"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KF/D"
+                    ]
+                }
+            },
+            "mesh": 63,
+            "name": "Surface 64"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFPE"
+                    ]
+                }
+            },
+            "mesh": 64,
+            "name": "Surface 68"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFHD"
+                    ]
+                }
+            },
+            "mesh": 65,
+            "name": "Surface 50"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFHC"
+                    ]
+                }
+            },
+            "mesh": 66,
+            "name": "Surface 34"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFHB"
+                    ]
+                }
+            },
+            "mesh": 67,
+            "name": "Surface 18"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "JFr"
+                    ]
+                }
+            },
+            "mesh": 68,
+            "name": "Surface 11"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFLE"
+                    ]
+                }
+            },
+            "mesh": 69,
+            "name": "Surface 67"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFDD"
+                    ]
+                }
+            },
+            "mesh": 70,
+            "name": "Surface 49"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFDC"
+                    ]
+                }
+            },
+            "mesh": 71,
+            "name": "Surface 33"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFDB"
+                    ]
+                }
+            },
+            "mesh": 72,
+            "name": "Surface 17"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFHF"
+                    ]
+                }
+            },
+            "mesh": 73,
+            "name": "Surface 82"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "JFv"
+                    ]
+                }
+            },
+            "mesh": 74,
+            "name": "Surface 12"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFHE"
+                    ]
+                }
+            },
+            "mesh": 75,
+            "name": "Surface 66"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "KFDF"
+                    ]
+                }
+            },
+            "mesh": 76,
+            "name": "Surface 81"
+        },
+        {
+            "extensions": {
+                "PTC_onshape_metadata": {
+                    "entity_type": "Body",
+                    "id": [
+                        "JFz"
+                    ]
+                }
