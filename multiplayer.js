@@ -981,7 +981,8 @@ export function createMultiplayerSystem(game) {
         pivot.quaternion.copy(steerQ).multiply(spinQ);
       }
     }
-    updatePlayerCount();
+    // Player count is already refreshed on join/leave events. Avoid rewriting
+    // HUD and hidden Sandbox builder DOM on every animation frame.
   }
 
   async function leaveArena() {
