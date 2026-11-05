@@ -144,19 +144,6 @@ export class MultiplayerRoom {
       }, webSocket);
       return;
     }
-
-    if (message.type === "profile") {
-      const updatedPeer = {
-        ...peer,
-        name: cleanPlayerName(message.name)
-      };
-      webSocket.serializeAttachment(updatedPeer);
-      this.broadcast({
-        type: "peer-profile",
-        peerId: peer.peerId,
-        name: updatedPeer.name
-      }, webSocket);
-    }
   }
 
   webSocketClose(webSocket, code, reason) {
