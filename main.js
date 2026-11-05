@@ -40,6 +40,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.7));
 renderer.setSize(window.innerWidth, window.innerHeight, false);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.autoUpdate = false;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.08;
@@ -63,7 +64,11 @@ sun.shadow.mapSize.set(1024, 1024);
 // schedule while driving instead of rendering thousands of static casters
 // again on every animation frame.
 sun.shadow.autoUpdate = false;
-sun.shadow.needsUpdate = true;
+function requestShadowRefresh() {
+  renderer.shadowMap.needsUpdate = true;
+  sun.shadow.needsUpdate = true;
+}
+requestShadowRefresh();
 sun.shadow.camera.left = -116;
 sun.shadow.camera.right = 116;
 sun.shadow.camera.top = 116;
@@ -115,7 +120,7 @@ function applyMapRenderQuality(mapId) {
   }
   sun.target.updateMatrixWorld();
   sun.updateMatrixWorld();
-  sun.shadow.needsUpdate = true;
+  requestShadowRefresh();
 }
 
 const fill = new THREE.DirectionalLight(0xb8d8e9, 0.65);
@@ -236,7 +241,7 @@ function setTimeOfDay(presetName, notify = true) {
   renderer.toneMappingExposure = preset.exposure;
   sun.target.updateMatrixWorld();
   sun.updateMatrixWorld();
-  sun.shadow.needsUpdate = true;
+  requestShadowRefresh();
   syncVisibleSun();
 
   if (notify) {
@@ -584,6 +589,7 @@ function prepareMapGraphics(mapId = game.activeMapId) {
     // off-screen target so all map textures and geometry buffers reach the GPU
     // before the player enters, without flashing the arena over the menu.
     garage.setArenaVisible(true);
+    const spawn = layout.spawn;
 
     // A high overhead view fits either complete map in one inexpensive pass.
     // This deliberately covers distant scenery too, where new materials would
@@ -616,7 +622,7 @@ function prepareMapGraphics(mapId = game.activeMapId) {
       sun.target.updateMatrixWorld();
       sun.updateMatrixWorld();
     }
-    sun.shadow.needsUpdate = true;
+    requestShadowRefresh();
 
     // Compile all map materials and draw the complete map once at low
     // resolution. Keeping culling disabled through this render also uploads
@@ -920,7 +926,7 @@ function animate(now) {
   // without spending the GPU budget rendering the full scenery 60 times/sec.
   if (drivingActive && !isPaused &&
       now - lastShadowRefreshAt >= SHADOW_REFRESH_INTERVAL_MS) {
-    sun.shadow.needsUpdate = true;
+    requestShadowRefresh();
     lastShadowRefreshAt = now;
   }
 
