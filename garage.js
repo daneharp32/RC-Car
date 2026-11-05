@@ -384,8 +384,9 @@ function updateGaragePartHover(event) {
   garagePointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   garagePointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   garageRaycaster.setFromCamera(garagePointer, camera);
-  // Do not raycast the shell at all when it has been removed.
-  const hoverTarget = garageShellInstalled ? localCar.root : localCar.chassisGroup;
+  // Raycast only the currently selected, visible shell. The root also
+  // contains the inactive shell variant, which must never receive hover hits.
+  const hoverTarget = garageShellInstalled ? activeShellGroup() : localCar.chassisGroup;
   const intersections = garageRaycaster.intersectObject(hoverTarget, true);
   let found = null;
   let foundObject = null;
