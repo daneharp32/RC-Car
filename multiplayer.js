@@ -116,41 +116,32 @@ export function createMultiplayerSystem(game) {
   function renderSelectedLobbyMode() {
     const isGravelBasin = game.activeMapId === "gravel-basin";
     const modeButtons = [...document.querySelectorAll(".lobby-mode-choice[data-lobby-mode]")];
-    const selected = modeButtons.find((button) => button.dataset.lobbyMode === selectedLobbyMode);
 
     for (const button of modeButtons) {
       const mode = button.dataset.lobbyMode;
       const restricted = isGravelBasin && (mode === "race" || mode === "time-trial");
       button.disabled = restricted || mode === "sandbox";
       button.classList.toggle("unavailable", restricted || mode === "sandbox");
-      button.classList.toggle("selected", mode === selectedLobbyMode);
       button.setAttribute("aria-disabled", button.disabled ? "true" : "false");
       const small = button.querySelector("small");
       if (small) {
-        if (restricted) {
-          small.textContent = "ONLY ON CLUB DIRT CIRCUIT";
-        } else if (mode === "race") {
-          small.textContent = "LAPS & CHECKPOINTS";
-        } else if (mode === "time-trial") {
-          small.textContent = "FASTEST LAP WINS · CHECKPOINTS";
-        } else if (mode === "free-drive") {
-          small.textContent = "OPEN DRIVING SESSION";
-        } else if (mode === "sandbox") {
-          small.textContent = "COMING SOON";
-        }
+        if (restricted) small.textContent = "ONLY ON CLUB DIRT CIRCUIT";
+        else if (mode === "race") small.textContent = "LAPS & CHECKPOINTS";
+        else if (mode === "time-trial") small.textContent = "FASTEST LAP WINS · CHECKPOINTS";
+        else if (mode === "free-drive") small.textContent = "OPEN DRIVING SESSION";
+        else if (mode === "sandbox") small.textContent = "COMING SOON";
       }
       button.title = restricted ? "Race and Time Trial are only available on Club Dirt Circuit." : "";
     }
 
-    if (!selected || selected.disabled) {
-      selectedLobbyMode = isGravelBasin ? "free-drive" : lastNonGravelLobbyMode;
-      const nextSelected = modeButtons.find((button) => button.dataset.lobbyMode === selectedLobbyMode);
-      for (const button of modeButtons) button.classList.toggle("selected", button === nextSelected);
+    const selectedButton = modeButtons.find((button) =>
+      button.dataset.lobbyMode === selectedLobbyMode && !button.disabled
+    );
+    if (!selectedButton) selectedLobbyMode = isGravelBasin ? "free-drive" : "race";
+    for (const button of modeButtons) {
+      button.classList.toggle("selected", button.dataset.lobbyMode === selectedLobbyMode);
     }
 
-    if (!isGravelBasin && selectedLobbyMode !== "free-drive") {
-      lastNonGravelLobbyMode = selectedLobbyMode;
-    }
     const lapField = $("raceLapField");
     if (lapField) lapField.style.display = selectedLobbyMode === "free-drive" ? "none" : "block";
     const lapLabel = lapField?.querySelector("span");
@@ -172,16 +163,11 @@ export function createMultiplayerSystem(game) {
 
   function updateAvailableModes() {
     const isGravelBasin = game.activeMapId === "gravel-basin";
-    if (isGravelBasin && selectedLobbyMode !== "free-drive") {
-      if (selectedLobbyMode !== "race" && selectedLobbyMode !== "time-trial") {
-        lastNonGravelLobbyMode = selectedLobbyMode;
-      } else {
-        lastNonGravelLobbyMode = selectedLobbyMode;
-      }
+    if (isGravelBasin) {
+      if (selectedLobbyMode !== "free-drive") lastNonGravelLobbyMode = selectedLobbyMode;
       selectedLobbyMode = "free-drive";
-    } else if (!isGravelBasin && selectedLobbyMode === "free-drive" && lastNonGravelLobbyMode !== "free-drive") {
-      // Restore the last Race/Time Trial choice when returning to the circuit.
-      selectedLobbyMode = lastNonGravelLobbyMode;
+    } else if (selectedLobbyMode === "free-drive") {
+      selectedLobbyMode = lastNonGravelLobbyMode || "race";
     }
     renderSelectedLobbyMode();
   }
@@ -292,9 +278,11 @@ export function createMultiplayerSystem(game) {
       const lobbyLocked = !lobbyCanBeJoined(lobby);
       join.textContent = lobby.playerCount >= MAX_PLAYERS
         ? "FULL"
-        : lobbyLocked
-          ? (lobby.mode === "free-drive" ? "CLOSED" : "IN SESSION")
-          : "JOIN";
+        : lobby.mapId === "gravel-basin" && lobby.mode !== "free-drive"
+          ? "MODE UNAVAILABLE"
+          : lobbyLocked
+            ? (lobby.mode === "free-drive" ? "CLOSED" : "IN SESSION")
+            : "JOIN";
       join.disabled = lobby.playerCount >= MAX_PLAYERS || lobbyLocked;
 
       row.append(main, count, join);
@@ -831,7 +819,7 @@ export function createMultiplayerSystem(game) {
     button.addEventListener("click", () => {
       if (button.disabled) return;
       selectedLobbyMode = button.dataset.lobbyMode || "race";
-      if (game.activeMapId !== "gravel-basin" && selectedLobbyMode !== "free-drive") {
+      if (game.activeMapId !== "gravel-basin") {
         lastNonGravelLobbyMode = selectedLobbyMode;
       }
       renderSelectedLobbyMode();
