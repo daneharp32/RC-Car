@@ -24,6 +24,11 @@ function addAlternateShellToVisual(visual) {
   // wheelbase gives an overall length near 1.54 game units. This is a single
   // uniform scale; no axis is stretched. The in-game test will confirm fit.
   const uniformScale = 1.54 / sourceSize.z;
+  const fitRoot = new THREE.Group();
+  fitRoot.name = "Concept4 shell fit and orientation";
+  // The supplied CAD body faces +Z; this simulator's truck faces -Z.
+  // Rotate the centered wrapper, not the mesh axes, to preserve the model.
+  fitRoot.rotation.y = Math.PI;
   imported.scale.multiplyScalar(uniformScale);
   imported.position.set(
     -sourceCenter.x * uniformScale,
@@ -38,7 +43,8 @@ function addAlternateShellToVisual(visual) {
     object.frustumCulled = true;
   });
 
-  visual.alternateShellGroup.add(imported);
+  fitRoot.add(imported);
+  visual.alternateShellGroup.add(fitRoot);
   visual.alternateShellGroup.userData.partInfo = {
     id: "ff-sc-concept4-body-shell",
     label: "FF SC Concept4 body shell",
