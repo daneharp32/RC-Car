@@ -3,7 +3,6 @@ import { RoundedBoxGeometry } from "https://cdn.jsdelivr.net/npm/three@0.187.0/e
 // Builds the detailed chassis, wheels, and the separately removable shell.
 export function createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellGeometry = null }) {
 let alternateShellTemplate = null;
-const createdVisuals = new Set();
 
 function addAlternateShellToVisual(visual) {
   if (!alternateShellTemplate || visual.alternateShellGroup.children.length) return;
@@ -46,7 +45,6 @@ function addAlternateShellToVisual(visual) {
 
 function makeVisualFactorySetAlternateShell(object) {
   alternateShellTemplate = object;
-  for (const visual of createdVisuals) addAlternateShellToVisual(visual);
 }
 
 function makeCarVisual(color, playerName = "") {
@@ -1223,11 +1221,14 @@ function makeCarVisual(color, playerName = "") {
     setShellVisible(visible) {
       this.activeShellGroup.visible = !!visible;
     },
+    setAlternateShellObject(object) {
+      makeVisualFactorySetAlternateShell(object);
+      addAlternateShellToVisual(this);
+    },
     setPlayerName
   };
 
   addAlternateShellToVisual(visual);
-  createdVisuals.add(visual);
   scene.add(root);
   return visual;
 }
