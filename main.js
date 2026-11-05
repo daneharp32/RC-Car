@@ -388,13 +388,17 @@ if (arenaSelect) {
   if (arenaDescription) arenaDescription.textContent = arenaDescriptions[game.activeMapId];
   arenaSelect.addEventListener("change", () => {
     if (game.setActiveMap(arenaSelect.value)) {
+      game.multiplayer?.updateAvailableModes?.();
       if (arenaDescription) arenaDescription.textContent = arenaDescriptions[game.activeMapId];
     } else {
       arenaSelect.value = game.activeMapId;
     }
   });
 }
-$("openCreateLobbyButton").addEventListener("click", () => garage.showCreateLobby());
+$("openCreateLobbyButton").addEventListener("click", () => {
+  multiplayer.updateAvailableModes();
+  garage.showCreateLobby();
+});
 $("modeBackButton").addEventListener("click", () => garage.showMainMenu());
 $("menuGarageButton").addEventListener("click", () => garage.showGarage());
 $("garageBackButton").addEventListener("click", () => garage.showMainMenu());
