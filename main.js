@@ -6,6 +6,7 @@ import { createControlsSystem } from "./controls.js";
 import { createMultiplayerSystem } from "./multiplayer.js";
 import { createGarageSystem } from "./garage.js";
 import { createTrackSystem } from "./track.js";
+import { createGravelBasinSystem } from "./gravel-map.js";
 import { createRaceSystem } from "./race.js";
 
 import { cleanRangerShellGeometry } from "./shell-cleanup.js";
@@ -70,7 +71,15 @@ scene.add(fill);
 
 // The track module owns the complete closed-course scenery and its shared layout.
 const trackSystem = createTrackSystem({ THREE, scene });
-const { arenaVisuals, trackLayout } = trackSystem;
+const gravelBasinSystem = createGravelBasinSystem({ THREE, scene });
+const arenaVisuals = [...trackSystem.arenaVisuals, ...gravelBasinSystem.arenaVisuals];
+let trackLayout = trackSystem.trackLayout;
+trackLayout.id = "closed-course";
+trackLayout.name = "Club Dirt Circuit";
+const mapLayouts = {
+  "closed-course": trackLayout,
+  "gravel-basin": gravelBasinSystem.trackLayout
+};
 
 // Decode the optional Ranger body before creating physics. If the model cannot
 // be decoded, the game automatically uses the original procedural truck instead.
@@ -180,7 +189,13 @@ try {
 // Physics: Cannon's RaycastVehicle applies suspension and tire impulses only
 // when each wheel ray has actually found a surface to touch.
 
-const physicsSystem = createPhysicsSystem({ CANNON, trackLayout, shellFit: !!shellGeometry, shellGeometry });
+const physicsSystem = createPhysicsSystem({
+  CANNON,
+  trackLayout,
+  additionalLayouts: { "gravel-basin": gravelBasinSystem.trackLayout },
+  shellFit: !!shellGeometry,
+  shellGeometry
+});
 const {
   world,
   chassisBody,
@@ -259,7 +274,10 @@ const game = {
   vehicle,
   wheelPositions,
   VISUAL_CHASSIS_LENGTH_SCALE,
+  physicsSystem,
   trackLayout,
+  activeMapId: "closed-course",
+  mapLayouts,
   spawnX,
   spawnZ,
   spawnYaw,
@@ -268,6 +286,26 @@ const game = {
   makeCarVisual,
   updateLocalVisual,
   showToast
+};
+
+game.setActiveMap = (mapId, options = {}) => {
+  if (!Object.prototype.hasOwnProperty.call(mapLayouts, mapId)) return false;
+  if (game.activeMapId === mapId) return true;
+  if (!physicsSystem.setActiveMap(mapId)) return false;
+
+  game.activeMapId = mapId;
+  trackLayout = mapLayouts[mapId];
+  game.trackLayout = trackLayout;
+  if (game.race?.setTrackLayout) game.race.setTrackLayout(trackLayout);
+  if (game.controls?.resetCar) {
+    game.controls.resetCar();
+    game.race?.onCarReset?.();
+  }
+  updateLocalVisual();
+  if (!options.silent) {
+    showToast("DRIVING AREA: " + (trackLayout.name || mapId.toUpperCase()));
+  }
+  return true;
 };
 
 const controls = createControlsSystem(game);
@@ -337,6 +375,23 @@ game.garage = garage;
 // Drive opens the live lobby browser. Users can join an existing lobby
 // or open the separate Create Lobby panel.
 $("menuDriveButton").addEventListener("click", () => garage.showModeSelect());
+const arenaSelect = $("arenaSelect");
+const arenaDescription = $("arenaDescription");
+const arenaDescriptions = {
+  "closed-course": "A closed dirt circuit with marked corners, jumps and red/white curbs.",
+  "gravel-basin": "A huge open gravel area with rolling terrain, natural jumps, parked full-size vehicles and a tree-lined edge."
+};
+if (arenaSelect) {
+  arenaSelect.value = game.activeMapId;
+  if (arenaDescription) arenaDescription.textContent = arenaDescriptions[game.activeMapId];
+  arenaSelect.addEventListener("change", () => {
+    if (game.setActiveMap(arenaSelect.value)) {
+      if (arenaDescription) arenaDescription.textContent = arenaDescriptions[game.activeMapId];
+    } else {
+      arenaSelect.value = game.activeMapId;
+    }
+  });
+}
 $("openCreateLobbyButton").addEventListener("click", () => garage.showCreateLobby());
 $("modeBackButton").addEventListener("click", () => garage.showMainMenu());
 $("menuGarageButton").addEventListener("click", () => garage.showGarage());
