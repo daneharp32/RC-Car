@@ -2,11 +2,61 @@ import { RoundedBoxGeometry } from "https://cdn.jsdelivr.net/npm/three@0.187.0/e
 
 // Builds the detailed chassis, wheels, and the separately removable shell.
 export function createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellGeometry = null }) {
+let alternateShellTemplate = null;
+const createdVisuals = new Set();
+
+function addAlternateShellToVisual(visual) {
+  if (!alternateShellTemplate || visual.alternateShellGroup.children.length) return;
+
+  const imported = alternateShellTemplate.clone(true);
+  imported.name = "FF_SC_Concept4 alternate body";
+  imported.updateMatrixWorld(true);
+
+  // Keep the supplied shell's proportions intact. Normalize it uniformly to
+  // the current short-course body length; never stretch individual axes.
+  const sourceBounds = new THREE.Box3().setFromObject(imported);
+  const sourceSize = sourceBounds.getSize(new THREE.Vector3());
+  const sourceCenter = sourceBounds.getCenter(new THREE.Vector3());
+  if (!Number.isFinite(sourceSize.z) || sourceSize.z < 0.001) {
+    throw new Error("The alternate shell has invalid dimensions.");
+  }
+  const uniformScale = 1.35 / sourceSize.z;
+  imported.scale.multiplyScalar(uniformScale);
+  imported.position.set(
+    -sourceCenter.x * uniformScale,
+    0.075 - sourceBounds.min.y * uniformScale,
+    -sourceCenter.z * uniformScale
+  );
+
+  imported.traverse((object) => {
+    if (!object.isMesh) return;
+    object.castShadow = true;
+    object.receiveShadow = true;
+    object.frustumCulled = true;
+  });
+
+  visual.alternateShellGroup.add(imported);
+  visual.alternateShellGroup.userData.partInfo = {
+    id: "ff-sc-concept4-body-shell",
+    label: "FF SC Concept4 body shell",
+    description: "The imported FF SC Concept4 short-course body. Its proportions are preserved with uniform scaling; the underlying chassis and wheel geometry remain separate."
+  };
+  visual.alternateShellGroup.visible = false;
+}
+
+function makeVisualFactorySetAlternateShell(object) {
+  alternateShellTemplate = object;
+  for (const visual of createdVisuals) addAlternateShellToVisual(visual);
+}
+
 function makeCarVisual(color, playerName = "") {
   const root = new THREE.Group();
   const chassisGroup = new THREE.Group();
   const shellGroup = new THREE.Group();
-  root.add(chassisGroup, shellGroup);
+  const alternateShellGroup = new THREE.Group();
+  alternateShellGroup.name = "alternate-shell-variant";
+  root.add(chassisGroup, shellGroup, alternateShellGroup);
+  alternateShellGroup.visible = false;
 
   // Fit axle-mounted components at the actual physics attachment points.
   // Keep the imported Ranger chassis at native proportions: no whole-group stretching.
@@ -1155,15 +1205,33 @@ function makeCarVisual(color, playerName = "") {
   }
   setPlayerName(playerName, !!playerName);
 
-  scene.add(root);
-  return {
+  const visual = {
     root,
     wheelPivots,
     shellGroup,
+    alternateShellGroup,
     chassisGroup,
-    setShellVisible(visible) { shellGroup.visible = !!visible; },
+    activeShellVariant: 0,
+    get activeShellGroup() {
+      return this.activeShellVariant === 1 ? this.alternateShellGroup : this.shellGroup;
+    },
+    setShellVariant(index) {
+      this.activeShellVariant = index === 1 && this.alternateShellGroup.children.length ? 1 : 0;
+      this.shellGroup.visible = this.activeShellVariant === 0;
+      this.alternateShellGroup.visible = this.activeShellVariant === 1;
+    },
+    setShellVisible(visible) {
+      this.activeShellGroup.visible = !!visible;
+    },
     setPlayerName
   };
+
+  addAlternateShellToVisual(visual);
+  createdVisuals.add(visual);
+  scene.add(root);
+  return visual;
 }
+  makeCarVisual.setAlternateShellObject = makeVisualFactorySetAlternateShell;
+  makeCarVisual.hasAlternateShell = () => !!alternateShellTemplate;
   return makeCarVisual;
 }
