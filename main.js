@@ -58,7 +58,12 @@ scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffe2bd, 2.15);
 sun.position.set(-8, 15, 8);
 sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.mapSize.set(1024, 1024);
+// The map scenery is static. Refresh the directional shadow map on a small
+// schedule while driving instead of rendering thousands of static casters
+// again on every animation frame.
+sun.shadow.autoUpdate = false;
+sun.shadow.needsUpdate = true;
 sun.shadow.camera.left = -116;
 sun.shadow.camera.right = 116;
 sun.shadow.camera.top = 116;
@@ -76,15 +81,15 @@ let activeLighting = { sunOffset: [-8, 15, 8] };
 // resolution and shadow-map size only while that map is active. Its shadow
 // frustum follows the RC truck to give nearby terrain shadows more detail
 // without increasing the shadow-map resolution or redraw cost.
-const DEFAULT_PIXEL_RATIO_CAP = 1.7;
+const DEFAULT_PIXEL_RATIO_CAP = 1.35;
 function applyMapRenderQuality(mapId) {
   const isGravelBasin = mapId === "gravel-basin";
-  const pixelRatioCap = isGravelBasin ? 1.2 : DEFAULT_PIXEL_RATIO_CAP;
+  const pixelRatioCap = isGravelBasin ? 1.05 : DEFAULT_PIXEL_RATIO_CAP;
   const pixelRatio = Math.min(window.devicePixelRatio || 1, pixelRatioCap);
   renderer.setPixelRatio(pixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight, false);
 
-  const shadowSize = isGravelBasin ? 1024 : 2048;
+  const shadowSize = 1024;
   if (sun.shadow.mapSize.x !== shadowSize || sun.shadow.mapSize.y !== shadowSize) {
     sun.shadow.map?.dispose();
     sun.shadow.map = null;
@@ -554,6 +559,9 @@ const sandbox = createSandboxSystem(game);
 game.sandbox = sandbox;
 
 const warmedMapGraphics = new Set();
+const SHADOW_REFRESH_INTERVAL_MS = 180;
+let lastShadowRefreshAt = 0;
+
 function prepareMapGraphics(mapId = game.activeMapId) {
   if (warmedMapGraphics.has(mapId)) return true;
   const layout = mapLayouts[mapId];
@@ -564,32 +572,35 @@ function prepareMapGraphics(mapId = game.activeMapId) {
   const previousCameraPosition = camera.position.clone();
   const previousCameraQuaternion = camera.quaternion.clone();
   const previousCameraUp = camera.up.clone();
+  const previousCameraFov = camera.fov;
+  const previousCameraNear = camera.near;
+  const previousCameraFar = camera.far;
   const previousRenderTarget = renderer.getRenderTarget();
+  const cullingStates = [];
   let prewarmTarget = null;
 
   try {
-    // Only the selected map is made visible, and the render is sent to a small
-    // off-screen target so the player never sees the arena flash over the menu.
+    // Make only the selected map visible. Its full area is rendered to a small
+    // off-screen target so all map textures and geometry buffers reach the GPU
+    // before the player enters, without flashing the arena over the menu.
     garage.setArenaVisible(true);
 
-    const spawn = layout.spawn;
-    const yaw = Number.isFinite(spawn.yaw) ? spawn.yaw : 0;
-    const forward = new THREE.Vector3(0, 0, -1)
-      .applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-    const carPosition = new THREE.Vector3(
-      spawn.x,
-      Number.isFinite(spawn.y) ? spawn.y : 0.24,
-      spawn.z
-    );
-    camera.position.copy(carPosition)
-      .addScaledVector(forward, -5.8)
-      .add(new THREE.Vector3(0, 2.8, 0));
-    camera.up.set(0, 1, 0);
-    camera.lookAt(
-      carPosition.clone()
-        .add(new THREE.Vector3(0, 0.28, 0))
-        .addScaledVector(forward, 0.85)
-    );
+    // A high overhead view fits either complete map in one inexpensive pass.
+    // This deliberately covers distant scenery too, where new materials would
+    // otherwise compile lazily as the player drives around the map.
+    camera.position.set(0, 240, 0);
+    camera.up.set(0, 0, -1);
+    camera.fov = 58;
+    camera.near = 0.1;
+    camera.far = 420;
+    camera.updateProjectionMatrix();
+    camera.lookAt(0, 0, 0);
+
+    mapVisual.traverse((object) => {
+      if (typeof object.frustumCulled !== "boolean") return;
+      cullingStates.push([object, object.frustumCulled]);
+      object.frustumCulled = false;
+    });
 
     // Gravel Basin tracks the shadow frustum around the truck. Prewarm it at
     // its real spawn point so entering the map does not immediately invalidate
@@ -607,21 +618,10 @@ function prepareMapGraphics(mapId = game.activeMapId) {
     }
     sun.shadow.needsUpdate = true;
 
-    // Compile every material used by this map, not just meshes inside the
-    // current camera frustum. Restore normal culling before the warm render.
-    const cullingStates = [];
-    mapVisual.traverse((object) => {
-      if (typeof object.frustumCulled !== "boolean") return;
-      cullingStates.push([object, object.frustumCulled]);
-      object.frustumCulled = false;
-    });
-    try {
-      renderer.compile(scene, camera);
-    } finally {
-      for (const [object, wasCulled] of cullingStates) {
-        object.frustumCulled = wasCulled;
-      }
-    }
+    // Compile all map materials and draw the complete map once at low
+    // resolution. Keeping culling disabled through this render also uploads
+    // textures and buffers for scenery outside the original spawn view.
+    renderer.compile(scene, camera);
     prewarmTarget = new THREE.WebGLRenderTarget(384, 216, {
       depthBuffer: true,
       stencilBuffer: false
@@ -629,6 +629,7 @@ function prepareMapGraphics(mapId = game.activeMapId) {
     renderer.setRenderTarget(prewarmTarget);
     renderer.render(scene, camera);
     warmedMapGraphics.add(mapId);
+    lastShadowRefreshAt = performance.now();
     return true;
   } catch (error) {
     console.warn("Map graphics prewarm failed; the map will load normally:", error);
@@ -637,9 +638,16 @@ function prepareMapGraphics(mapId = game.activeMapId) {
     renderer.setRenderTarget(previousRenderTarget);
     prewarmTarget?.dispose();
     garage.setArenaVisible(false);
+    for (const [object, wasCulled] of cullingStates) {
+      object.frustumCulled = wasCulled;
+    }
     camera.position.copy(previousCameraPosition);
     camera.quaternion.copy(previousCameraQuaternion);
     camera.up.copy(previousCameraUp);
+    camera.fov = previousCameraFov;
+    camera.near = previousCameraNear;
+    camera.far = previousCameraFar;
+    camera.updateProjectionMatrix();
     camera.updateMatrixWorld(true);
   }
 }
@@ -905,6 +913,15 @@ function animate(now) {
     );
     sun.target.updateMatrixWorld();
     sun.updateMatrixWorld();
+  }
+
+  // Static map casters do not need a new shadow pass every frame. Refresh at
+  // roughly 5-6 Hz while driving so the truck's moving shadow stays responsive
+  // without spending the GPU budget rendering the full scenery 60 times/sec.
+  if (drivingActive && !isPaused &&
+      now - lastShadowRefreshAt >= SHADOW_REFRESH_INTERVAL_MS) {
+    sun.shadow.needsUpdate = true;
+    lastShadowRefreshAt = now;
   }
 
   // Keep the visible sun aligned with the active lighting preset and camera.
