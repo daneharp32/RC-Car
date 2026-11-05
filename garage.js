@@ -2,6 +2,7 @@
 export function createGarageSystem(game) {
   const { THREE, scene, localCar, arenaVisuals, renderer, camera, chassisBody, vehicle, updateLocalVisual } = game;
   const $ = game.$;
+  const sandboxBuilderPanel = $("sandboxBuilderPanel");
   const { mainMenuPanel, modeSelectPanel, garagePanel, joinPanel, hud } = game;
 // Illuminated showroom used by the main menu and garage.
 const garageGroup = new THREE.Group();
@@ -376,6 +377,8 @@ function parkCarForShowroom() {
 function showMainMenu() {
   clearGaragePartHover();
   resetGarageShellState(true);
+  if (sandboxBuilderPanel) sandboxBuilderPanel.style.display = "none";
+  $("sandboxHudCard").style.display = "none";
   viewMode = "menu";
   mainMenuPanel.style.display = "block";
   modeSelectPanel.style.display = "none";
@@ -389,6 +392,8 @@ function showMainMenu() {
 function showModeSelect() {
   clearGaragePartHover();
   resetGarageShellState(true);
+  if (sandboxBuilderPanel) sandboxBuilderPanel.style.display = "none";
+  $("sandboxHudCard").style.display = "none";
   viewMode = "mode-select";
   mainMenuPanel.style.display = "none";
   modeSelectPanel.style.display = "block";
@@ -403,6 +408,8 @@ function showModeSelect() {
 function showCreateLobby() {
   clearGaragePartHover();
   resetGarageShellState(true);
+  if (sandboxBuilderPanel) sandboxBuilderPanel.style.display = "none";
+  $("sandboxHudCard").style.display = "none";
   viewMode = "create-lobby";
   mainMenuPanel.style.display = "none";
   modeSelectPanel.style.display = "none";
@@ -418,6 +425,8 @@ function showCreateLobby() {
 function showGarage() {
   clearGaragePartHover();
   resetGarageShellState(true);
+  if (sandboxBuilderPanel) sandboxBuilderPanel.style.display = "none";
+  $("sandboxHudCard").style.display = "none";
   viewMode = "garage";
   mainMenuPanel.style.display = "none";
   modeSelectPanel.style.display = "none";
@@ -452,6 +461,8 @@ $("shellToggleButton").addEventListener("click", () => {
 });
 
 function showDriveScreen() {
+  if (sandboxBuilderPanel) sandboxBuilderPanel.style.display = "none";
+  $("sandboxHudCard").style.display = "none";
   viewMode = "drive";
   mainMenuPanel.style.display = "none";
   modeSelectPanel.style.display = "none";
@@ -462,6 +473,42 @@ function showDriveScreen() {
   setArenaVisible(true);
   game.controls.cameraOrbitYaw = 0;
   game.controls.resetCar();
+}
+function showSandboxBuilder() {
+  clearGaragePartHover();
+  resetGarageShellState(true);
+  viewMode = "sandbox-builder";
+  mainMenuPanel.style.display = "none";
+  modeSelectPanel.style.display = "none";
+  garagePanel.style.display = "none";
+  joinPanel.style.display = "none";
+  hud.style.display = "none";
+  $("topStatus").style.display = "none";
+  if (sandboxBuilderPanel) sandboxBuilderPanel.style.display = "block";
+  $("sandboxHudCard").style.display = "none";
+  setArenaVisible(false);
+  parkCarForShowroom();
+  if (game.controls) game.controls.cameraOrbitYaw = 0;
+}
+function showSandboxDrive() {
+  clearGaragePartHover();
+  resetGarageShellState(true);
+  viewMode = "sandbox-drive";
+  mainMenuPanel.style.display = "none";
+  modeSelectPanel.style.display = "none";
+  garagePanel.style.display = "none";
+  joinPanel.style.display = "none";
+  if (sandboxBuilderPanel) sandboxBuilderPanel.style.display = "none";
+  hud.style.display = "block";
+  $("topStatus").style.display = "flex";
+  $("topStatus").textContent = "SANDBOX SESSION";
+  $("roomValue").textContent = "SANDBOX";
+  $("playersValue").textContent = "1 DRIVER";
+  $("raceCard").style.display = "none";
+  $("sandboxHudCard").style.display = "block";
+  setArenaVisible(true);
+  if (game.controls) game.controls.cameraOrbitYaw = 0;
+  game.controls?.resetCar?.();
 }
   function updateHoverBounds() {
     if (activeGaragePartObject) {
@@ -478,6 +525,8 @@ function showDriveScreen() {
     showCreateLobby,
     showGarage,
     showDriveScreen,
+    showSandboxBuilder,
+    showSandboxDrive,
     setGarageShellVisible,
     updateGarageShellAnimation,
     updateHoverBounds,

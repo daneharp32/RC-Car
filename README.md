@@ -13,6 +13,7 @@ RC-Car/
 ├── car.js          # Detailed RC truck, chassis, wheels, and removable body shell
 ├── physics.js      # Cannon-es world, ramp colliders, suspension, and vehicle physics
 ├── garage.js       # Showroom, component hover inspection, and shell animation
+├── sandbox.js      # Local Sandbox builder, arcade attachments, and game-only effects
 ├── controls.js     # Keyboard input, camera orbit, reset, and driving controls
 ├── multiplayer.js  # Trystero rooms, player snapshots, and remote vehicles
 └── README.md       # Setup notes and project map
@@ -36,6 +37,12 @@ The project imports Three.js, Cannon-es, and Trystero from CDNs, so an internet 
 - **R** — reset the car
 - **Drag** — orbit the camera around the vehicle
 
+In local Sandbox, choose attachments and a map in the builder before entering.
+The optional arcade parts use **1** for boost pods, **2** for a harmless foam/confetti
+burst, and **3** for a cartoon bounce pulse that can fling the nearby truck.
+Sandbox currently runs as a local single-player mode; online lobby Sandbox remains
+separate and is not enabled yet.
+
 ## Code map
 
 1. **main.js** — creates the renderer and arena, connects the systems, and runs the frame loop.
@@ -44,11 +51,12 @@ The project imports Three.js, Cannon-es, and Trystero from CDNs, so an internet 
 4. **car.js** — builds the detailed short-course truck, chassis components, wheels, body shell, and player name tags.
 5. **physics.js** — creates the Cannon-es world, switchable terrain colliders, parked-vehicle collision shapes, chassis body, raycast vehicle, and suspension.
 6. **garage.js** — creates the showroom, handles menu/garage transitions, component hover labels, and shell removal animation.
-7. **controls.js** — handles keyboard input, camera dragging, vehicle reset, steering, throttle, braking, and airborne control.
-8. **multiplayer.js** — manages lobby discovery, room membership, player counts, host race controls, and remote vehicle visuals.
-9. **room-relay-client.js** — opens the per-room WebSocket and handles join/leave, snapshots, and race-control events.
-10. **worker.js** — routes the public lobby directory and room WebSocket endpoints to Cloudflare Durable Objects.
-11. **multiplayer-room.js** — manages one room's connected sockets, assigns peer IDs, and relays snapshots and host controls.
+7. **sandbox.js** — manages the Sandbox build catalog, selected attachments, map choice, arcade inputs, and local pulse physics.
+8. **controls.js** — handles keyboard input, camera dragging, vehicle reset, steering, throttle, braking, and airborne control.
+9. **multiplayer.js** — manages lobby discovery, room membership, player counts, host race controls, and remote vehicle visuals.
+10. **room-relay-client.js** — opens the per-room WebSocket and handles join/leave, snapshots, and race-control events.
+11. **worker.js** — routes the public lobby directory and room WebSocket endpoints to Cloudflare Durable Objects.
+12. **multiplayer-room.js** — manages one room's connected sockets, assigns peer IDs, and relays snapshots and host controls.
 
 ## Multiplayer notes
 
