@@ -5,20 +5,34 @@
   "assets": {
     "directory": "./",
     "binding": "ASSETS",
-    "run_worker_first": ["/api/*"]
+    "run_worker_first": [
+      "/api/*"
+    ]
   },
   "durable_objects": {
     "bindings": [
       {
         "name": "LOBBY_DIRECTORY",
         "class_name": "LobbyDirectory"
+      },
+      {
+        "name": "ROOM_RELAY",
+        "class_name": "MultiplayerRoom"
       }
     ]
   },
   "migrations": [
     {
       "tag": "v1",
-      "new_sqlite_classes": ["LobbyDirectory"]
+      "new_sqlite_classes": [
+        "LobbyDirectory"
+      ]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": [
+        "MultiplayerRoom"
+      ]
     }
   ],
   "previews": {}
