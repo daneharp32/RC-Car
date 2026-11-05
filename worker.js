@@ -1,3 +1,6 @@
+import { MultiplayerRoom } from "./multiplayer-room.js";
+export { MultiplayerRoom };
+
 const MAX_LOBBIES = 100;
 const LOBBY_TTL_MS = 45_000;
 const MAX_BODY_LENGTH = 4096;
@@ -167,6 +170,21 @@ export default {
       const id = env.LOBBY_DIRECTORY.idFromName("rc-car-public-lobbies");
       return env.LOBBY_DIRECTORY.get(id).fetch(request);
     }
+
+    const roomPrefix = "/api/rooms/";
+    if (url.pathname.startsWith(roomPrefix)) {
+      const roomName = url.pathname.slice(roomPrefix.length);
+      if (!/^[a-z0-9_-]{5,40}$/i.test(roomName)) {
+        return jsonResponse({ error: "Invalid room address" }, 404);
+      }
+      if (request.method !== "GET" ||
+          request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
+        return jsonResponse({ error: "A WebSocket connection is required" }, 426);
+      }
+      const id = env.ROOM_RELAY.idFromName("rc-car-room:" + roomName);
+      return env.ROOM_RELAY.get(id).fetch(request);
+    }
+
     if (url.pathname.startsWith("/api/")) {
       return jsonResponse({ error: "API route not found" }, 404);
     }

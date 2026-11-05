@@ -1,6 +1,6 @@
 # RC Car Multiplayer
 
-A browser-based 3D RC car driving game with peer-to-peer multiplayer.
+A browser-based 3D RC car driving game with cross-device multiplayer rooms.
 
 ## Project layout
 
@@ -22,13 +22,9 @@ The game uses native JavaScript ES modules. `index.html` still loads only `main.
 
 ## Run and deploy
 
-This is a static web app. For Cloudflare Pages:
-- Framework preset: **None**
-- Build command: leave blank
-- Build output directory: **.**
-- Entry file: `index.html`
+The game is served by a Cloudflare Worker with static assets and two Durable Objects: one shared lobby directory and one WebSocket relay per active room. The existing `wrangler.jsonc` defines the Worker entry point, static asset binding, Durable Object bindings, and migrations.
 
-The project imports Three.js, Cannon-es, and Trystero from CDNs, so an internet connection is required. Serve it over HTTPS when deployed; localhost is suitable for local testing.
+The project imports Three.js, Cannon-es, and Trystero from CDNs, so an internet connection is required. Deploy through the connected Cloudflare Worker integration or Wrangler, and serve the game over HTTPS. The multiplayer lobby directory and room relay require the Cloudflare Worker environment; a basic static file server can render the game but cannot provide cross-device multiplayer.
 
 ## Controls
 
@@ -49,13 +45,16 @@ The project imports Three.js, Cannon-es, and Trystero from CDNs, so an internet 
 5. **physics.js** — creates the Cannon-es world, switchable terrain colliders, parked-vehicle collision shapes, chassis body, raycast vehicle, and suspension.
 6. **garage.js** — creates the showroom, handles menu/garage transitions, component hover labels, and shell removal animation.
 7. **controls.js** — handles keyboard input, camera dragging, vehicle reset, steering, throttle, braking, and airborne control.
-8. **multiplayer.js** — joins/leaves rooms, synchronizes selected maps in lobby announcements, sends snapshots, receives player state, and updates remote vehicle visuals.
+8. **multiplayer.js** — manages lobby discovery, room membership, player counts, host race controls, and remote vehicle visuals.
+9. **room-relay-client.js** — opens the per-room WebSocket and handles join/leave, snapshots, and race-control events.
+10. **worker.js** — routes the public lobby directory and room WebSocket endpoints to Cloudflare Durable Objects.
+11. **multiplayer-room.js** — manages one room's connected sockets, assigns peer IDs, and relays snapshots and host controls.
 
 ## Multiplayer notes
 
-Players enter the same room code to meet in the same arena. Trystero handles peer discovery/signaling and WebRTC carries vehicle-state updates directly between browsers. No game account or custom game server is currently required.
+Players enter the same lobby to meet in the same arena. The Cloudflare lobby directory lets different computers discover the same room. Each room uses a dedicated Cloudflare Durable Object WebSocket relay for join/leave events, vehicle snapshots, player counts, and host race controls.
 
-This is peer-to-peer rather than server-authoritative. Each browser simulates its own car locally and exchanges vehicle snapshots with other players.
+Each browser still simulates its own car locally. The room relay forwards compact snapshots and race-control messages between connected players; it does not run the vehicle physics. Trystero remains as a fallback for the legacy lobby-directory announcements.
 
 ## Safe iteration
 
