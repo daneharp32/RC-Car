@@ -198,10 +198,11 @@ export function createMultiplayerSystem(game) {
       name.textContent = lobby.name;
       const mode = document.createElement("div");
       mode.className = "lobby-row-mode";
-      mode.textContent = lobby.mode === "free-drive"
+      const mapLabel = lobby.mapId === "gravel-basin" ? "GRAVEL BASIN" : "CLUB DIRT CIRCUIT";
+      mode.textContent = (lobby.mode === "free-drive"
         ? "FREE DRIVE · OPEN SESSION"
         : (lobby.mode === "time-trial" ? "TIME TRIAL · " : "RACE · ") +
-          lobby.laps + (lobby.laps === 1 ? " LAP" : " LAPS");
+          lobby.laps + (lobby.laps === 1 ? " LAP" : " LAPS")) + " · " + mapLabel;
       main.append(name, mode);
 
       const count = document.createElement("div");
@@ -245,6 +246,7 @@ export function createMultiplayerSystem(game) {
       id: currentLobby.id,
       name: currentLobby.name,
       mode: currentLobby.mode,
+      mapId: currentLobby.mapId || "closed-course",
       laps: currentLobby.laps,
       phase: game.race?.phase || "waiting",
       playerCount: currentPlayerCount(),
@@ -325,6 +327,7 @@ export function createMultiplayerSystem(game) {
           id: message.id,
           name: name || "Untitled Lobby",
           mode,
+          mapId: message.mapId === "gravel-basin" ? "gravel-basin" : "closed-course",
           laps: Number.isFinite(message.laps) ? Math.max(1, Math.min(20, Math.floor(message.laps))) : 3,
           phase: ["waiting", "countdown", "racing", "finished", "free-drive"].includes(message.phase) ? message.phase : "waiting",
           playerCount,
@@ -387,6 +390,8 @@ export function createMultiplayerSystem(game) {
     if (joined || room) return;
     startDirectory();
 
+    const selectedMapId = lobby.mapId === "gravel-basin" ? "gravel-basin" : "closed-course";
+    game.setActiveMap?.(selectedMapId, { silent: true });
     const typedName = $("driverName").value;
     setDriverName(typedName);
     currentLobby = {
@@ -395,6 +400,7 @@ export function createMultiplayerSystem(game) {
       mode: lobby.mode === "free-drive"
         ? "free-drive"
         : lobby.mode === "time-trial" ? "time-trial" : "race",
+      mapId: selectedMapId,
       laps: Number.isFinite(lobby.laps) ? Math.max(1, Math.min(20, Math.floor(lobby.laps))) : 3,
       hostPeerId: isHost ? selfId : lobby.peerId
     };
@@ -576,7 +582,8 @@ export function createMultiplayerSystem(game) {
       mode,
       laps,
       phase: "waiting",
-      playerCount: 1
+      playerCount: 1,
+      mapId: game.activeMapId || "closed-course"
     }, true);
   }
 
