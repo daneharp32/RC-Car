@@ -375,7 +375,7 @@ loadConcept4ShellScene().then((modelScene) => {
   garage.setAlternateShellReady(true);
   console.info("FF SC Concept4 shell loaded with its original high-detail geometry.");
 }).catch((error) => {
-  garage.setAlternateShellReady(false);
+  garage.setAlternateShellReady(false, true);
   console.warn("FF SC Concept4 shell could not be loaded; the current shell remains available:", error);
 });
 
