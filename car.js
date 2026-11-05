@@ -30,9 +30,13 @@ function addAlternateShellToVisual(visual) {
   // Rotate the centered wrapper, not the mesh axes, to preserve the model.
   fitRoot.rotation.y = Math.PI;
   imported.scale.multiplyScalar(uniformScale);
+  // Lower the complete shell slightly so the wheel arches and lower body sit
+  // closer to the chassis. Keep the imported model's scale and proportions
+  // unchanged; vertical placement is adjusted independently of the mesh.
+  const shellVerticalOffset = 0.0;
   imported.position.set(
     -sourceCenter.x * uniformScale,
-    0.075 - sourceBounds.min.y * uniformScale,
+    shellVerticalOffset - sourceBounds.min.y * uniformScale,
     -sourceCenter.z * uniformScale
   );
 
