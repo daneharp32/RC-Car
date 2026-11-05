@@ -5,6 +5,7 @@ import { createCarVisualFactory } from "./car.js";
 import { createControlsSystem } from "./controls.js";
 import { createMultiplayerSystem } from "./multiplayer.js";
 import { createGarageSystem } from "./garage.js";
+import { createSandboxSystem } from "./sandbox.js";
 import { createTrackSystem } from "./track.js";
 import { createGravelBasinSystem } from "./gravel-map.js";
 import { createRaceSystem } from "./race.js";
@@ -546,6 +547,8 @@ const multiplayer = createMultiplayerSystem(game);
 game.multiplayer = multiplayer;
 const garage = createGarageSystem(game);
 game.garage = garage;
+const sandbox = createSandboxSystem(game);
+game.sandbox = sandbox;
 
 let isPaused = false;
 function setPaused(nextPaused) {
@@ -660,6 +663,7 @@ function animate(now) {
     }
   }
   garage.updateGarageShellAnimation(now);
+  sandbox.update(delta, now);
   if (!isPaused) world.step(FIXED_STEP, delta, 3);
   // Read wheel contact and sliding flags before visual wheel transforms refresh them.
 
@@ -673,10 +677,10 @@ function animate(now) {
   $("wheelStatus").textContent = touching + " / 4 TIRES IN CONTACT";
 
   // The showroom camera presents the parked truck in menu and garage views.
-  if (garage.viewMode === "menu" || garage.viewMode === "mode-select" || garage.viewMode === "create-lobby" || garage.viewMode === "garage") {
+  if (garage.viewMode === "menu" || garage.viewMode === "mode-select" || garage.viewMode === "create-lobby" || garage.viewMode === "garage" || garage.viewMode === "sandbox-builder") {
     easeCameraFov(58, delta, 4.0);
-    const distance = garage.viewMode === "garage" ? 2.35 : 5.1;
-    const height = garage.viewMode === "garage" ? 1.18 : 2.15;
+    const distance = garage.viewMode === "sandbox-builder" ? 3.45 : garage.viewMode === "garage" ? 2.35 : 5.1;
+    const height = garage.viewMode === "sandbox-builder" ? 1.55 : garage.viewMode === "garage" ? 1.18 : 2.15;
     const orbitDirection = new THREE.Vector3(0, 0, 1)
       .applyAxisAngle(new THREE.Vector3(0, 1, 0), controls.cameraOrbitYaw + (garage.viewMode === "menu" ? -0.18 : 0));
     const showroomCamera = localCar.root.position.clone()

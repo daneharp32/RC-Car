@@ -62,3 +62,10 @@ Each browser still simulates its own car locally. The room relay forwards compac
 - Change one system at a time and test the Cloudflare preview after each meaningful change.
 - Confirm the deployment reports **Success** before testing it.
 - If something breaks, return to the last working GitHub backup branch.
+
+
+## Multiplayer Sandbox
+
+Sandbox rooms use the same Cloudflare WebSocket relay as the other multiplayer modes. Players equip a spring-bumper field, a fold-out jump pad, and twin boost vents in the builder, then enter the selected map independently. Spring-field activations and jump-pad placements are relayed to the other sandbox players. Each client applies non-damaging arcade bounce physics locally, including upward launches and multi-axis vehicle rotation. Sandbox is supported on Club Dirt Circuit and Gravel Basin.
+
+Sandbox controls while driving: Q activates the spring field, E deploys a shared jump pad, and F activates the truck's forward boost vents.
