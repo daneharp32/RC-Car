@@ -632,9 +632,7 @@ export function createSandboxSystem(game) {
       );
     }
     beacon.group.visible = true;
-    beacon.orb.material = new THREE.MeshBasicMaterial({
-      color: 0xe5fbff, toneMapped: false
-    });
+    beacon.orb.material.color.setHex(0xe5fbff);
   }
 
   function update(delta, now = performance.now()) {
@@ -677,7 +675,7 @@ export function createSandboxSystem(game) {
   }
 
   function handleKeyDown(key, event) {
-    if (!active || !inMap || !game.multiplayer?.joined) return false;
+    if (!active || !inMap || !game.multiplayer?.joined || game.isPaused?.()) return false;
     if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return false;
 
     const part = ({ q: "lift", e: "forward", f: "beacon" })[key];
@@ -694,7 +692,12 @@ export function createSandboxSystem(game) {
 
     if (part === "lift") held.lift = true;
     else if (part === "forward") held.forward = true;
-    else if (part === "beacon" && !event?.repeat) deployImpulseBeacon();
+    else if (part === "beacon" && !event?.repeat) {
+      const now = performance.now();
+      if (now < cooldowns.beacon) return true;
+      cooldowns.beacon = now + 2200;
+      deployImpulseBeacon();
+    }
 
     renderControlHints();
     return true;
