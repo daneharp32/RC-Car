@@ -16,6 +16,9 @@ export function createMultiplayerSystem(game) {
     appId: APP_ID,
     relayConfig: { redundancy: SIGNALING_REDUNDANCY }
   });
+  // The Cloudflare registry is the authoritative lobby list. Trystero remains
+  // as a secondary discovery path for clients running older builds.
+  const DIRECTORY_API_URL = "/api/lobbies";
 
   const {
     THREE, scene, chassisBody, vehicle, wheelPositions,
@@ -66,6 +69,8 @@ export function createMultiplayerSystem(game) {
   let directoryRoom = null;
   let directoryAction = null;
   let directoryTimer = null;
+  let centralDirectoryOnline = false;
+  let centralFetchInFlight = false;
   let driverName = "Driver";
   let currentLobby = null;
   let hostingLobby = false;
@@ -199,9 +204,11 @@ export function createMultiplayerSystem(game) {
       status.textContent = message;
       return;
     }
-    status.textContent = directoryPeers.size
-      ? "LOBBY DIRECTORY CONNECTED"
-      : "SEARCHING FOR AVAILABLE LOBBIES";
+    status.textContent = centralDirectoryOnline
+      ? "LOBBY DIRECTORY ONLINE"
+      : directoryPeers.size
+        ? "PEER DIRECTORY CONNECTED"
+        : "SEARCHING FOR AVAILABLE LOBBIES";
   }
 
   function addRemotePlayer(peerId, data) {
@@ -310,7 +317,9 @@ export function createMultiplayerSystem(game) {
   function publishLobby() {
     // Race and Time Trial rooms leave the browser when their countdown starts.
     // Free Drive rooms stay open and discoverable while the host remains there.
-    if (!hostingLobby || !currentLobby || !directoryAction || !currentLobbyAcceptsPlayers()) return;
+    // The Cloudflare registry works even when no peer-to-peer directory peers
+    // are available, which is important for players on separate computers.
+    if (!hostingLobby || !currentLobby || !currentLobbyAcceptsPlayers()) return;
 
     const announcement = {
       type: "upsert",
@@ -327,9 +336,15 @@ export function createMultiplayerSystem(game) {
     discoveredLobbies.set(currentLobby.id, {
       ...announcement,
       peerId: selfId,
+      source: "local",
       lastSeen: Date.now()
     });
-    directoryAction.send(announcement);
+
+    if (directoryAction) directoryAction.send(announcement);
+    postCentralLobbyMessage({
+      ...announcement,
+      token: currentLobby.directoryToken || ""
+    });
     renderLobbyList();
   }
 
@@ -339,6 +354,11 @@ export function createMultiplayerSystem(game) {
     const old = discoveredLobbies.get(id);
     if (old && old.peerId === selfId) discoveredLobbies.delete(id);
     if (directoryAction) directoryAction.send({ type: "remove", id });
+    postCentralLobbyMessage({
+      type: "remove",
+      id,
+      token: currentLobby.directoryToken || ""
+    });
     renderLobbyList();
   }
 
@@ -354,7 +374,121 @@ export function createMultiplayerSystem(game) {
     if (changed) renderLobbyList();
   }
 
+  function postCentralLobbyMessage(message) {
+    fetch(DIRECTORY_API_URL, {
+      method: "POST",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(message)
+    }).then((response) => {
+      if (!response.ok) throw new Error("Lobby directory returned HTTP " + response.status);
+      centralDirectoryOnline = true;
+      updateDirectoryStatus();
+    }).catch((error) => {
+      centralDirectoryOnline = false;
+      console.warn("Cloudflare lobby directory update failed:", error);
+      updateDirectoryStatus("CLOUD LOBBY DIRECTORY UNAVAILABLE — RETRYING");
+    });
+  }
+
+  async function fetchCentralLobbyList() {
+    if (centralFetchInFlight) return;
+    centralFetchInFlight = true;
+
+    try {
+      const response = await fetch(DIRECTORY_API_URL, {
+        method: "GET",
+        cache: "no-store",
+        headers: { "Accept": "application/json" }
+      });
+      if (!response.ok) throw new Error("Lobby directory returned HTTP " + response.status);
+
+      const payload = await response.json();
+      if (!payload || !Array.isArray(payload.lobbies)) {
+        throw new Error("Lobby directory returned an invalid response");
+      }
+
+      const now = Date.now();
+      const receivedIds = new Set();
+      for (const item of payload.lobbies) {
+        if (!item || !validLobbyId(item.id)) continue;
+        const mode = ["race", "free-drive", "time-trial"].includes(item.mode)
+          ? item.mode
+          : "race";
+        const mapId = item.mapId === "gravel-basin" ? "gravel-basin" : "closed-course";
+        if (mapId === "gravel-basin" && mode !== "free-drive") continue;
+
+        const previous = discoveredLobbies.get(item.id);
+        receivedIds.add(item.id);
+        discoveredLobbies.set(item.id, {
+          id: item.id,
+          name: cleanLobbyName(item.name) || "Untitled Lobby",
+          mode,
+          mapId,
+          laps: Number.isFinite(item.laps) ? Math.max(1, Math.min(20, Math.floor(item.laps))) : 3,
+          phase: item.phase === "free-drive" ? "free-drive" : "waiting",
+          playerCount: Number.isFinite(item.playerCount)
+            ? Math.max(1, Math.min(MAX_PLAYERS, Math.floor(item.playerCount)))
+            : 1,
+          maxPlayers: MAX_PLAYERS,
+          peerId: previous?.peerId || "",
+          source: "central",
+          lastSeen: now
+        });
+      }
+
+      // The server's response is authoritative for records it previously
+      // supplied, while peer-discovered records remain as a compatibility
+      // fallback if the server is temporarily unreachable.
+      for (const [id, lobby] of discoveredLobbies) {
+        if (lobby.source === "central" && !receivedIds.has(id)) {
+          discoveredLobbies.delete(id);
+        }
+      }
+
+      centralDirectoryOnline = true;
+      renderLobbyList();
+      updateDirectoryStatus();
+    } catch (error) {
+      centralDirectoryOnline = false;
+      console.warn("Unable to read the Cloudflare lobby directory:", error);
+      updateDirectoryStatus("CLOUD LOBBY DIRECTORY UNAVAILABLE — RETRYING");
+    } finally {
+      centralFetchInFlight = false;
+    }
+  }
+
+  function createDirectoryToken() {
+    const bytes = new Uint8Array(16);
+    if (globalThis.crypto?.getRandomValues) {
+      globalThis.crypto.getRandomValues(bytes);
+    } else {
+      for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+    }
+    return [...bytes].map((value) => value.toString(16).padStart(2, "0")).join("");
+  }
+
   function startDirectory() {
+    // Keep the Cloudflare registry heartbeat running independently of the
+    // peer-to-peer directory. A failed relay must not prevent lobby listing.
+    if (!directoryTimer) {
+      directoryTimer = setInterval(() => {
+        pruneLobbyListings();
+
+        if (hostingLobby && joined && currentLobbyAcceptsPlayers()) {
+          publishLobby();
+        }
+
+        const browsingLobbies = !joined && modeSelectPanel?.style.display !== "none";
+        if (browsingLobbies) {
+          if (directoryAction) {
+            directoryAction.send({ type: "request", requestedAt: Date.now() });
+          }
+          fetchCentralLobbyList();
+        }
+      }, HEARTBEAT_MS);
+    }
+
     if (directoryRoom) return;
 
     try {
@@ -409,6 +543,7 @@ export function createMultiplayerSystem(game) {
           playerCount,
           maxPlayers: MAX_PLAYERS,
           peerId,
+          source: "peer",
           lastSeen: Date.now()
         });
         renderLobbyList();
@@ -431,21 +566,6 @@ export function createMultiplayerSystem(game) {
       };
 
       if (!directoryTimer) {
-        directoryTimer = setInterval(() => {
-          pruneLobbyListings();
-
-          if (hostingLobby && joined && currentLobbyAcceptsPlayers()) {
-            publishLobby();
-          }
-
-          // Keep asking while the lobby browser is visible. This recovers if
-          // an initial discovery message was sent before a peer connected or
-          // a relay briefly dropped a directory message.
-          const browsingLobbies = !joined && modeSelectPanel?.style.display !== "none";
-          if (browsingLobbies && directoryAction) {
-            directoryAction.send({ type: "request", requestedAt: Date.now() });
-          }
-        }, HEARTBEAT_MS);
       }
       updateDirectoryStatus("CONNECTING TO LOBBY DIRECTORY...");
     } catch (error) {
@@ -467,6 +587,7 @@ export function createMultiplayerSystem(game) {
     if (directoryAction) {
       directoryAction.send({ type: "request", requestedAt: Date.now() });
     }
+    fetchCentralLobbyList();
   }
 
   function createRoomId() {
@@ -500,7 +621,8 @@ export function createMultiplayerSystem(game) {
         : lobby.mode === "time-trial" ? "time-trial" : "race",
       mapId: selectedMapId,
       laps: Number.isFinite(lobby.laps) ? Math.max(1, Math.min(20, Math.floor(lobby.laps))) : 3,
-      hostPeerId: isHost ? selfId : lobby.peerId
+      hostPeerId: isHost ? selfId : lobby.peerId,
+      directoryToken: isHost ? createDirectoryToken() : ""
     };
     hostingLobby = !!isHost;
     roomPeerIds.clear();
