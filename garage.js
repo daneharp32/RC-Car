@@ -244,6 +244,7 @@ let garageShellInstalled = true;
 let garageShellAnimation = null;
 let activeShellVariant = localCar.activeShellVariant || "current";
 let alternateShellReady = !!localCar.alternateShellReady;
+let alternateShellLoadFailed = false;
 const garageShellDuration = 520;
 const garageShellSwitchDuration = 700;
 const garageShellAttachedPosition = new THREE.Vector3(0, 0, 0);
@@ -277,7 +278,7 @@ function updateShellControlLabels() {
     variantButton.disabled = !alternateShellReady || !!garageShellAnimation;
     variantButton.textContent = alternateShellReady
       ? (activeShellVariant === "current" ? "SWITCH TO FF SC CONCEPT4" : "SWITCH TO CURRENT SHELL")
-      : "LOADING FF SC CONCEPT4...";
+      : (alternateShellLoadFailed ? "NEW BODY FAILED TO LOAD" : "LOADING FF SC CONCEPT4...");
   }
 }
 
@@ -327,8 +328,9 @@ function updateGarageShellAnimation(now) {
   }
 }
 
-function setAlternateShellReady(ready) {
+function setAlternateShellReady(ready, failed = false) {
   alternateShellReady = !!ready;
+  alternateShellLoadFailed = !alternateShellReady && !!failed;
   updateShellControlLabels();
 }
 
