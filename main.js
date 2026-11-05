@@ -803,6 +803,8 @@ function animate(now) {
   // The physics world is only active while the truck is on a driving screen.
   // This keeps showroom, menus, and the Sandbox builder completely stationary.
   if (drivingActive && !isPaused) world.step(FIXED_STEP, delta, 3);
+  // Stabilize the Sandbox chassis after physics so contact forces cannot build into a flip.
+  sandbox.postPhysicsUpdate(delta);
   // Read wheel contact and sliding flags before visual wheel transforms refresh them.
 
   updateLocalVisual();
