@@ -145,6 +145,7 @@ function makeJumpSurfaceGeometry(THREE, profile) {
 export function createTrackSystem({ THREE, scene }) {
   const trackGroup = new THREE.Group();
   trackGroup.name = "closed-dirt-track";
+  trackGroup.userData.mapId = "closed-course";
   scene.add(trackGroup);
 
   const trackHalfWidth = 5.75;
