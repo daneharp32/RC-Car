@@ -62,12 +62,19 @@ sun.shadow.camera.left = -116;
 sun.shadow.camera.right = 116;
 sun.shadow.camera.top = 116;
 sun.shadow.camera.bottom = -116;
-sun.shadow.bias = -0.00015;
+sun.shadow.camera.near = 0.5;
+sun.shadow.camera.far = 250;
+sun.shadow.bias = -0.00022;
+sun.shadow.normalBias = 0.035;
+sun.shadow.radius = 2.5;
 scene.add(sun);
+scene.add(sun.target);
+let activeLighting = { sunOffset: [-8, 15, 8] };
 
 // Gravel Basin is a much larger view with dense scenery, so cap render
-// resolution and shadow-map size only while that map is active. The circuit
-// keeps the original quality settings.
+// resolution and shadow-map size only while that map is active. Its shadow
+// frustum follows the RC truck to give nearby terrain shadows more detail
+// without increasing the shadow-map resolution or redraw cost.
 const DEFAULT_PIXEL_RATIO_CAP = 1.7;
 function applyMapRenderQuality(mapId) {
   const isGravelBasin = mapId === "gravel-basin";
@@ -81,13 +88,87 @@ function applyMapRenderQuality(mapId) {
     sun.shadow.map?.dispose();
     sun.shadow.map = null;
     sun.shadow.mapSize.set(shadowSize, shadowSize);
-    sun.shadow.needsUpdate = true;
   }
+
+  const shadowExtent = isGravelBasin ? 58 : 116;
+  sun.shadow.camera.left = -shadowExtent;
+  sun.shadow.camera.right = shadowExtent;
+  sun.shadow.camera.top = shadowExtent;
+  sun.shadow.camera.bottom = -shadowExtent;
+  sun.shadow.camera.near = 0.5;
+  sun.shadow.camera.far = isGravelBasin ? 145 : 250;
+  sun.shadow.camera.updateProjectionMatrix();
+
+  if (!isGravelBasin) {
+    sun.target.position.set(0, 0, 0);
+    sun.position.set(
+      sun.target.position.x + activeLighting.sunOffset[0],
+      sun.target.position.y + activeLighting.sunOffset[1],
+      sun.target.position.z + activeLighting.sunOffset[2]
+    );
+  }
+  sun.target.updateMatrixWorld();
+  sun.updateMatrixWorld();
+  sun.shadow.needsUpdate = true;
 }
 
 const fill = new THREE.DirectionalLight(0xb8d8e9, 0.65);
 fill.position.set(8, 6, -10);
 scene.add(fill);
+
+const TIME_OF_DAY_PRESETS = {
+  day: {
+    sky: 0x83c5ef, fog: 0x83c5ef,
+    hemiSky: 0xe7f1f4, hemiGround: 0x6b5943, hemiIntensity: 1.45,
+    sunColor: 0xffe2bd, sunIntensity: 2.15, sunOffset: [-8, 15, 8],
+    fillColor: 0xb8d8e9, fillIntensity: 0.65, exposure: 1.08
+  },
+  "golden-hour": {
+    sky: 0xd89a70, fog: 0xc78d69,
+    hemiSky: 0xffd3a7, hemiGround: 0x57402f, hemiIntensity: 1.12,
+    sunColor: 0xffa45f, sunIntensity: 2.0, sunOffset: [-17, 6.5, 14],
+    fillColor: 0xf0a875, fillIntensity: 0.42, exposure: 1.10
+  },
+  night: {
+    sky: 0x101a2b, fog: 0x172338,
+    hemiSky: 0x788db7, hemiGround: 0x111824, hemiIntensity: 0.72,
+    sunColor: 0xa3c2ff, sunIntensity: 0.82, sunOffset: [17, 11, -14],
+    fillColor: 0x536fae, fillIntensity: 0.34, exposure: 0.92
+  }
+};
+
+let activeTimeOfDay = "day";
+function setTimeOfDay(presetName, notify = true) {
+  const preset = TIME_OF_DAY_PRESETS[presetName];
+  if (!preset) return false;
+
+  activeTimeOfDay = presetName;
+  activeLighting = preset;
+  scene.background.setHex(preset.sky);
+  if (scene.fog) scene.fog.color.setHex(preset.fog);
+  hemi.color.setHex(preset.hemiSky);
+  hemi.groundColor.setHex(preset.hemiGround);
+  hemi.intensity = preset.hemiIntensity;
+  sun.color.setHex(preset.sunColor);
+  sun.intensity = preset.sunIntensity;
+  sun.position.set(
+    sun.target.position.x + preset.sunOffset[0],
+    sun.target.position.y + preset.sunOffset[1],
+    sun.target.position.z + preset.sunOffset[2]
+  );
+  fill.color.setHex(preset.fillColor);
+  fill.intensity = preset.fillIntensity;
+  renderer.toneMappingExposure = preset.exposure;
+  sun.target.updateMatrixWorld();
+  sun.updateMatrixWorld();
+
+  if (notify) {
+    const label = presetName === "golden-hour" ? "GOLDEN HOUR" : presetName.toUpperCase();
+    console.info("Time of day changed to", label);
+  }
+  return true;
+}
+setTimeOfDay("day", false);
 
 // The track module owns the complete closed-course scenery and its shared layout.
 const trackSystem = createTrackSystem({ THREE, scene });
@@ -395,6 +476,55 @@ game.multiplayer = multiplayer;
 const garage = createGarageSystem(game);
 game.garage = garage;
 
+let isPaused = false;
+function setPaused(nextPaused) {
+  const shouldPause = Boolean(nextPaused) && multiplayer.joined;
+  if (isPaused === shouldPause) return;
+  isPaused = shouldPause;
+
+  const pauseOverlay = $("pauseOverlay");
+  const pauseButton = $("pauseButton");
+  pauseOverlay.style.display = isPaused ? "grid" : "none";
+  pauseButton.setAttribute("aria-expanded", isPaused ? "true" : "false");
+  pauseButton.textContent = isPaused ? "PAUSED" : "PAUSE · ESC";
+
+  // Clear held keys when entering or leaving the menu so a key held while
+  // paused cannot unexpectedly accelerate the truck after resuming.
+  for (const key of Object.keys(controls.keys)) controls.keys[key] = false;
+
+  if (isPaused) {
+    chassisBody.velocity.set(0, 0, 0);
+    chassisBody.angularVelocity.set(0, 0, 0);
+    for (let i = 0; i < 4; i++) {
+      vehicle.applyEngineForce(0, i);
+      vehicle.setBrake(0, i);
+    }
+    vehicle.setSteeringValue(0, 0);
+    vehicle.setSteeringValue(0, 1);
+  }
+}
+game.setPaused = setPaused;
+$("pauseButton").addEventListener("click", () => setPaused(!isPaused));
+$("resumeButton").addEventListener("click", () => setPaused(false));
+$("leaveButton").addEventListener("click", () => setPaused(false));
+
+const timeOfDaySelect = $("timeOfDaySelect");
+timeOfDaySelect.value = activeTimeOfDay;
+timeOfDaySelect.addEventListener("change", () => {
+  if (setTimeOfDay(timeOfDaySelect.value)) {
+    const label = timeOfDaySelect.options[timeOfDaySelect.selectedIndex].textContent;
+    showToast("TIME OF DAY: " + label);
+  }
+});
+
+window.addEventListener("keydown", (event) => {
+  if (event.repeat || event.key !== "Escape" || !multiplayer.joined) return;
+  // Let Escape close the native select dropdown first when it has focus.
+  if (event.target === timeOfDaySelect && isPaused) return;
+  event.preventDefault();
+  setPaused(!isPaused);
+});
+
 // Drive opens the live lobby browser. Users can join an existing lobby
 // or open the separate Create Lobby panel.
 $("menuDriveButton").addEventListener("click", () => garage.showModeSelect());
@@ -442,7 +572,7 @@ function animate(now) {
   lastTime = now;
 
   try {
-    controls.updateDrivingControls(delta);
+    if (!isPaused) controls.updateDrivingControls(delta);
   } catch (error) {
     // A control bug must not stop the render loop or turn the track screen
     // into a blank background. Remove drive force and report the error once.
@@ -459,7 +589,7 @@ function animate(now) {
     }
   }
   garage.updateGarageShellAnimation(now);
-  world.step(FIXED_STEP, delta, 3);
+  if (!isPaused) world.step(FIXED_STEP, delta, 3);
   // Read wheel contact and sliding flags before visual wheel transforms refresh them.
 
   updateLocalVisual();
@@ -564,6 +694,21 @@ function animate(now) {
   }
 
   multiplayer.sendSnapshotIfReady(delta);
+
+  // Keep the Gravel Basin shadow frustum centered near the truck. Snapping the
+  // focus in small increments prevents visible shadow-map shimmer while driving.
+  if (game.activeMapId === "gravel-basin") {
+    const focusX = Math.round(chassisBody.position.x / 3) * 3;
+    const focusZ = Math.round(chassisBody.position.z / 3) * 3;
+    sun.target.position.set(focusX, 0, focusZ);
+    sun.position.set(
+      focusX + activeLighting.sunOffset[0],
+      activeLighting.sunOffset[1],
+      focusZ + activeLighting.sunOffset[2]
+    );
+    sun.target.updateMatrixWorld();
+    sun.updateMatrixWorld();
+  }
 
   renderer.render(scene, camera);
 }

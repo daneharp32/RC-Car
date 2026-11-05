@@ -416,10 +416,44 @@
       .race-spectator-list { gap: 5px; }
       .race-spectator-button, .race-action-button { min-height: 29px; font-size: 7px; }
     }
+    #pauseButton {
+      position: absolute; top: 72px; left: 18px; min-height: 38px; padding: 0 14px;
+      pointer-events: auto; border: 1px solid rgba(255,255,255,.18);
+      background: rgba(13,20,29,.76); color: #eaf3fb;
+      font: 900 9px "Orbitron",ui-sans-serif,sans-serif; letter-spacing: .08em;
+    }
+    #pauseOverlay {
+      display: none; position: fixed; z-index: 8; inset: 0;
+      place-items: center; padding: 18px; pointer-events: auto;
+      background: rgba(4,10,18,.70); backdrop-filter: blur(9px);
+    }
+    .pause-menu-card {
+      width: min(410px, calc(100vw - 32px)); padding: 25px;
+      border: 1px solid rgba(155,205,255,.24); border-radius: 20px;
+      background: rgba(9,20,34,.96); box-shadow: 0 24px 85px rgba(0,0,0,.48);
+      text-align: center;
+    }
+    .pause-title {
+      margin: 11px 0 7px; color: #f4f9ff;
+      font: 900 clamp(27px, 6vw, 36px)/1.05 "Orbitron",ui-sans-serif,sans-serif;
+      letter-spacing: -.04em;
+    }
+    .pause-copy { margin: 0 0 18px; color: #aebfce; font-size: 11px; line-height: 1.5; }
+    .pause-select-field { display: grid; gap: 8px; margin: 0 0 15px; text-align: left; }
+    .pause-select-field span {
+      color: #9ecfff; font-size: 9px; font-weight: 900; letter-spacing: .16em;
+    }
+    .pause-select-field select {
+      width: 100%; height: 44px; padding: 0 12px;
+      border: 1px solid rgba(155,205,255,.25); border-radius: 9px;
+      outline: none; background: #15283b; color: #f4f8fc;
+      font: 800 11px "Orbitron",ui-sans-serif,sans-serif; letter-spacing: .06em;
+    }
+    #resumeButton, #leaveButton { width: 100%; min-height: 45px; }
     #leaveButton {
-      position: absolute; top: 72px; left: 18px; pointer-events: auto; padding: 9px 12px;
-      border: 1px solid rgba(255,255,255,.16); background: rgba(13,20,29,.68); color: #e6edf1;
-      font-size: 10px;
+      margin-top: 9px; border: 1px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.07); color: #e6edf1;
+      box-shadow: none; font-size: 10px;
     }
     #toast {
       position: fixed; z-index: 5; left: 50%; bottom: 26px; transform: translate(-50%, 14px);
@@ -441,7 +475,7 @@
       #speedCard { left: 12px; bottom: 12px; min-width: 116px; }
       #speedValue { font-size: 36px; }
       #roomCard { right: 12px; top: 66px; }
-      #leaveButton { left: 12px; top: 66px; }
+      #pauseButton { left: 12px; top: 66px; }
       #controlsCard { display: none; }
       #cameraModeCard { right: 12px; bottom: 12px; min-width: 256px; padding: 8px; }
       .camera-mode-button { min-height: 29px; padding: 0 5px; font-size: 7px; letter-spacing: .04em; }
@@ -584,7 +618,7 @@
   </section>
 
   <section id="hud" aria-live="polite">
-    <button id="leaveButton" type="button">LEAVE ROOM</button>
+    <button id="pauseButton" type="button" aria-haspopup="dialog" aria-expanded="false">PAUSE · ESC</button>
     <div id="roomCard" class="hud-card">
       <div class="hud-label">ROOM</div>
       <div id="roomValue">PIT-LANE</div>
@@ -642,6 +676,24 @@
       </div>
     </div>
     <div id="raceCountdownOverlay" aria-live="assertive"></div>
+
+    <div id="pauseOverlay" role="dialog" aria-modal="true" aria-labelledby="pauseTitle">
+      <div class="pause-menu-card">
+        <div class="menu-kicker">SESSION CONTROLS</div>
+        <h2 id="pauseTitle" class="pause-title">PAUSED</h2>
+        <p class="pause-copy">Your truck is paused locally. Other drivers remain in the room.</p>
+        <label class="pause-select-field" for="timeOfDaySelect">
+          <span>TIME OF DAY</span>
+          <select id="timeOfDaySelect" aria-label="Time of day">
+            <option value="day" selected>DAY</option>
+            <option value="golden-hour">GOLDEN HOUR</option>
+            <option value="night">NIGHT</option>
+          </select>
+        </label>
+        <button id="resumeButton" class="menu-button" type="button">RESUME DRIVING</button>
+        <button id="leaveButton" type="button">LEAVE ROOM</button>
+      </div>
+    </div>
 
     <div id="controlsCard" class="hud-card">
       <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Drive / steer</div>
