@@ -65,6 +65,26 @@ sun.shadow.camera.bottom = -116;
 sun.shadow.bias = -0.00015;
 scene.add(sun);
 
+// Gravel Basin is a much larger view with dense scenery, so cap render
+// resolution and shadow-map size only while that map is active. The circuit
+// keeps the original quality settings.
+const DEFAULT_PIXEL_RATIO_CAP = 1.7;
+function applyMapRenderQuality(mapId) {
+  const isGravelBasin = mapId === "gravel-basin";
+  const pixelRatioCap = isGravelBasin ? 1.2 : DEFAULT_PIXEL_RATIO_CAP;
+  const pixelRatio = Math.min(window.devicePixelRatio || 1, pixelRatioCap);
+  renderer.setPixelRatio(pixelRatio);
+  renderer.setSize(window.innerWidth, window.innerHeight, false);
+
+  const shadowSize = isGravelBasin ? 1024 : 2048;
+  if (sun.shadow.mapSize.x !== shadowSize || sun.shadow.mapSize.y !== shadowSize) {
+    sun.shadow.map?.dispose();
+    sun.shadow.map = null;
+    sun.shadow.mapSize.set(shadowSize, shadowSize);
+    sun.shadow.needsUpdate = true;
+  }
+}
+
 const fill = new THREE.DirectionalLight(0xb8d8e9, 0.65);
 fill.position.set(8, 6, -10);
 scene.add(fill);
@@ -294,6 +314,7 @@ game.setActiveMap = (mapId, options = {}) => {
   if (!physicsSystem.setActiveMap(mapId)) return false;
 
   game.activeMapId = mapId;
+  applyMapRenderQuality(mapId);
   trackLayout = mapLayouts[mapId];
   game.trackLayout = trackLayout;
   if (game.race?.setTrackLayout) game.race.setTrackLayout(trackLayout);
@@ -409,8 +430,7 @@ function resize() {
   const height = window.innerHeight;
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
-  renderer.setSize(width, height, false);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.7));
+  applyMapRenderQuality(game.activeMapId || "closed-course");
 }
 window.addEventListener("resize", resize);
 
