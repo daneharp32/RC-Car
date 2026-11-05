@@ -97,8 +97,7 @@ export function createSandboxSystem(game) {
           group,
           new THREE.TorusGeometry(0.055, 0.012, 8, 20),
           materials.cyan,
-          [side * 0.17, 0.31, 0.475],
-          [Math.PI / 2, 0, 0]
+          [side * 0.17, 0.31, 0.475]
         );
         addMesh(
           group,
@@ -364,7 +363,7 @@ export function createSandboxSystem(game) {
     const material = new THREE.MeshBasicMaterial({
       color: 0xffe28a,
       transparent: true,
-      emissive: 0xffa72e
+      depthWrite: false
     });
     const mesh = new THREE.Mesh(podGeometry, material);
     mesh.position.copy(position);
@@ -397,14 +396,14 @@ export function createSandboxSystem(game) {
     );
     const offset = carPosition.sub(center);
     const distance = offset.length();
-    const radius = 8.5;
+    const radius = 9.0;
 
     if (distance < radius) {
       if (distance < 0.001) offset.set(0, 1, 0);
       else offset.normalize();
 
       const falloff = 1 - Math.max(0, distance) / radius;
-      const strength = 48 * falloff;
+      const strength = 100 * falloff;
       const vertical = (Math.max(0.42, offset.y) + 0.55) * strength;
       chassisBody.applyImpulse(new CANNON.Vec3(
         offset.x * strength,
@@ -443,7 +442,7 @@ export function createSandboxSystem(game) {
       );
       addParticle(center, velocity, confettiColors[index % confettiColors.length], 0.65, 0.85);
     }
-    showToast("BOUNCE PULSE · NEARBY TRUCKS GET FLUNG");
+    showToast("BOUNCE PULSE · NEARBY CAR GETS FLUNG");
   }
 
   function clearEffects() {
