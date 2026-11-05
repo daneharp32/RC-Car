@@ -481,6 +481,9 @@ game.setActiveMap = (mapId, options = {}) => {
   if (!options.silent) {
     showToast("DRIVING AREA: " + (trackLayout.name || mapId.toUpperCase()));
   }
+  // Prepare the selected arena's shaders, geometry buffers, and shadow map
+  // while the player is still in the menu rather than on the first drive frame.
+  game.prepareMapGraphics?.(mapId);
   return true;
 };
 
@@ -549,6 +552,87 @@ const garage = createGarageSystem(game);
 game.garage = garage;
 const sandbox = createSandboxSystem(game);
 game.sandbox = sandbox;
+
+const warmedMapGraphics = new Set();
+function prepareMapGraphics(mapId = game.activeMapId) {
+  if (warmedMapGraphics.has(mapId)) return true;
+  const layout = mapLayouts[mapId];
+  const mapVisual = arenaVisuals.find((item) => item.userData?.mapId === mapId);
+  if (!layout?.spawn || !mapVisual || garage.viewMode === "drive") return false;
+
+  const previousMapId = game.activeMapId;
+  const previousCameraPosition = camera.position.clone();
+  const previousCameraQuaternion = camera.quaternion.clone();
+  const previousCameraUp = camera.up.clone();
+  const previousRenderTarget = renderer.getRenderTarget();
+  let prewarmTarget = null;
+
+  try {
+    // Only the selected map is made visible, and the render is sent to a small
+    // off-screen target so the player never sees the arena flash over the menu.
+    game.activeMapId = mapId;
+    garage.setArenaVisible(true);
+
+    const spawn = layout.spawn;
+    const yaw = Number.isFinite(spawn.yaw) ? spawn.yaw : 0;
+    const forward = new THREE.Vector3(0, 0, -1)
+      .applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+    const carPosition = new THREE.Vector3(
+      spawn.x,
+      Number.isFinite(spawn.y) ? spawn.y : 0.24,
+      spawn.z
+    );
+    camera.position.copy(carPosition)
+      .addScaledVector(forward, -5.8)
+      .add(new THREE.Vector3(0, 2.8, 0));
+    camera.up.set(0, 1, 0);
+    camera.lookAt(
+      carPosition.clone()
+        .add(new THREE.Vector3(0, 0.28, 0))
+        .addScaledVector(forward, 0.85)
+    );
+
+    // Gravel Basin tracks the shadow frustum around the truck. Prewarm it at
+    // its real spawn point so entering the map does not immediately invalidate
+    // the shadow map and trigger another expensive first-frame update.
+    if (mapId === "gravel-basin") {
+      const offset = activeLighting.sunOffset;
+      sun.target.position.set(spawn.x, 0, spawn.z);
+      sun.position.set(
+        spawn.x + offset[0],
+        offset[1],
+        spawn.z + offset[2]
+      );
+      sun.target.updateMatrixWorld();
+      sun.updateMatrixWorld();
+    }
+    sun.shadow.needsUpdate = true;
+
+    renderer.compile(scene, camera);
+    prewarmTarget = new THREE.WebGLRenderTarget(384, 216, {
+      depthBuffer: true,
+      stencilBuffer: false
+    });
+    renderer.setRenderTarget(prewarmTarget);
+    renderer.render(scene, camera);
+    warmedMapGraphics.add(mapId);
+    return true;
+  } catch (error) {
+    console.warn("Map graphics prewarm failed; the map will load normally:", error);
+    return false;
+  } finally {
+    renderer.setRenderTarget(previousRenderTarget);
+    prewarmTarget?.dispose();
+    game.activeMapId = previousMapId;
+    garage.setArenaVisible(false);
+    camera.position.copy(previousCameraPosition);
+    camera.quaternion.copy(previousCameraQuaternion);
+    camera.up.copy(previousCameraUp);
+    camera.updateMatrixWorld(true);
+    applyMapRenderQuality(previousMapId);
+  }
+}
+game.prepareMapGraphics = prepareMapGraphics;
 
 let isPaused = false;
 function setPaused(nextPaused) {
@@ -657,8 +741,21 @@ function animate(now) {
   const delta = Math.min((now - lastTime) / 1000, 0.05);
   lastTime = now;
 
+  const drivingActive = garage.viewMode === "drive";
   try {
-    if (!isPaused) controls.updateDrivingControls(delta);
+    if (!isPaused && drivingActive) {
+      controls.updateDrivingControls(delta);
+    } else {
+      // The showroom and builder are display-only: clear stale input and wheel
+      // forces instead of letting controls keep acting on the parked truck.
+      for (const key of Object.keys(controls.keys)) controls.keys[key] = false;
+      for (let i = 0; i < 4; i++) {
+        vehicle.applyEngineForce(0, i);
+        vehicle.setBrake(0, i);
+      }
+      vehicle.setSteeringValue(0, 0);
+      vehicle.setSteeringValue(0, 1);
+    }
   } catch (error) {
     // A control bug must not stop the render loop or turn the track screen
     // into a blank background. Remove drive force and report the error once.
@@ -676,7 +773,9 @@ function animate(now) {
   }
   garage.updateGarageShellAnimation(now);
   sandbox.update(delta, now);
-  if (!isPaused) world.step(FIXED_STEP, delta, 3);
+  // The physics world is only active while the truck is on a driving screen.
+  // This keeps showroom, menus, and the Sandbox builder completely stationary.
+  if (drivingActive && !isPaused) world.step(FIXED_STEP, delta, 3);
   // Read wheel contact and sliding flags before visual wheel transforms refresh them.
 
   updateLocalVisual();
@@ -784,7 +883,7 @@ function animate(now) {
 
   // Keep the Gravel Basin shadow frustum centered near the truck. Snapping the
   // focus in small increments prevents visible shadow-map shimmer while driving.
-  if (game.activeMapId === "gravel-basin") {
+  if (game.activeMapId === "gravel-basin" && garage.viewMode === "drive") {
     const focusX = Math.round(chassisBody.position.x / 3) * 3;
     const focusZ = Math.round(chassisBody.position.z / 3) * 3;
     sun.target.position.set(focusX, 0, focusZ);
@@ -802,8 +901,11 @@ function animate(now) {
   renderer.render(scene, camera);
 }
 updateLocalVisual();
-$("loading").style.display = "none";
 garage.showMainMenu();
+// Prewarm the default arena under the loading screen. Alternate maps are
+// prepared as soon as they are selected in the lobby browser.
+prepareMapGraphics(game.activeMapId);
+$("loading").style.display = "none";
 requestAnimationFrame(animate);
 
 // Keep the driver's name in the multiplayer lobby browser between visits.
