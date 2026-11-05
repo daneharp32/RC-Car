@@ -7,8 +7,15 @@ export function createMultiplayerSystem(game) {
   const DIRECTORY_ROOM_ID = "rc-car-public-lobby-directory-v1";
   const DIRECTORY_ACTION = "lobby-directory";
   const MAX_PLAYERS = 8;
-  const LOBBY_TTL_MS = 14000;
+  // Allow a few missed heartbeat intervals before a listing expires.
+  const LOBBY_TTL_MS = 20000;
   const HEARTBEAT_MS = 4000;
+  // Use several default Nostr relays rather than relying on one relay endpoint.
+  const SIGNALING_REDUNDANCY = 5;
+  const signalingConfig = () => ({
+    appId: APP_ID,
+    relayConfig: { redundancy: SIGNALING_REDUNDANCY }
+  });
 
   const {
     THREE, scene, chassisBody, vehicle, wheelPositions,
@@ -351,7 +358,12 @@ export function createMultiplayerSystem(game) {
     if (directoryRoom) return;
 
     try {
-      directoryRoom = joinRoom({ appId: APP_ID }, DIRECTORY_ROOM_ID);
+      directoryRoom = joinRoom(signalingConfig(), DIRECTORY_ROOM_ID, {
+        onJoinError: ({ peerId, error }) => {
+          console.warn("Lobby directory peer connection failed:", peerId, error);
+          updateDirectoryStatus("DIRECTORY CONNECTION ISSUE — RETRYING");
+        }
+      });
       directoryAction = directoryRoom.makeAction(DIRECTORY_ACTION);
 
       directoryAction.onMessage = (message, meta) => {
@@ -405,7 +417,13 @@ export function createMultiplayerSystem(game) {
       directoryRoom.onPeerJoin = (peerId) => {
         directoryPeers.add(peerId);
         updateDirectoryStatus();
-        if (hostingLobby) publishLobby();
+        if (hostingLobby) {
+          publishLobby();
+        } else if (directoryAction) {
+          // Ask immediately after the data channel is ready. The first request
+          // from the browser may have been sent before this peer connected.
+          directoryAction.send({ type: "request", requestedAt: Date.now() });
+        }
       };
       directoryRoom.onPeerLeave = (peerId) => {
         directoryPeers.delete(peerId);
@@ -415,7 +433,18 @@ export function createMultiplayerSystem(game) {
       if (!directoryTimer) {
         directoryTimer = setInterval(() => {
           pruneLobbyListings();
-          if (hostingLobby && joined && currentLobbyAcceptsPlayers()) publishLobby();
+
+          if (hostingLobby && joined && currentLobbyAcceptsPlayers()) {
+            publishLobby();
+          }
+
+          // Keep asking while the lobby browser is visible. This recovers if
+          // an initial discovery message was sent before a peer connected or
+          // a relay briefly dropped a directory message.
+          const browsingLobbies = !joined && modeSelectPanel?.style.display !== "none";
+          if (browsingLobbies && directoryAction) {
+            directoryAction.send({ type: "request", requestedAt: Date.now() });
+          }
         }, HEARTBEAT_MS);
       }
       updateDirectoryStatus("CONNECTING TO LOBBY DIRECTORY...");
@@ -489,7 +518,7 @@ export function createMultiplayerSystem(game) {
     }
 
     try {
-      room = joinRoom({ appId: APP_ID }, currentLobby.id, {
+      room = joinRoom(signalingConfig(), currentLobby.id, {
         onPeerHandshake: async (peerId) => {
           if (hostingLobby && !currentLobbyAcceptsPlayers()) {
             throw new Error(currentLobby?.mode === "free-drive" ? "FREE_DRIVE_CLOSED" : "RACE_IN_PROGRESS");
