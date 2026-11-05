@@ -565,8 +565,6 @@ export function createMultiplayerSystem(game) {
         updateDirectoryStatus();
       };
 
-      if (!directoryTimer) {
-      }
       updateDirectoryStatus("CONNECTING TO LOBBY DIRECTORY...");
     } catch (error) {
       console.error("Unable to start lobby directory:", error);
