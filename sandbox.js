@@ -574,7 +574,7 @@ export function createSandboxSystem(game) {
     // RaycastVehicle uses local +Z as forward; match the physics vehicle axis.
     const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(current);
     forward.y = 0;
-    if (forward.lengthSq() < 0.0001) forward.set(0, 0, -1);
+    if (forward.lengthSq() < 0.0001) forward.set(0, 0, 1);
     forward.normalize();
 
     const forwardCannon = new CANNON.Vec3(forward.x, 0, forward.z);
