@@ -54,6 +54,13 @@ export class MultiplayerRoom {
     const existingPeers = existingSockets
       .map(readPeer)
       .filter((peer) => peer && typeof peer.peerId === "string");
+    const requestedMode = url.searchParams.get("mode");
+    const mode = ["race", "free-drive", "time-trial", "sandbox"].includes(requestedMode)
+      ? requestedMode
+      : "race";
+    if (existingPeers.some((peer) => peer.mode && peer.mode !== mode)) {
+      return roomError("This room belongs to a different game mode", 409);
+    }
     const peerId = crypto.randomUUID();
     const name = cleanPlayerName(url.searchParams.get("name"));
     const isHost = existingPeers.length === 0;
@@ -66,6 +73,7 @@ export class MultiplayerRoom {
     server.serializeAttachment({
       peerId,
       name,
+      mode,
       isHost,
       joinedAt: Date.now()
     });
@@ -141,6 +149,29 @@ export class MultiplayerRoom {
         type: "control",
         peerId: peer.peerId,
         message: message.message
+      }, webSocket);
+      return;
+    }
+
+    if (message.type === "sandbox-event") {
+      const event = message.event;
+      if (peer.mode !== "sandbox" || !event ||
+          typeof event.id !== "string" || event.id.length > 80 ||
+          !["spring-bounce", "jump-pad"].includes(event.type) ||
+          ![event.x, event.y, event.z, event.yaw].every(Number.isFinite)) return;
+      if ([event.x, event.y, event.z].some((value) => Math.abs(value) > 300) ||
+          Math.abs(event.yaw) > Math.PI * 4) return;
+      this.broadcast({
+        type: "sandbox-event",
+        peerId: peer.peerId,
+        event: {
+          id: event.id,
+          type: event.type,
+          x: event.x,
+          y: event.y,
+          z: event.z,
+          yaw: event.yaw
+        }
       }, webSocket);
       return;
     }

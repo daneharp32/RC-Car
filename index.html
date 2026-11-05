@@ -228,6 +228,25 @@
       .lobby-join-button { grid-column: 2; grid-row: 1 / span 2; }
       .create-lobby-content { top: 6%; padding: 20px 16px; }
     }
+    #sandboxBuilderPanel { pointer-events: none; background: linear-gradient(90deg, rgba(4,10,17,.50), transparent 66%); }
+    .sandbox-builder-card { position:absolute; left:22px; top:82px; bottom:22px; width:min(370px,calc(100vw - 36px)); display:flex; flex-direction:column; gap:12px; padding:22px; pointer-events:auto; overflow-y:auto; border:1px solid rgba(155,205,255,.22); border-radius:18px; background:rgba(8,18,30,.90); backdrop-filter:blur(16px); box-shadow:0 22px 75px rgba(0,0,0,.34); }
+    .sandbox-builder-kicker { color:#66bdff; font-size:9px; font-weight:900; letter-spacing:.2em; }
+    .sandbox-builder-title { margin:0; font:900 25px/1.05 "Orbitron",sans-serif; color:#f5faff; }
+    .sandbox-builder-copy { margin:0; color:#aebfce; font-size:11px; line-height:1.55; }
+    .sandbox-map-chip,.sandbox-player-count { padding:9px 11px; border:1px solid rgba(105,180,255,.2); border-radius:9px; background:rgba(34,82,125,.22); color:#a9d7ff; font-size:9px; font-weight:900; letter-spacing:.1em; }
+    .sandbox-part-list { display:grid; gap:8px; }
+    .sandbox-part-card { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:10px; width:100%; padding:11px 12px; min-height:72px; text-align:left; border:1px solid rgba(155,205,255,.18); border-radius:11px; color:#eef7ff; background:rgba(255,255,255,.055); box-shadow:none; }
+    .sandbox-part-card.equipped { border-color:rgba(80,190,255,.7); background:linear-gradient(120deg,rgba(32,127,199,.32),rgba(15,37,58,.72)); box-shadow:inset 0 0 0 1px rgba(80,190,255,.12); }
+    .sandbox-part-copy { display:grid; gap:5px; min-width:0; }
+    .sandbox-part-copy strong { font:800 10px "Orbitron",sans-serif; letter-spacing:.045em; }
+    .sandbox-part-copy small { color:#a9bac8; font-size:9px; line-height:1.4; font-weight:500; }
+    .sandbox-part-action { color:#7fcaff; font-size:8px; font-weight:900; letter-spacing:.06em; white-space:nowrap; }
+    .sandbox-equipped-label { color:#9bb0c0; font-size:9px; line-height:1.5; }
+    #sandboxEquippedValue { display:block; margin-top:5px; color:#eaf5ff; font-weight:800; }
+    #sandboxEnterMapButton { width:100%; min-height:48px; font:900 10px "Orbitron",sans-serif; }
+    #sandboxLeaveButton { width:100%; min-height:38px; color:#c5d2dc; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.055); font-size:9px; }
+    .sandbox-builder-hint { color:#75bfff; font-size:9px; line-height:1.5; letter-spacing:.045em; }
+    @media (max-width:700px) { .sandbox-builder-card { left:10px; top:66px; bottom:10px; width:min(330px,calc(100vw - 20px)); padding:15px; gap:9px; } .sandbox-builder-title { font-size:21px; } .sandbox-part-card { min-height:62px; padding:9px; } .sandbox-builder-copy { font-size:10px; } }
     .eyebrow { color: var(--accent); font-size: 10px; font-weight: 900; letter-spacing: .2em; }
     h1 { margin: 9px 0 7px; font-size: clamp(27px, 6vw, 36px); line-height: 1.02; letter-spacing: -.04em; }
     .intro { margin: 0 0 22px; color: #b5c2cb; font-size: 13px; line-height: 1.55; }
@@ -570,6 +589,26 @@
     <button id="garageBackButton" type="button">BACK TO MAIN MENU</button>
   </section>
 
+  <section id="sandboxBuilderPanel" class="menu-screen" style="display:none">
+    <div class="sandbox-builder-card">
+      <div class="sandbox-builder-kicker">MULTIPLAYER SANDBOX WORKSHOP</div>
+      <h2 class="sandbox-builder-title">BUILD YOUR TRUCK</h2>
+      <p class="sandbox-builder-copy">Your truck is displayed in the center. Add the gadgets you want, drag the view to inspect your build, and enter the map whenever you are ready.</p>
+      <div id="sandboxBuilderMapLabel" class="sandbox-map-chip">CLUB DIRT CIRCUIT</div>
+      <div id="sandboxPlayerCount" class="sandbox-player-count">1 / 8 DRIVERS CONNECTED</div>
+      <div class="sandbox-builder-kicker">AVAILABLE GADGETS</div>
+      <div class="sandbox-part-list">
+        <button class="sandbox-part-card" type="button" data-sandbox-part="spring" aria-pressed="false"><span class="sandbox-part-copy"><strong>SPRING BUMPER FIELD</strong><small>Creates a broad trampoline-like bounce wave that sends nearby RC cars into the air · Q</small></span><span class="sandbox-part-action">ADD TO TRUCK</span></button>
+        <button class="sandbox-part-card" type="button" data-sandbox-part="boost" aria-pressed="false"><span class="sandbox-part-copy"><strong>TWIN BOOST VENTS</strong><small>Glowing blue vents give your own truck a short forward burst · F</small></span><span class="sandbox-part-action">ADD TO TRUCK</span></button>
+        <button class="sandbox-part-card" type="button" data-sandbox-part="pad" aria-pressed="false"><span class="sandbox-part-copy"><strong>FOLD-OUT JUMP PAD</strong><small>Deploy a shared stunt pad that launches cars when they drive across it · E</small></span><span class="sandbox-part-action">ADD TO TRUCK</span></button>
+      </div>
+      <div class="sandbox-equipped-label">CURRENT BUILD<span id="sandboxEquippedValue">NO GADGETS EQUIPPED</span></div>
+      <div class="sandbox-builder-hint">DRAG TO ROTATE THE TRUCK · YOU CAN ENTER THE MAP BEFORE OR AFTER OTHER PLAYERS</div>
+      <button id="sandboxEnterMapButton" class="menu-button" type="button">ENTER MAP</button>
+      <button id="sandboxLeaveButton" type="button">LEAVE SANDBOX SESSION</button>
+    </div>
+  </section>
+
   <section id="joinPanel" class="menu-screen" style="display:none">
     <div class="menu-content create-lobby-content">
       <div class="menu-kicker">NEW MULTIPLAYER ROOM</div>
@@ -603,8 +642,8 @@
         <button class="lobby-mode-choice" data-lobby-mode="time-trial" type="button">
           <strong>TIME TRIAL</strong><small>FASTEST LAP WINS · CHECKPOINTS</small>
         </button>
-        <button class="lobby-mode-choice unavailable" data-lobby-mode="sandbox" type="button" disabled>
-          <strong>SANDBOX</strong><small>COMING SOON</small>
+        <button class="lobby-mode-choice" data-lobby-mode="sandbox" type="button">
+          <strong>SANDBOX</strong><small>BUILD YOUR TRUCK · ENTER ANYTIME</small>
         </button>
       </div>
 
@@ -613,7 +652,7 @@
       <button id="joinButton" class="menu-button" type="button">CREATE RACE LOBBY</button>
       <button id="driveBackButton" type="button">BACK TO LOBBIES</button>
       <div id="joinError"></div>
-      <div class="fine-print">Up to 8 drivers · Peer-to-peer multiplayer</div>
+      <div class="fine-print">Up to 8 drivers · Cross-device Cloudflare room relay</div>
     </div>
   </section>
 

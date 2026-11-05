@@ -3,10 +3,12 @@
 export function createRoomRelay({
   roomId,
   playerName,
+  roomMode,
   onPeerJoin,
   onPeerLeave,
   onSnapshot,
   onControl,
+  onSandboxEvent,
   onRoomClosed,
   onDisconnected,
   onError
@@ -17,6 +19,7 @@ export function createRoomRelay({
   );
   endpoint.protocol = endpoint.protocol === "https:" ? "wss:" : "ws:";
   endpoint.searchParams.set("name", String(playerName || "Driver").slice(0, 18));
+  endpoint.searchParams.set("mode", String(roomMode || "race"));
 
   let socket;
   let manuallyClosed = false;
@@ -58,6 +61,7 @@ export function createRoomRelay({
       ready,
       sendSnapshot: () => false,
       sendControl: () => false,
+      sendSandboxEvent: () => false,
       close: () => {},
       get connected() { return false; },
       get peerId() { return localPeerId; }
@@ -126,6 +130,11 @@ export function createRoomRelay({
       return;
     }
 
+    if (message.type === "sandbox-event" && typeof message.peerId === "string" && message.event) {
+      onSandboxEvent?.(message.peerId, message.event);
+      return;
+    }
+
     if (message.type === "room-closed") {
       onRoomClosed?.(message.reason || "The host left the room.");
     }
@@ -160,6 +169,9 @@ export function createRoomRelay({
     },
     sendControl(message) {
       return send({ type: "control", message });
+    },
+    sendSandboxEvent(event) {
+      return send({ type: "sandbox-event", event });
     },
     close() {
       manuallyClosed = true;

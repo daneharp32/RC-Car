@@ -120,12 +120,12 @@ export class LobbyDirectory {
       return jsonResponse({ error: "Lobby ID is already owned by another host" }, 409);
     }
 
-    const mode = ["race", "free-drive", "time-trial"].includes(message.mode)
+    const mode = ["race", "free-drive", "time-trial", "sandbox"].includes(message.mode)
       ? message.mode
       : "race";
     const mapId = message.mapId === "gravel-basin" ? "gravel-basin" : "closed-course";
-    if (mapId === "gravel-basin" && mode !== "free-drive") {
-      return jsonResponse({ error: "Gravel Basin only supports Free Drive" }, 400);
+    if (mapId === "gravel-basin" && !["free-drive", "sandbox"].includes(mode)) {
+      return jsonResponse({ error: "Gravel Basin supports Free Drive and Sandbox" }, 400);
     }
 
     const storedLobbies = await this.state.storage.list({ prefix: "lobby:" });
@@ -151,7 +151,7 @@ export class LobbyDirectory {
       mode,
       mapId,
       laps,
-      phase: mode === "free-drive" ? "free-drive" : "waiting",
+      phase: mode === "free-drive" ? "free-drive" : mode === "sandbox" ? "sandbox" : "waiting",
       playerCount,
       maxPlayers: 8,
       token,
