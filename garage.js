@@ -278,12 +278,13 @@ function beginAlternateShellLoad() {
     alternateShellReady = true;
     refreshShellVariantButton();
   }).catch((error) => {
-    console.warn("Concept4 shell could not be loaded:", error);
+    const detail = error instanceof Error ? error.message : String(error);
+    console.warn("Concept4 shell could not be loaded:", detail);
     alternateShellLoadStarted = false;
     if (shellVariantButton) {
       shellVariantButton.disabled = true;
-      shellVariantButton.textContent = "NEW BODY MODEL UNAVAILABLE";
-      shellVariantButton.title = "The file assets/FF_SC_Concept4.gltf could not be loaded.";
+      shellVariantButton.textContent = `MODEL LOAD FAILED: ${detail.slice(0, 32)}`;
+      shellVariantButton.title = `Could not load assets/FF_SC_Concept4.gltf. ${detail}`;
     }
   });
 }
