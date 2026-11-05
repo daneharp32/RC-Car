@@ -745,6 +745,8 @@ export function createMultiplayerSystem(game) {
     }
 
     try {
+      // Wait for the selected map's first-render work to finish before joining.
+      await game.prepareMapGraphics?.(selectedMapId);
       room = createRoomRelay({
         roomId: currentLobby.id,
         playerName: driverName,
