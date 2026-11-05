@@ -65,8 +65,8 @@ sun.shadow.camera.bottom = -116;
 sun.shadow.camera.near = 0.5;
 sun.shadow.camera.far = 250;
 sun.shadow.bias = -0.00022;
-sun.shadow.normalBias = 0.035;
-sun.shadow.radius = 2.5;
+sun.shadow.normalBias = 0.025;
+sun.shadow.radius = 2.0;
 scene.add(sun);
 scene.add(sun.target);
 let activeLighting = { sunOffset: [-8, 15, 8] };
@@ -120,13 +120,13 @@ const TIME_OF_DAY_PRESETS = {
   day: {
     sky: 0x83c5ef, fog: 0x83c5ef,
     hemiSky: 0xe7f1f4, hemiGround: 0x6b5943, hemiIntensity: 1.45,
-    sunColor: 0xffe2bd, sunIntensity: 2.15, sunOffset: [-8, 15, 8],
+    sunColor: 0xffe2bd, sunIntensity: 2.15, sunOffset: [18, 2.5, -14],
     fillColor: 0xb8d8e9, fillIntensity: 0.65, exposure: 1.08
   },
   "golden-hour": {
     sky: 0xd89a70, fog: 0xc78d69,
     hemiSky: 0xffd3a7, hemiGround: 0x57402f, hemiIntensity: 1.12,
-    sunColor: 0xffa45f, sunIntensity: 2.0, sunOffset: [-17, 6.5, 14],
+    sunColor: 0xffa45f, sunIntensity: 2.0, sunOffset: [18, 1.8, -14],
     fillColor: 0xf0a875, fillIntensity: 0.42, exposure: 1.10
   },
   night: {
@@ -138,6 +138,75 @@ const TIME_OF_DAY_PRESETS = {
 };
 
 let activeTimeOfDay = "day";
+
+// A lightweight camera-distant sun disc and soft halo make the directional
+// light source visible in the sky. Its direction is derived from the same
+// preset vector used by the shadow-casting directional light.
+const visibleSun = new THREE.Group();
+visibleSun.name = "visible-sun";
+visibleSun.frustumCulled = false;
+
+const sunGlowCanvas = document.createElement("canvas");
+sunGlowCanvas.width = 128;
+sunGlowCanvas.height = 128;
+const sunGlowContext = sunGlowCanvas.getContext("2d");
+if (sunGlowContext) {
+  const glowGradient = sunGlowContext.createRadialGradient(64, 64, 2, 64, 64, 64);
+  glowGradient.addColorStop(0, "rgba(255,255,255,0.96)");
+  glowGradient.addColorStop(0.2, "rgba(255,255,255,0.84)");
+  glowGradient.addColorStop(0.52, "rgba(255,255,255,0.24)");
+  glowGradient.addColorStop(1, "rgba(255,255,255,0)");
+  sunGlowContext.fillStyle = glowGradient;
+  sunGlowContext.fillRect(0, 0, 128, 128);
+}
+const sunGlowTexture = new THREE.CanvasTexture(sunGlowCanvas);
+sunGlowTexture.colorSpace = THREE.SRGBColorSpace;
+const sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({
+  map: sunGlowTexture,
+  color: 0xffe7b5,
+  transparent: true,
+  opacity: 0.62,
+  depthWrite: false,
+  fog: false,
+  toneMapped: false
+}));
+sunGlow.scale.set(17, 17, 1);
+sunGlow.renderOrder = 10;
+visibleSun.add(sunGlow);
+
+const sunDisc = new THREE.Mesh(
+  new THREE.SphereGeometry(2.35, 28, 18),
+  new THREE.MeshBasicMaterial({
+    color: 0xfff2d1,
+    fog: false,
+    toneMapped: false
+  })
+);
+sunDisc.frustumCulled = false;
+sunDisc.renderOrder = 11;
+visibleSun.add(sunDisc);
+scene.add(visibleSun);
+
+const visibleSunDirection = new THREE.Vector3();
+const visibleSunCameraPosition = new THREE.Vector3();
+function syncVisibleSun() {
+  if (activeTimeOfDay === "night") {
+    visibleSun.visible = false;
+    return;
+  }
+
+  const offset = activeLighting.sunOffset;
+  visibleSunDirection.set(offset[0], offset[1], offset[2]).normalize();
+  camera.getWorldPosition(visibleSunCameraPosition);
+  visibleSun.position.copy(visibleSunCameraPosition)
+    .addScaledVector(visibleSunDirection, 190);
+
+  const goldenHour = activeTimeOfDay === "golden-hour";
+  sunGlow.material.color.setHex(goldenHour ? 0xffa45f : 0xffe6ad);
+  sunDisc.material.color.setHex(goldenHour ? 0xffb06b : 0xfff2d1);
+  visibleSun.visible = true;
+}
+
 function setTimeOfDay(presetName, notify = true) {
   const preset = TIME_OF_DAY_PRESETS[presetName];
   if (!preset) return false;
@@ -161,6 +230,8 @@ function setTimeOfDay(presetName, notify = true) {
   renderer.toneMappingExposure = preset.exposure;
   sun.target.updateMatrixWorld();
   sun.updateMatrixWorld();
+  sun.shadow.needsUpdate = true;
+  syncVisibleSun();
 
   if (notify) {
     const label = presetName === "golden-hour" ? "GOLDEN HOUR" : presetName.toUpperCase();
@@ -710,6 +781,8 @@ function animate(now) {
     sun.updateMatrixWorld();
   }
 
+  // Keep the visible sun aligned with the active lighting preset and camera.
+  syncVisibleSun();
   renderer.render(scene, camera);
 }
 updateLocalVisual();

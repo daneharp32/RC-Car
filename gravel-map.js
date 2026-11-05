@@ -533,8 +533,7 @@ export function createGravelBasinSystem({ THREE, scene }) {
 
   const carDefinitions = [
     { x: -82, z: -43, yaw: 0.18, type: "suv", color: 0xb7c0c5, accent: 0x252c31 },
-    { x: 82, z: 21, yaw: -0.54, type: "pickup", color: 0x315747, accent: 0x202b27 },
-    { x: 13, z: 91, yaw: 1.12, type: "wagon", color: 0xc8c3b8, accent: 0x33383b }
+    { x: 82, z: 21, yaw: -0.54, type: "pickup", color: 0x315747, accent: 0x202b27 }
   ];
 
   const parkedCars = [];
@@ -684,7 +683,7 @@ export function createGravelBasinSystem({ THREE, scene }) {
     }
 
     mergeStaticMeshes(THREE, car, "parked-" + definition.type);
-    // A soft decal-like contact shadow replaces three cars' many shadow casters.
+    // A soft decal-like contact shadow replaces the detailed parked-vehicle shadow casters.
     const contactShadow = new THREE.Mesh(
       new THREE.CircleGeometry(1, 24),
       new THREE.MeshBasicMaterial({
