@@ -678,7 +678,7 @@ export function createSandboxSystem(game) {
           triggerBeacon(beacon);
         }
       }
-      if (now - beacon.createdAt > 12_000) {
+      if (now - beacon.createdAt > 30_000) {
         scene.remove(beacon.group);
         dispose(beacon.group);
         beacons.splice(i, 1);
