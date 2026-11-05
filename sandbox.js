@@ -10,6 +10,10 @@ export function createSandboxSystem(game) {
   const seenEvents = new Set();
   const held = { lift: false, forward: false };
   const cooldowns = { beacon: 0 };
+  const BEACON_ARM_DELAY = 3000;
+  const BEACON_TRIGGER_RADIUS = 8;
+  const MAX_THRUSTER_ALTITUDE = 8;
+  const ALTITUDE_FADE_RANGE = 2.5;
   const PARTS = [
     { id: "lift", title: "JUMP THRUSTERS" },
     { id: "forward", title: "FORWARD THRUSTERS" },
@@ -413,7 +417,7 @@ export function createSandboxSystem(game) {
     });
   }
 
-  function applyImpulseField(origin, radius = 12) {
+  function applyImpulseField(origin, radius = 14) {
     const offset = new THREE.Vector3(
       chassisBody.position.x - origin.x,
       chassisBody.position.y - origin.y,
@@ -427,8 +431,9 @@ export function createSandboxSystem(game) {
     if (horizontal.lengthSq() < 0.0001) horizontal.set(0.25, 0, -0.35);
     horizontal.normalize();
 
-    const horizontalImpulse = 20 + 15 * falloff;
-    const verticalImpulse = 68 + 42 * falloff;
+    // Stronger spring pulse, with extra reach but still no damage or vehicle health effects.
+    const horizontalImpulse = 30 + 30 * falloff;
+    const verticalImpulse = 90 + 60 * falloff;
     chassisBody.applyImpulse(new CANNON.Vec3(
       horizontal.x * horizontalImpulse * falloff,
       verticalImpulse,
@@ -503,7 +508,7 @@ export function createSandboxSystem(game) {
       ring,
       origin: new THREE.Vector3(event.x, event.y, event.z),
       createdAt,
-      pulseAt: createdAt + 1350,
+      pulseAt: createdAt + BEACON_ARM_DELAY,
       triggered: false
     });
     return true;
@@ -530,11 +535,11 @@ export function createSandboxSystem(game) {
     };
     if (!createImpulseBeacon(event)) return false;
     game.multiplayer?.sendSandboxEvent?.(event);
-    game.showToast("Impulse beacon placed — its spring pulse is charging");
+    game.showToast("Impulse beacon placed — 3-second charge; it pulses when a car gets close");
     return true;
   }
 
-  function levelVehicleForLift() {
+  function stabilizeVehicleAttitude() {
     const current = new THREE.Quaternion(
       chassisBody.quaternion.x,
       chassisBody.quaternion.y,
@@ -576,22 +581,31 @@ export function createSandboxSystem(game) {
       worldUp,
       -angularVelocity.dot(worldUp)
     );
-    const torque = axis.multiplyScalar(angle * 88)
-      .addScaledVector(angularVelocity, -20);
-    if (torque.lengthSq() > 110 * 110) torque.setLength(110);
+    // Use a gentle correction so the truck levels smoothly instead of snapping.
+    const torque = axis.multiplyScalar(angle * 24)
+      .addScaledVector(angularVelocity, -8);
+    if (torque.lengthSq() > 32 * 32) torque.setLength(32);
     chassisBody.applyTorque(new CANNON.Vec3(torque.x, torque.y, torque.z));
   }
 
   function applyJumpThrusters() {
     const mass = chassisBody.mass || 10.5;
     const verticalSpeed = chassisBody.velocity.y;
-    const liftAcceleration = THREE.MathUtils.clamp((18 - verticalSpeed) * 2.2, 0, 17);
-    const liftForce = mass * (9.82 + liftAcceleration);
+    const groundY = sampleGroundHeight(chassisBody.position.x, chassisBody.position.z);
+    const heightAboveGround = Math.max(0, chassisBody.position.y - groundY);
+    const altitudeScale = THREE.MathUtils.clamp(
+      (MAX_THRUSTER_ALTITUDE - heightAboveGround) / ALTITUDE_FADE_RANGE,
+      0,
+      1
+    );
+    // A gentle lift speed target and altitude fade prevent endless upward flight.
+    const liftAcceleration = THREE.MathUtils.clamp((4.2 - verticalSpeed) * 0.7, 0, 1.6);
+    const liftForce = mass * (9.82 + liftAcceleration) * altitudeScale;
     chassisBody.applyForce(
       new CANNON.Vec3(0, liftForce, 0),
       chassisBody.position
     );
-    levelVehicleForLift();
+    stabilizeVehicleAttitude();
     chassisBody.wakeUp();
   }
 
@@ -607,17 +621,27 @@ export function createSandboxSystem(game) {
     if (forward.lengthSq() < 0.0001) forward.set(0, 0, -1);
     forward.normalize();
 
+    stabilizeVehicleAttitude();
     const forwardCannon = new CANNON.Vec3(forward.x, 0, forward.z);
     const forwardSpeed = chassisBody.velocity.dot(forwardCannon);
-    if (forwardSpeed >= 34) return;
+    const maxForwardSpeed = 12;
+    if (forwardSpeed >= maxForwardSpeed) return;
 
-    const forceScale = THREE.MathUtils.clamp((34 - forwardSpeed) / 12, 0.2, 1);
-    const force = 260 * forceScale;
+    // Limit boost to a modest acceleration and speed appropriate for the RC truck.
+    const forceScale = THREE.MathUtils.clamp((maxForwardSpeed - forwardSpeed) / 4, 0, 1);
+    const force = (chassisBody.mass || 10.5) * 1.8 * forceScale;
     chassisBody.applyForce(
       new CANNON.Vec3(forward.x * force, 0, forward.z * force),
       chassisBody.position
     );
     chassisBody.wakeUp();
+  }
+
+  function isLocalCarNearBeacon(beacon) {
+    const dx = chassisBody.position.x - beacon.origin.x;
+    const dy = chassisBody.position.y - beacon.origin.y;
+    const dz = chassisBody.position.z - beacon.origin.z;
+    return Math.hypot(dx, dy, dz) <= BEACON_TRIGGER_RADIUS;
   }
 
   function triggerBeacon(beacon) {
@@ -647,9 +671,14 @@ export function createSandboxSystem(game) {
       if (!beacon.triggered) {
         const pulse = 1 + Math.sin((now - beacon.createdAt) * 0.012) * 0.12;
         beacon.orb.scale.setScalar(pulse);
-        if (canDrive && now >= beacon.pulseAt) triggerBeacon(beacon);
+        beacon.ring.scale.setScalar(
+          now >= beacon.pulseAt ? 1.12 + Math.sin(now * 0.014) * 0.18 : 0.82 + pulse * 0.08
+        );
+        if (canDrive && now >= beacon.pulseAt && isLocalCarNearBeacon(beacon)) {
+          triggerBeacon(beacon);
+        }
       }
-      if (now - beacon.createdAt > 12_000) {
+      if (now - beacon.createdAt > 30_000) {
         scene.remove(beacon.group);
         dispose(beacon.group);
         beacons.splice(i, 1);
