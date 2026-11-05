@@ -782,6 +782,7 @@ export function createSandboxSystem(game) {
     enterMap,
     endSession,
     update,
+    postPhysicsUpdate,
     handleKeyDown,
     handleKeyUp,
     clearHeldControls,
