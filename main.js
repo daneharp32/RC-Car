@@ -1,4 +1,5 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js";
+import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/loaders/GLTFLoader.js";
 import * as CANNON from "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js";
 import { createPhysicsSystem } from "./physics.js";
 import { createCarVisualFactory } from "./car.js";
@@ -195,6 +196,28 @@ const {
 const makeCarVisual = createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellGeometry });
 const localCar = makeCarVisual(0xffa33d);
 
+// Load the optional Concept4 shell only when the Garage is opened. This keeps
+// the initial menu fast and leaves the current body available if the asset is
+// absent or cannot be decoded.
+let alternateShellLoadPromise = null;
+function loadAlternateShellModel() {
+  if (makeCarVisual.hasAlternateShell()) return Promise.resolve(true);
+  if (!alternateShellLoadPromise) {
+    alternateShellLoadPromise = new GLTFLoader()
+      .loadAsync("./assets/FF_SC_Concept4.gltf")
+      .then((gltf) => {
+        makeCarVisual.setAlternateShellObject(gltf.scene);
+        console.info("Concept4 alternate shell loaded.");
+        return true;
+      })
+      .catch((error) => {
+        alternateShellLoadPromise = null;
+        throw error;
+      });
+  }
+  return alternateShellLoadPromise;
+}
+
 
 function updateLocalVisual() {
   localCar.root.position.set(chassisBody.position.x, chassisBody.position.y, chassisBody.position.z);
@@ -266,6 +289,7 @@ const game = {
   arenaVisuals,
   localCar,
   makeCarVisual,
+  loadAlternateShellModel,
   updateLocalVisual,
   showToast
 };
