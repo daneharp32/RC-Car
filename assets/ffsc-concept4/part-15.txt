@@ -1,0 +1,1000 @@
+            "byteLength": 1152,
+            "byteOffset": 11494192,
+            "name": "mesh141_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 768,
+            "byteOffset": 11495344,
+            "name": "mesh141_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 1128,
+            "byteOffset": 11496112,
+            "name": "mesh141_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 864,
+            "byteOffset": 11497240,
+            "name": "mesh142_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 864,
+            "byteOffset": 11498104,
+            "name": "mesh142_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 576,
+            "byteOffset": 11498968,
+            "name": "mesh142_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 840,
+            "byteOffset": 11499544,
+            "name": "mesh142_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 48,
+            "byteOffset": 11500384,
+            "name": "mesh143_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 48,
+            "byteOffset": 11500432,
+            "name": "mesh143_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 32,
+            "byteOffset": 11500480,
+            "name": "mesh143_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 24,
+            "byteOffset": 11500512,
+            "name": "mesh143_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 27528,
+            "byteOffset": 11500536,
+            "name": "mesh144_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 27528,
+            "byteOffset": 11528064,
+            "name": "mesh144_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 18352,
+            "byteOffset": 11555592,
+            "name": "mesh144_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 51444,
+            "byteOffset": 11573944,
+            "name": "mesh144_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 14460,
+            "byteOffset": 11625388,
+            "name": "mesh145_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 14460,
+            "byteOffset": 11639848,
+            "name": "mesh145_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 9640,
+            "byteOffset": 11654308,
+            "name": "mesh145_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 24456,
+            "byteOffset": 11663948,
+            "name": "mesh145_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 1584,
+            "byteOffset": 11688404,
+            "name": "mesh146_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 1584,
+            "byteOffset": 11689988,
+            "name": "mesh146_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 1056,
+            "byteOffset": 11691572,
+            "name": "mesh146_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 2184,
+            "byteOffset": 11692628,
+            "name": "mesh146_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 26700,
+            "byteOffset": 11694812,
+            "name": "mesh147_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 26700,
+            "byteOffset": 11721512,
+            "name": "mesh147_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 17800,
+            "byteOffset": 11748212,
+            "name": "mesh147_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 48744,
+            "byteOffset": 11766012,
+            "name": "mesh147_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 41916,
+            "byteOffset": 11814756,
+            "name": "mesh148_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 41916,
+            "byteOffset": 11856672,
+            "name": "mesh148_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 27944,
+            "byteOffset": 11898588,
+            "name": "mesh148_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 78456,
+            "byteOffset": 11926532,
+            "name": "mesh148_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 24252,
+            "byteOffset": 12004988,
+            "name": "mesh149_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 24252,
+            "byteOffset": 12029240,
+            "name": "mesh149_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 16168,
+            "byteOffset": 12053492,
+            "name": "mesh149_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 43236,
+            "byteOffset": 12069660,
+            "name": "mesh149_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 5724,
+            "byteOffset": 12112896,
+            "name": "mesh150_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 5724,
+            "byteOffset": 12118620,
+            "name": "mesh150_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 3816,
+            "byteOffset": 12124344,
+            "name": "mesh150_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 5808,
+            "byteOffset": 12128160,
+            "name": "mesh150_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 15264,
+            "byteOffset": 12133968,
+            "name": "mesh151_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 15264,
+            "byteOffset": 12149232,
+            "name": "mesh151_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 10176,
+            "byteOffset": 12164496,
+            "name": "mesh151_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 26892,
+            "byteOffset": 12174672,
+            "name": "mesh151_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 2868,
+            "byteOffset": 12201564,
+            "name": "mesh152_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 2868,
+            "byteOffset": 12204432,
+            "name": "mesh152_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 1912,
+            "byteOffset": 12207300,
+            "name": "mesh152_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 3660,
+            "byteOffset": 12209212,
+            "name": "mesh152_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 684,
+            "byteOffset": 12212872,
+            "name": "mesh153_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 684,
+            "byteOffset": 12213556,
+            "name": "mesh153_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 456,
+            "byteOffset": 12214240,
+            "name": "mesh153_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 864,
+            "byteOffset": 12214696,
+            "name": "mesh153_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 1584,
+            "byteOffset": 12215560,
+            "name": "mesh154_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 1584,
+            "byteOffset": 12217144,
+            "name": "mesh154_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 1056,
+            "byteOffset": 12218728,
+            "name": "mesh154_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 2184,
+            "byteOffset": 12219784,
+            "name": "mesh154_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 2616,
+            "byteOffset": 12221968,
+            "name": "mesh155_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 2616,
+            "byteOffset": 12224584,
+            "name": "mesh155_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 1744,
+            "byteOffset": 12227200,
+            "name": "mesh155_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 2592,
+            "byteOffset": 12228944,
+            "name": "mesh155_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 19116,
+            "byteOffset": 12231536,
+            "name": "mesh156_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 19116,
+            "byteOffset": 12250652,
+            "name": "mesh156_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 12744,
+            "byteOffset": 12269768,
+            "name": "mesh156_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 35976,
+            "byteOffset": 12282512,
+            "name": "mesh156_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 1152,
+            "byteOffset": 12318488,
+            "name": "mesh157_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 1152,
+            "byteOffset": 12319640,
+            "name": "mesh157_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 768,
+            "byteOffset": 12320792,
+            "name": "mesh157_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 1128,
+            "byteOffset": 12321560,
+            "name": "mesh157_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 864,
+            "byteOffset": 12322688,
+            "name": "mesh158_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 864,
+            "byteOffset": 12323552,
+            "name": "mesh158_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 576,
+            "byteOffset": 12324416,
+            "name": "mesh158_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 840,
+            "byteOffset": 12324992,
+            "name": "mesh158_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 17592,
+            "byteOffset": 12325832,
+            "name": "mesh159_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 17592,
+            "byteOffset": 12343424,
+            "name": "mesh159_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 11728,
+            "byteOffset": 12361016,
+            "name": "mesh159_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 32952,
+            "byteOffset": 12372744,
+            "name": "mesh159_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 79296,
+            "byteOffset": 12405696,
+            "name": "mesh160_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 79296,
+            "byteOffset": 12484992,
+            "name": "mesh160_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 52864,
+            "byteOffset": 12564288,
+            "name": "mesh160_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 154224,
+            "byteOffset": 12617152,
+            "name": "mesh160_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 35556,
+            "byteOffset": 12771376,
+            "name": "mesh161_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 35556,
+            "byteOffset": 12806932,
+            "name": "mesh161_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 23704,
+            "byteOffset": 12842488,
+            "name": "mesh161_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 67104,
+            "byteOffset": 12866192,
+            "name": "mesh161_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 10932,
+            "byteOffset": 12933296,
+            "name": "mesh162_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 10932,
+            "byteOffset": 12944228,
+            "name": "mesh162_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 7288,
+            "byteOffset": 12955160,
+            "name": "mesh162_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 16548,
+            "byteOffset": 12962448,
+            "name": "mesh162_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 24000,
+            "byteOffset": 12978996,
+            "name": "mesh163_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 24000,
+            "byteOffset": 13002996,
+            "name": "mesh163_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 16000,
+            "byteOffset": 13026996,
+            "name": "mesh163_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 44004,
+            "byteOffset": 13042996,
+            "name": "mesh163_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 3576,
+            "byteOffset": 13087000,
+            "name": "mesh164_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 3576,
+            "byteOffset": 13090576,
+            "name": "mesh164_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 2384,
+            "byteOffset": 13094152,
+            "name": "mesh164_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 3552,
+            "byteOffset": 13096536,
+            "name": "mesh164_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 17676,
+            "byteOffset": 13100088,
+            "name": "mesh165_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 17676,
+            "byteOffset": 13117764,
+            "name": "mesh165_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 11784,
+            "byteOffset": 13135440,
+            "name": "mesh165_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 31008,
+            "byteOffset": 13147224,
+            "name": "mesh165_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 141684,
+            "byteOffset": 13178232,
+            "name": "mesh166_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 141684,
+            "byteOffset": 13319916,
+            "name": "mesh166_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 94456,
+            "byteOffset": 13461600,
+            "name": "mesh166_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 276420,
+            "byteOffset": 13556056,
+            "name": "mesh166_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 14160,
+            "byteOffset": 13832476,
+            "name": "mesh167_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 14160,
+            "byteOffset": 13846636,
+            "name": "mesh167_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 9440,
+            "byteOffset": 13860796,
+            "name": "mesh167_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 23784,
+            "byteOffset": 13870236,
+            "name": "mesh167_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 105432,
+            "byteOffset": 13894020,
+            "name": "mesh168_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 105432,
+            "byteOffset": 13999452,
+            "name": "mesh168_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 70288,
+            "byteOffset": 14104884,
+            "name": "mesh168_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 201696,
+            "byteOffset": 14175172,
+            "name": "mesh168_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 27528,
+            "byteOffset": 14376868,
+            "name": "mesh169_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 27528,
+            "byteOffset": 14404396,
+            "name": "mesh169_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 18352,
+            "byteOffset": 14431924,
+            "name": "mesh169_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 51444,
+            "byteOffset": 14450276,
+            "name": "mesh169_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 1008,
+            "byteOffset": 14501720,
+            "name": "mesh170_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 1008,
+            "byteOffset": 14502728,
+            "name": "mesh170_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 672,
+            "byteOffset": 14503736,
+            "name": "mesh170_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 984,
+            "byteOffset": 14504408,
+            "name": "mesh170_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 2172,
+            "byteOffset": 14505392,
+            "name": "mesh171_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 2172,
+            "byteOffset": 14507564,
+            "name": "mesh171_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 1448,
+            "byteOffset": 14509736,
+            "name": "mesh171_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 2148,
+            "byteOffset": 14511184,
+            "name": "mesh171_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 816,
+            "byteOffset": 14513332,
+            "name": "mesh172_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 816,
+            "byteOffset": 14514148,
+            "name": "mesh172_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 544,
+            "byteOffset": 14514964,
+            "name": "mesh172_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 792,
+            "byteOffset": 14515508,
+            "name": "mesh172_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 15468,
+            "byteOffset": 14516300,
+            "name": "mesh173_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 15468,
+            "byteOffset": 14531768,
+            "name": "mesh173_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 10312,
+            "byteOffset": 14547236,
+            "name": "mesh173_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 26220,
+            "byteOffset": 14557548,
+            "name": "mesh173_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 1716,
+            "byteOffset": 14583768,
+            "name": "mesh174_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 1716,
+            "byteOffset": 14585484,
+            "name": "mesh174_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 1144,
+            "byteOffset": 14587200,
+            "name": "mesh174_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 1692,
+            "byteOffset": 14588344,
+            "name": "mesh174_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 1056,
+            "byteOffset": 14590036,
+            "name": "mesh175_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 1056,
+            "byteOffset": 14591092,
+            "name": "mesh175_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 704,
+            "byteOffset": 14592148,
+            "name": "mesh175_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 1032,
+            "byteOffset": 14592852,
+            "name": "mesh175_idx_bufferView",
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteLength": 1236,
+            "byteOffset": 14593884,
+            "name": "mesh176_coord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 1236,
+            "byteOffset": 14595120,
+            "name": "mesh176_norm_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 824,
+            "byteOffset": 14596356,
+            "name": "mesh176_texcoord_bufferView",
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteLength": 1212,
+            "byteOffset": 14597180,
+            "name": "mesh176_idx_bufferView",
+            "target": 34963
+        },
+        {

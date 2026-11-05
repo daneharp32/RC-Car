@@ -6,6 +6,12 @@ function makeCarVisual(color, playerName = "") {
   const root = new THREE.Group();
   const chassisGroup = new THREE.Group();
   const shellGroup = new THREE.Group();
+  const currentShellGroup = new THREE.Group();
+  const alternateShellGroup = new THREE.Group();
+  currentShellGroup.name = "current-shell-variant";
+  alternateShellGroup.name = "ff-sc-concept4-shell-variant";
+  alternateShellGroup.visible = false;
+  shellGroup.add(currentShellGroup, alternateShellGroup);
   root.add(chassisGroup, shellGroup);
 
   // Fit axle-mounted components at the actual physics attachment points.
@@ -668,7 +674,7 @@ function makeCarVisual(color, playerName = "") {
     const shellGeometryGroup = new THREE.Group();
     shellGeometryGroup.name = "shell-geometry";
     shellGeometryGroup.scale.z = 0.75;
-    shellGroup.add(shellGeometryGroup);
+    currentShellGroup.add(shellGeometryGroup);
 
     const orange = new THREE.MeshStandardMaterial({
       color: 0xff4b0b,
@@ -1050,7 +1056,7 @@ function makeCarVisual(color, playerName = "") {
 
   if (shellGeometry) {
     const importedShell = makePart(
-      shellGroup,
+      currentShellGroup,
       "scx30-single-cab-shell",
       "SCX30 single-cab Ranger body shell",
       "The repaired supplied Ranger shell. Its original proportions are preserved and the chassis wheelbase is fitted to its wheel openings."
@@ -1074,18 +1080,69 @@ function makeCarVisual(color, playerName = "") {
 
   // All painted shell surfaces share one garage hover identity. The chassis
   // retains its own individual component labels when the shell is removed.
-  shellGroup.userData.partInfo = {
+  const currentShellInfo = {
     id: "short-course-body-shell",
-    label: shellGeometry ? "SCX30 single-cab Ranger body shell" : "Short-course truck body shell",
+    label: shellGeometry ? "Current SCX30 Ranger body shell" : "Current short-course body shell",
     description: shellGeometry
-      ? "Repaired imported SCX30 Ranger shell, kept at its original dimensions and fitted to the adjusted chassis."
-      : "Complete orange, black and graphite-gray short-course body shell, including the hood, cab, windows, rear bed, fenders and exterior trim."
+      ? "The original imported SCX30 Ranger shell. Its proportions and current chassis fit are unchanged."
+      : "The existing orange, black and graphite-gray short-course shell with its original shape and trim."
   };
+  const concept4ShellInfo = {
+    id: "ff-sc-concept4-shell",
+    label: "FF SC Concept4 body shell",
+    description: "The newly supplied high-detail FF SC Concept4 shell. It is loaded at a uniform scale, keeping its original proportions and geometry."
+  };
+  let hasAlternateShell = false;
+  let activeShellVariant = "current";
+
+  function setShellVariant(variant) {
+    if (variant !== "current" && variant !== "concept4") return false;
+    if (variant === "concept4" && !hasAlternateShell) return false;
+    activeShellVariant = variant;
+    currentShellGroup.visible = variant === "current";
+    alternateShellGroup.visible = variant === "concept4";
+    shellGroup.userData.partInfo = variant === "concept4"
+      ? concept4ShellInfo
+      : currentShellInfo;
+    return true;
+  }
+
+  function setAlternateShell(modelScene) {
+    if (!modelScene) throw new Error("The FF SC Concept4 model scene is empty.");
+    alternateShellGroup.clear();
+    const importedModel = modelScene.clone(true);
+    // The source bounds are approximately 5.257 long x 2.174 wide x 1.465
+    // high. A single uniform scale preserves the shell's shape and proportions.
+    importedModel.scale.setScalar(0.25);
+    importedModel.position.set(0, 0.07, 0.061);
+    importedModel.traverse((object) => {
+      if (!object.isMesh) return;
+      object.name = object.name || "FF SC Concept4 shell surface";
+      object.castShadow = false;
+      object.receiveShadow = true;
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      for (const material of materials) {
+        if (!material) continue;
+        // The CAD export provides one plain light-blue material, not a painted
+        // livery. Apply the simulator's orange body color without changing mesh data.
+        if (material.color) material.color.set(0xff5a20);
+        material.roughness = 0.56;
+        material.metalness = 0.02;
+        material.side = THREE.DoubleSide;
+        material.needsUpdate = true;
+      }
+    });
+    alternateShellGroup.add(importedModel);
+    hasAlternateShell = true;
+    setShellVariant(activeShellVariant);
+  }
+
   shellGroup.traverse((object) => {
     if (object !== shellGroup && object.userData) {
       delete object.userData.partInfo;
     }
   });
+  setShellVariant("current");
 
   let playerNameSprite = null;
   function setPlayerName(name, visible = true) {
@@ -1162,6 +1219,10 @@ function makeCarVisual(color, playerName = "") {
     shellGroup,
     chassisGroup,
     setShellVisible(visible) { shellGroup.visible = !!visible; },
+    setShellVariant,
+    setAlternateShell,
+    get activeShellVariant() { return activeShellVariant; },
+    get alternateShellReady() { return hasAlternateShell; },
     setPlayerName
   };
 }
