@@ -683,7 +683,7 @@ function animate(now) {
   updateLocalVisual();
   race.update(delta, now);
   multiplayer.updateRemoteVisuals(delta);
-  sandbox.update(delta, now);
+  if (!isPaused) sandbox.update(delta, now);
 
   const speedMph = chassisBody.velocity.length() * 2.236936;
   $("speedValue").textContent = String(Math.round(speedMph));
