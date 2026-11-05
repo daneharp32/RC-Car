@@ -314,6 +314,25 @@ for (const [mapId, layout] of alternateMapLayouts) {
     bodies.push(obstacleBody);
   }
 
+  // Static concrete deck, inclined ramp, support piers, curbs, and stair
+  // tiers are represented as individual boxes for stable wheel contact.
+  for (const box of layout.staticBoxes || []) {
+    const boxBody = new CANNON.Body({ mass: 0, material: groundBody.material });
+    boxBody.addShape(new CANNON.Box(new CANNON.Vec3(
+      box.halfWidth,
+      box.halfHeight,
+      box.halfLength
+    )));
+    boxBody.position.set(box.x, box.y, box.z);
+    const pitch = new CANNON.Quaternion();
+    pitch.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), box.rotationX || 0);
+    const yaw = new CANNON.Quaternion();
+    yaw.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), box.yaw || 0);
+    yaw.mult(pitch, boxBody.quaternion);
+    world.addBody(boxBody);
+    bodies.push(boxBody);
+  }
+
   for (const body of bodies) body.collisionFilterMask = 0;
   alternateMapBodies.set(mapId, bodies);
 }
