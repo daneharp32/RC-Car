@@ -283,6 +283,33 @@
     #roomValue { margin-top: 4px; font-size: 13px; font-weight: 900; letter-spacing: .12em; }
     #playersValue { margin-top: 4px; color: #b8c5cd; font-size: 11px; }
     #controlsCard { left: 18px; bottom: 18px; transform: translateY(-132px); color: #bdc9d0; font-size: 10px; line-height: 1.8; }
+    #sandboxControlsCard {
+      left: 50%; bottom: 18px; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 9px; padding: 9px 11px;
+      white-space: nowrap; pointer-events: none;
+    }
+    .sandbox-controls-heading {
+      color: #9fcfff; font-size: 8px; font-weight: 900; letter-spacing: .13em;
+    }
+    .sandbox-controls-list { display: flex; align-items: center; gap: 7px; }
+    .sandbox-control-item {
+      display: flex; align-items: center; gap: 5px; min-width: 0;
+      padding: 5px 7px; border: 1px solid rgba(255,255,255,.12);
+      border-radius: 8px; background: rgba(255,255,255,.045); opacity: .48;
+    }
+    .sandbox-control-item.equipped {
+      border-color: rgba(73,178,255,.42);
+      background: rgba(35,126,198,.18); opacity: 1;
+    }
+    .sandbox-control-copy { display: grid; gap: 2px; min-width: 0; }
+    .sandbox-control-copy strong {
+      color: #eaf4fc; font: 800 8px "Orbitron",ui-sans-serif,sans-serif;
+      letter-spacing: .035em;
+    }
+    .sandbox-control-copy small {
+      color: #9aabba; font-size: 7px; font-weight: 800; letter-spacing: .07em;
+    }
+    .sandbox-control-item.equipped .sandbox-control-copy small { color: #76d5a3; }
     #cameraModeCard {
       right: 18px; bottom: 18px; min-width: 286px; padding: 9px 10px;
       pointer-events: auto;
@@ -468,7 +495,8 @@
       outline: none; background: #15283b; color: #f4f8fc;
       font: 800 11px "Orbitron",ui-sans-serif,sans-serif; letter-spacing: .06em;
     }
-    #resumeButton, #leaveButton { width: 100%; min-height: 45px; }
+    #resumeButton, #leaveButton, #sandboxEditButton { width: 100%; min-height: 45px; }
+    #sandboxEditButton { margin-top: 9px; }
     #leaveButton {
       margin-top: 9px; border: 1px solid rgba(255,255,255,.18);
       background: rgba(255,255,255,.07); color: #e6edf1;
@@ -496,6 +524,16 @@
       #roomCard { right: 12px; top: 66px; }
       #pauseButton { left: 12px; top: 66px; }
       #controlsCard { display: none; }
+      #sandboxControlsCard {
+        left: 12px; right: 12px; bottom: 82px; transform: none;
+        justify-content: center; gap: 5px; padding: 7px 6px;
+      }
+      .sandbox-controls-heading { display: none; }
+      .sandbox-controls-list { width: 100%; gap: 5px; }
+      .sandbox-control-item { flex: 1; gap: 4px; padding: 5px 5px; }
+      .sandbox-control-copy strong { font-size: 7px; }
+      .sandbox-control-copy small { font-size: 6px; }
+      #sandboxControlsCard kbd { min-width: 18px; height: 18px; margin: 0; font-size: 9px; }
       #cameraModeCard { right: 12px; bottom: 12px; min-width: 256px; padding: 8px; }
       .camera-mode-button { min-height: 29px; padding: 0 5px; font-size: 7px; letter-spacing: .04em; }
       .menu-content { top: 13%; padding: 21px 18px; }
@@ -730,6 +768,7 @@
           </select>
         </label>
         <button id="resumeButton" class="menu-button" type="button">RESUME DRIVING</button>
+        <button id="sandboxEditButton" class="menu-button secondary" type="button" style="display:none">EDIT SANDBOX CAR</button>
         <button id="leaveButton" type="button">LEAVE ROOM</button>
       </div>
     </div>
@@ -738,6 +777,20 @@
       <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Drive / steer</div>
       <div><kbd>SPACE</kbd> Brake</div>
       <div><kbd>R</kbd> Reset car</div>
+    </div>
+    <div id="sandboxControlsCard" class="hud-card" aria-label="Sandbox gadget controls" style="display:none">
+      <div class="sandbox-controls-heading">GADGET KEYS</div>
+      <div class="sandbox-controls-list">
+        <div class="sandbox-control-item" data-sandbox-control="spring">
+          <kbd>Q</kbd><span class="sandbox-control-copy"><strong>SPRING FIELD</strong><small>NOT EQUIPPED</small></span>
+        </div>
+        <div class="sandbox-control-item" data-sandbox-control="pad">
+          <kbd>E</kbd><span class="sandbox-control-copy"><strong>JUMP PAD</strong><small>NOT EQUIPPED</small></span>
+        </div>
+        <div class="sandbox-control-item" data-sandbox-control="boost">
+          <kbd>F</kbd><span class="sandbox-control-copy"><strong>BOOST VENTS</strong><small>NOT EQUIPPED</small></span>
+        </div>
+      </div>
     </div>
     <div id="cameraModeCard" class="hud-card" aria-label="Camera mode">
       <div class="hud-label">CAMERA · C TO CYCLE</div>

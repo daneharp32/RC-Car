@@ -2,6 +2,7 @@
 export function createSandboxSystem(game) {
   const { THREE, CANNON, scene, chassisBody, localCar, $ } = game;
   const builderPanel = $("sandboxBuilderPanel");
+  const controlsPanel = $("sandboxControlsCard");
   const loadout = new Set();
   const attachmentCache = new WeakMap();
   const pads = [];
@@ -175,6 +176,17 @@ export function createSandboxSystem(game) {
     if (countLabel) countLabel.textContent = playerCount + " / 8 DRIVERS CONNECTED";
   }
 
+  function renderControlHints() {
+    if (!controlsPanel) return;
+    controlsPanel.style.display = active && inMap ? "flex" : "none";
+    document.querySelectorAll("[data-sandbox-control]").forEach((item) => {
+      const equipped = loadout.has(item.dataset.sandboxControl);
+      item.classList.toggle("equipped", equipped);
+      const state = item.querySelector("small");
+      if (state) state.textContent = equipped ? "READY" : "NOT EQUIPPED";
+    });
+  }
+
   function updatePlayerCount(count) {
     playerCount = Math.max(1, Math.min(8, Number(count) || 1));
     renderBuilder();
@@ -199,6 +211,7 @@ export function createSandboxSystem(game) {
     if (localAttachmentGroup) localAttachmentGroup.visible = true;
     for (const pad of pads) pad.group.visible = false;
     renderBuilder();
+    renderControlHints();
   }
 
   function beginSession() {
@@ -214,6 +227,7 @@ export function createSandboxSystem(game) {
     for (const pad of pads) pad.group.visible = true;
     game.garage.showDriveScreen();
     localCar.setPlayerName?.(game.multiplayer?.driverName || "Driver", true);
+    renderControlHints();
     game.showToast("Sandbox: Q spring field · E jump pad · F boost vents");
   }
 
@@ -233,6 +247,7 @@ export function createSandboxSystem(game) {
     }
     waves.length = 0;
     if (localAttachmentGroup) localAttachmentGroup.visible = false;
+    renderControlHints();
     seenEvents.clear();
   }
 
@@ -527,6 +542,7 @@ export function createSandboxSystem(game) {
       applyLoadout(localCar, getLoadout());
       if (localAttachmentGroup) localAttachmentGroup.visible = active;
       renderBuilder();
+      renderControlHints();
     });
   });
   $("sandboxEnterMapButton").addEventListener("click", enterMap);

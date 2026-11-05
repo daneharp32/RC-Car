@@ -558,7 +558,12 @@ function setPaused(nextPaused) {
 
   const pauseOverlay = $("pauseOverlay");
   const pauseButton = $("pauseButton");
+  const sandboxEditButton = $("sandboxEditButton");
   pauseOverlay.style.display = isPaused ? "grid" : "none";
+  if (sandboxEditButton) {
+    sandboxEditButton.style.display =
+      isPaused && sandbox.active && sandbox.inMap ? "block" : "none";
+  }
   pauseButton.setAttribute("aria-expanded", isPaused ? "true" : "false");
   pauseButton.textContent = isPaused ? "PAUSED" : "PAUSE · ESC";
 
@@ -580,6 +585,12 @@ function setPaused(nextPaused) {
 game.setPaused = setPaused;
 $("pauseButton").addEventListener("click", () => setPaused(!isPaused));
 $("resumeButton").addEventListener("click", () => setPaused(false));
+$("sandboxEditButton").addEventListener("click", () => {
+  if (!multiplayer.joined || !sandbox.active || !sandbox.inMap) return;
+  setPaused(false);
+  sandbox.showBuilder();
+  showToast("Back in the workshop — edit your truck, then re-enter the map");
+});
 $("leaveButton").addEventListener("click", () => setPaused(false));
 
 const timeOfDaySelect = $("timeOfDaySelect");
@@ -592,7 +603,8 @@ timeOfDaySelect.addEventListener("change", () => {
 });
 
 window.addEventListener("keydown", (event) => {
-  if (event.repeat || event.key !== "Escape" || !multiplayer.joined) return;
+  if (event.repeat || event.key !== "Escape" || !multiplayer.joined ||
+      (sandbox.active && !sandbox.inMap)) return;
   // Let Escape close the native select dropdown first when it has focus.
   if (event.target === timeOfDaySelect && isPaused) return;
   event.preventDefault();
