@@ -66,6 +66,6 @@ Each browser still simulates its own car locally. The room relay forwards compac
 
 ## Multiplayer Sandbox
 
-Sandbox rooms use the same Cloudflare WebSocket relay as the other multiplayer modes. Drivers can equip continuous jump thrusters, continuous forward thrusters, and a shared impulse beacon. Holding Q lifts the truck while an attitude stabilizer keeps it level; holding E applies sustained forward thrust; F places a glowing ground beacon that charges for three seconds, then releases a stronger non-damaging spring pulse only when an RC car is within its trigger range. Beacon events are relayed to other Sandbox players. Sandbox is supported on Club Dirt Circuit and Gravel Basin.
+Sandbox rooms use the same Cloudflare WebSocket relay as the other multiplayer modes. Drivers can equip continuous jump thrusters, continuous forward thrusters, and a shared impulse beacon. Holding Q applies a controlled world-up lift; holding E adds forward force through the same driven wheels as the normal throttle; F places a glowing ground beacon that charges for three seconds, then releases a stronger non-damaging spring pulse only when an RC car is within its trigger range. Beacon events are relayed to other Sandbox players. Sandbox is supported on Club Dirt Circuit and Gravel Basin.
 
 Sandbox controls while driving: hold Q to fly, hold E for forward thrust, and press F to place an impulse beacon.
