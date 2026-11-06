@@ -268,7 +268,7 @@ export function createSandboxSystem(game) {
     return { group: plume, layers, particles, baseGlow, length, radius };
   }
 
-  function makeJumpThrusters(root) {
+  function makeJumpThrusters(root, createGroundEffects = true) {
     const group = new THREE.Group();
     group.name = "sandbox-jump-thrusters";
     const housing = new THREE.MeshStandardMaterial({color:0x202c36,roughness:0.42,metalness:0.82});
@@ -287,7 +287,7 @@ export function createSandboxSystem(game) {
           end: z < 0 ? "rear" : "front",
           position: new THREE.Vector3(x, -0.035, z),
           plume: makeColdGasPlume(group, [x, -0.035, z], "down", 1.42, 0.145),
-          groundWash: makeGroundWash()
+          groundWash: createGroundEffects ? makeGroundWash() : null
         });
       }
     }
@@ -354,7 +354,7 @@ export function createSandboxSystem(game) {
 
     const group = new THREE.Group();
     group.name = "sandbox-thruster-and-beacon-parts";
-    const liftFlames = ids.includes("lift") ? makeJumpThrusters(group) : [];
+    const liftFlames = ids.includes("lift") ? makeJumpThrusters(group, visual === localCar) : [];
     const forwardFlames = ids.includes("forward") ? makeForwardThrusters(group) : [];
     if (ids.includes("beacon")) makeImpulseBeaconModule(group);
     group.visible = visual === localCar ? active : true;
