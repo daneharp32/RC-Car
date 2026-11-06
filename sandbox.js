@@ -553,11 +553,13 @@ export function createSandboxSystem(game) {
     // Apply force only along world-up, at the chassis center of mass.
     // This changes vertical motion without pushing from an off-center point
     // or using the truck's tilted local axes.
-    const targetClimbSpeed = 3.8;
+    // Give the lift system enough excess force to overcome the suspension
+    // load and make the truck actually leave the ground.
+    const targetClimbSpeed = 8.0;
     const liftAcceleration = THREE.MathUtils.clamp(
-      (targetClimbSpeed - chassisBody.velocity.y) * 0.9,
+      (targetClimbSpeed - chassisBody.velocity.y) * 1.4,
       0,
-      2.2
+      10.0
     );
     const liftForce = mass * (9.82 + liftAcceleration) * altitudeScale;
     // Cannon expects a COM-relative offset here, not the chassis world position.
