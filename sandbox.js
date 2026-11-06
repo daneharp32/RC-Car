@@ -539,40 +539,67 @@ export function createSandboxSystem(game) {
     return true;
   }
 
+  function isVehicleInFlight() {
+    const wheels = game.vehicle?.wheelInfos || [];
+    const groundedWheels = wheels.reduce(
+      (count, wheel) => count + (wheel.isInContact ? 1 : 0),
+      0
+    );
+    return chassisBody.position.y > 0.42 && (wheels.length === 0 || groundedWheels <= 1);
+  }
+
   function postPhysicsUpdate(delta) {
     const state = getThrusterState();
-    if (!state.lift && !state.forward) return;
+    const inFlight = active && inMap && !game.isPaused?.() && isVehicleInFlight();
+    if (!state.lift && !state.forward && !inFlight) return;
 
-    // Dampen rotation in the chassis' own coordinate frame without changing
-    // the chassis orientation or its travel direction. X/Z are pitch and roll;
-    // Y is yaw. This is a soft angular brake, not a forced heading correction.
+    // Work in the truck's local coordinate frame: X = pitch, Y = yaw,
+    // Z = roll. Flight inputs are only read while the vehicle is airborne.
     const orientation = new THREE.Quaternion(
       chassisBody.quaternion.x,
       chassisBody.quaternion.y,
       chassisBody.quaternion.z,
       chassisBody.quaternion.w
     );
+    const inverseOrientation = orientation.clone().invert();
     const localAngularVelocity = new THREE.Vector3(
       chassisBody.angularVelocity.x,
       chassisBody.angularVelocity.y,
       chassisBody.angularVelocity.z
-    ).applyQuaternion(orientation.clone().invert());
+    ).applyQuaternion(inverseOrientation);
 
-    const pitchRollDamping = Math.exp(-(state.lift ? 24 : 8) * Math.max(0, delta));
-    const yawDamping = Math.exp(-(state.lift ? 8 : 4) * Math.max(0, delta));
-    // While Q is held, keep the truck from building pitch/roll rotation.
-    // Yaw remains available for steering, but is gently limited.
-    localAngularVelocity.x = state.lift
-      ? 0
-      : THREE.MathUtils.clamp(localAngularVelocity.x * pitchRollDamping, -0.85, 0.85);
-    localAngularVelocity.z = state.lift
-      ? 0
-      : THREE.MathUtils.clamp(localAngularVelocity.z * pitchRollDamping, -0.85, 0.85);
-    localAngularVelocity.y = THREE.MathUtils.clamp(
-      localAngularVelocity.y * yawDamping,
-      state.lift ? -1.0 : -1.8,
-      state.lift ? 1.0 : 1.8
-    );
+    if (inFlight) {
+      const keys = game.controls?.keys || {};
+      // W raises the nose, S lowers it. A rolls left, D rolls right.
+      const pitchInput = (keys.s ? 1 : 0) - (keys.w ? 1 : 0);
+      const rollInput = (keys.a ? 1 : 0) - (keys.d ? 1 : 0);
+      const response = 1 - Math.exp(-10 * Math.max(0, delta));
+
+      const targetPitchRate = pitchInput * 1.55;
+      const targetRollRate = rollInput * 1.75;
+      localAngularVelocity.x += (targetPitchRate - localAngularVelocity.x) * response;
+      localAngularVelocity.z += (targetRollRate - localAngularVelocity.z) * response;
+      // Keep yaw calm; A/D are reserved for roll while in Sandbox flight.
+      localAngularVelocity.y *= Math.exp(-5 * Math.max(0, delta));
+      localAngularVelocity.x = THREE.MathUtils.clamp(localAngularVelocity.x, -1.55, 1.55);
+      localAngularVelocity.z = THREE.MathUtils.clamp(localAngularVelocity.z, -1.75, 1.75);
+    } else {
+      // On the ground, Q must not introduce any pitch or roll. When forward
+      // boost is used, damp unwanted rotation without taking over steering.
+      const pitchRollDamping = Math.exp(-(state.lift ? 24 : 8) * Math.max(0, delta));
+      const yawDamping = Math.exp(-(state.lift ? 8 : 4) * Math.max(0, delta));
+      localAngularVelocity.x = state.lift
+        ? 0
+        : THREE.MathUtils.clamp(localAngularVelocity.x * pitchRollDamping, -0.85, 0.85);
+      localAngularVelocity.z = state.lift
+        ? 0
+        : THREE.MathUtils.clamp(localAngularVelocity.z * pitchRollDamping, -0.85, 0.85);
+      localAngularVelocity.y = THREE.MathUtils.clamp(
+        localAngularVelocity.y * yawDamping,
+        state.lift ? -1.0 : -1.8,
+        state.lift ? 1.0 : 1.8
+      );
+    }
 
     localAngularVelocity.applyQuaternion(orientation);
     chassisBody.angularVelocity.set(
@@ -591,17 +618,25 @@ export function createSandboxSystem(game) {
       );
 
       if (altitudeScale > 0 && delta > 0) {
-        // Direct, time-scaled vertical speed control is not cancelled by the
-        // suspension's spring forces. It is applied after physics, through
-        // world-up only, so it cannot create a pitch or roll torque.
-        const targetClimbSpeed = 10.5;
-        const maxUpwardAcceleration = 26;
-        const neededSpeed = Math.max(0, targetClimbSpeed - chassisBody.velocity.y);
+        // Point thrust along the truck's rotated local-up axis. As W/S pitch
+        // or A/D roll the truck, lift follows that new orientation instead of
+        // continuing to push straight up in world space.
+        const localUp = new CANNON.Vec3(0, 1, 0);
+        const thrustDirection = new CANNON.Vec3();
+        chassisBody.quaternion.vmult(localUp, thrustDirection);
+        thrustDirection.normalize();
+
+        const targetThrustSpeed = 10.5;
+        const speedAlongThrust = chassisBody.velocity.dot(thrustDirection);
+        const neededSpeed = Math.max(0, targetThrustSpeed - speedAlongThrust);
+        const maxThrustAcceleration = 26;
         const speedChange = Math.min(
           neededSpeed,
-          maxUpwardAcceleration * delta * altitudeScale
+          maxThrustAcceleration * delta * altitudeScale
         );
-        chassisBody.velocity.y += speedChange;
+        chassisBody.velocity.x += thrustDirection.x * speedChange;
+        chassisBody.velocity.y += thrustDirection.y * speedChange;
+        chassisBody.velocity.z += thrustDirection.z * speedChange;
         chassisBody.wakeUp();
       }
     }

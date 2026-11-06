@@ -305,8 +305,9 @@ function updateDrivingControls(delta) {
   const airborne = groundedWheels <= 1 && chassisBody.position.y > 0.42;
   const thrusterState = game.sandbox?.getThrusterState?.();
   const sandboxThrustersActive = Boolean(thrusterState?.lift || thrusterState?.forward);
+  const sandboxMode = game.sandbox?.active === true && game.sandbox?.inMap === true;
 
-  if (airborne && !sandboxThrustersActive) {
+  if (airborne && !sandboxMode) {
     // RC-style attitude control while airborne:
     // W raises the nose, S lowers it, A/D yaw the truck, and a small roll
     // component banks it into turns.
