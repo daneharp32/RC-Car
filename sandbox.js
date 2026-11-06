@@ -560,9 +560,11 @@ export function createSandboxSystem(game) {
       2.2
     );
     const liftForce = mass * (9.82 + liftAcceleration) * altitudeScale;
+    // Cannon expects a COM-relative offset here, not the chassis world position.
+    // Zero applies the lift through the center of mass and creates no artificial torque.
     chassisBody.applyForce(
       new CANNON.Vec3(0, liftForce, 0),
-      chassisBody.position
+      new CANNON.Vec3(0, 0, 0)
     );
     chassisBody.wakeUp();
   }
@@ -586,16 +588,20 @@ export function createSandboxSystem(game) {
       chassisBody.angularVelocity.z
     ).applyQuaternion(orientation.clone().invert());
 
-    const pitchRollDamping = Math.exp(-8 * Math.max(0, delta));
-    const yawDamping = Math.exp(-4 * Math.max(0, delta));
-    localAngularVelocity.x = THREE.MathUtils.clamp(
-      localAngularVelocity.x * pitchRollDamping, -0.85, 0.85
-    );
-    localAngularVelocity.z = THREE.MathUtils.clamp(
-      localAngularVelocity.z * pitchRollDamping, -0.85, 0.85
-    );
+    const pitchRollDamping = Math.exp(-(state.lift ? 24 : 8) * Math.max(0, delta));
+    const yawDamping = Math.exp(-(state.lift ? 8 : 4) * Math.max(0, delta));
+    // While Q is held, keep the truck from building pitch/roll rotation.
+    // Yaw remains available for steering, but is gently limited.
+    localAngularVelocity.x = state.lift
+      ? 0
+      : THREE.MathUtils.clamp(localAngularVelocity.x * pitchRollDamping, -0.85, 0.85);
+    localAngularVelocity.z = state.lift
+      ? 0
+      : THREE.MathUtils.clamp(localAngularVelocity.z * pitchRollDamping, -0.85, 0.85);
     localAngularVelocity.y = THREE.MathUtils.clamp(
-      localAngularVelocity.y * yawDamping, -1.8, 1.8
+      localAngularVelocity.y * yawDamping,
+      state.lift ? -1.0 : -1.8,
+      state.lift ? 1.0 : 1.8
     );
 
     localAngularVelocity.applyQuaternion(orientation);
