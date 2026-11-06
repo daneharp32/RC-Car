@@ -267,6 +267,7 @@ export function createSandboxSystem(game) {
   function clearHeldControls() {
     held.lift = false;
     held.forward = false;
+    flightControlArmed = false;
     updateThrusterVisuals(performance.now());
     renderControlHints();
   }
