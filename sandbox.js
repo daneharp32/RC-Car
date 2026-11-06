@@ -629,10 +629,14 @@ export function createSandboxSystem(game) {
         thrustDirection.normalize();
 
         const targetVerticalSpeed = 10.5 * altitudeScale;
-        const verticalSpeedError = targetVerticalSpeed - chassisBody.velocity.y;
-        const velocityResponse = 1 - Math.exp(-8 * delta);
         const gravityAcceleration = Math.abs(Number(game.world?.gravity?.y ?? -9.82));
         const gravityCompensation = gravityAcceleration * delta;
+        // postPhysicsUpdate runs after world.step has applied gravity. Add
+        // that step back when measuring the speed error so the hover feedback
+        // does not slowly over-correct and drift upward.
+        const verticalSpeedBeforeGravity = chassisBody.velocity.y + gravityCompensation;
+        const verticalSpeedError = targetVerticalSpeed - verticalSpeedBeforeGravity;
+        const velocityResponse = 1 - Math.exp(-8 * delta);
         const maxVelocityChange = 26 * delta;
         const verticalVelocityChange = THREE.MathUtils.clamp(
           gravityCompensation + verticalSpeedError * velocityResponse,
