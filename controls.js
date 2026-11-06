@@ -173,9 +173,15 @@ function updateDrivingControls(delta) {
   vehicle.setSteeringValue(steeringAngleState, 0);
   vehicle.setSteeringValue(steeringAngleState, 1);
 
-  // Progressive four-wheel drive with a gradual top-speed fade.
+  // Normal drive and the Sandbox forward booster both use the same
+  // RaycastVehicle wheel force, so boost follows exactly the same direction
+  // as W/Up Arrow instead of adding a separate world-space chassis force.
   const speedLimitScale = THREE.MathUtils.clamp(1 - speed / 27, 0.24, 1);
-  const engineForce = throttleState * 30 * speedLimitScale;
+  const sandboxThrusterState = game.sandbox?.getThrusterState?.();
+  const signedForwardSpeed = chassisBody.velocity.dot(worldForwardAxis);
+  const boosterSpeedScale = THREE.MathUtils.clamp((14.5 - signedForwardSpeed) / 3.5, 0, 1);
+  const boosterForce = sandboxThrusterState?.forward ? 40 * boosterSpeedScale : 0;
+  const engineForce = (throttleState * 30 + boosterForce) * speedLimitScale;
   for (let i = 0; i < 4; i++) {
     vehicle.applyEngineForce(engineForce, i);
     vehicle.setBrake(0, i);
