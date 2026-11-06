@@ -26,6 +26,7 @@ export function createSandboxSystem(game) {
   let playerCount = 1;
   let localAttachment = null;
   const standardAngularDamping = chassisBody.angularDamping;
+  let flightControlArmed = false;
 
   function dispose(root) {
     root.traverse((object) => {
@@ -60,72 +61,65 @@ export function createSandboxSystem(game) {
     return mesh;
   }
 
+  function makeColdGasPlume(parent, position, direction, length, radius) {
+    const plume = new THREE.Group();
+    plume.position.set(...position);
+    if (direction === "down") plume.rotation.z = Math.PI;
+    else plume.rotation.x = -Math.PI / 2;
+    const layers = [];
+    for (const [scale, opacity, color] of [[1,0.30,0xdff8ff],[0.68,0.24,0x9feaff],[0.36,0.30,0xffffff]]) {
+      const material = new THREE.MeshBasicMaterial({color,transparent:true,opacity,depthWrite:false,blending:THREE.AdditiveBlending,toneMapped:false});
+      const mesh = new THREE.Mesh(new THREE.ConeGeometry(radius*scale,length*scale,18,1,true),material);
+      mesh.position.y = length*scale*0.46;
+      plume.add(mesh);
+      layers.push({material,baseOpacity:opacity});
+    }
+    const particles = [];
+    for(let i=0;i<6;i++){
+      const particle = new THREE.Mesh(
+        new THREE.SphereGeometry(radius*(0.10+(i%3)*0.035),7,6),
+        new THREE.MeshBasicMaterial({color:0xeafaff,transparent:true,opacity:0.34,depthWrite:false,toneMapped:false})
+      );
+      particle.position.set(Math.sin(i*2.4)*radius*0.4,length*(0.25+i*0.11),Math.cos(i*1.7)*radius*0.4);
+      plume.add(particle); particles.push(particle);
+    }
+    plume.visible=false; parent.add(plume);
+    return {group:plume,layers,particles};
+  }
+
   function makeJumpThrusters(root) {
     const group = new THREE.Group();
     group.name = "sandbox-jump-thrusters";
-    const housing = new THREE.MeshStandardMaterial({
-      color: 0x202c36, roughness: 0.45, metalness: 0.76
-    });
-    const nozzle = new THREE.MeshStandardMaterial({
-      color: 0x7d909c, roughness: 0.32, metalness: 0.84
-    });
-    const flames = [];
-
-    for (const x of [-0.25, 0.25]) {
-      for (const z of [-0.34, 0.34]) {
-        addBox(group, [0.16, 0.075, 0.19], [x, 0.12, z], housing);
-        addCylinder(group, 0.055, 0.085, 0.14, [x, 0.045, z], nozzle);
-        const flameMaterial = new THREE.MeshBasicMaterial({
-          color: 0x58d9ff, transparent: true, opacity: 0.88,
-          depthWrite: false, toneMapped: false
-        });
-        const flame = new THREE.Mesh(
-          new THREE.ConeGeometry(0.075, 0.30, 12),
-          flameMaterial
-        );
-        flame.rotation.z = Math.PI;
-        flame.position.set(x, -0.16, z);
-        flame.visible = false;
-        group.add(flame);
-        flames.push(flame);
+    const housing = new THREE.MeshStandardMaterial({color:0x202c36,roughness:0.42,metalness:0.82});
+    const nozzle = new THREE.MeshStandardMaterial({color:0x91a7b2,roughness:0.24,metalness:0.9});
+    const aperture = new THREE.MeshStandardMaterial({color:0x07131c,roughness:0.3,metalness:0.5});
+    const jets=[];
+    for(const x of [-0.31,0.31]){
+      for(const z of [-0.39,0.39]){
+        addBox(group,[0.19,0.075,0.21],[x,0.13,z],housing);
+        addCylinder(group,0.074,0.096,0.12,[x,0.055,z],nozzle);
+        addCylinder(group,0.052,0.052,0.012,[x,-0.012,z],aperture);
+        const rim=new THREE.Mesh(new THREE.TorusGeometry(0.073,0.009,8,24),new THREE.MeshBasicMaterial({color:0x9cecff,transparent:true,opacity:0.55}));
+        rim.position.set(x,-0.022,z); rim.rotation.x=Math.PI/2; group.add(rim);
+        jets.push({side:x<0?"left":"right",end:z<0?"rear":"front",plume:makeColdGasPlume(group,[x,-0.035,z],"down",0.48,0.11)});
       }
     }
-    root.add(group);
-    return flames;
+    root.add(group); return jets;
   }
-
   function makeForwardThrusters(root) {
-    const group = new THREE.Group();
-    group.name = "sandbox-forward-thrusters";
-    const housing = new THREE.MeshStandardMaterial({
-      color: 0x18242e, roughness: 0.42, metalness: 0.78
-    });
-    const nozzle = new THREE.MeshStandardMaterial({
-      color: 0x8799a3, roughness: 0.3, metalness: 0.82
-    });
-    const flames = [];
-
-    for (const x of [-0.22, 0.22]) {
-      addBox(group, [0.17, 0.095, 0.22], [x, 0.22, 0.36], housing);
-      addCylinder(group, 0.065, 0.09, 0.14, [x, 0.22, 0.48], nozzle, [Math.PI / 2, 0, 0]);
-      const flameMaterial = new THREE.MeshBasicMaterial({
-        color: 0x47baff, transparent: true, opacity: 0.88,
-        depthWrite: false, toneMapped: false
-      });
-      const flame = new THREE.Mesh(
-        new THREE.ConeGeometry(0.078, 0.34, 12),
-        flameMaterial
-      );
-      flame.rotation.x = Math.PI / 2;
-      flame.position.set(x, 0.22, 0.66);
-      flame.visible = false;
-      group.add(flame);
-      flames.push(flame);
+    const group=new THREE.Group(); group.name="sandbox-forward-thrusters";
+    const housing=new THREE.MeshStandardMaterial({color:0x18242e,roughness:0.38,metalness:0.84});
+    const nozzle=new THREE.MeshStandardMaterial({color:0x9aadb7,roughness:0.23,metalness:0.9});
+    const aperture=new THREE.MeshStandardMaterial({color:0x07131c,roughness:0.28,metalness:0.55});
+    const jets=[];
+    for(const x of [-0.22,0.22]){
+      addBox(group,[0.19,0.105,0.23],[x,0.22,0.36],housing);
+      addCylinder(group,0.079,0.102,0.15,[x,0.22,0.48],nozzle,[Math.PI/2,0,0]);
+      addCylinder(group,0.055,0.055,0.012,[x,0.22,0.56],aperture,[Math.PI/2,0,0]);
+      jets.push(makeColdGasPlume(group,[x,0.22,0.57],"back",0.62,0.13));
     }
-    root.add(group);
-    return flames;
+    root.add(group); return jets;
   }
-
   function makeImpulseBeaconModule(root) {
     const group = new THREE.Group();
     group.name = "sandbox-impulse-beacon-module";
@@ -197,24 +191,34 @@ export function createSandboxSystem(game) {
     if (!entry) return;
     const lift = state?.lift === true;
     const forward = state?.forward === true;
-    for (const flame of entry.liftFlames) flame.visible = lift;
-    for (const flame of entry.forwardFlames) flame.visible = forward;
+    for (const jet of entry.liftFlames) setColdGasJet(jet.plume,lift,0);
+    for (const jet of entry.forwardFlames) setColdGasJet(jet,forward,0);
+  }
+
+  function setColdGasJet(jet,active,now) {
+    if(!jet?.group)return;
+    jet.group.visible=active;
+    if(!active)return;
+    const pulse=0.94+Math.sin(now*0.026)*0.045+Math.sin(now*0.011)*0.025;
+    jet.group.scale.set(pulse,0.9+pulse*0.12,pulse);
+    for(const layer of jet.layers)layer.material.opacity=layer.baseOpacity*(0.9+Math.sin(now*0.018)*0.08);
+    jet.particles.forEach((particle,index)=>particle.scale.setScalar(0.88+Math.sin(now*0.02+index)*0.18));
   }
 
   function updateThrusterVisuals(now) {
-    const state = getThrusterState();
-    if (localAttachment) {
-      for (const flame of localAttachment.liftFlames) {
-        flame.visible = state.lift;
-        flame.scale.setScalar(state.lift ? 0.88 + Math.sin(now * 0.035) * 0.10 : 1);
+    const state=getThrusterState();
+    const keys=game.controls?.keys||{};
+    const armed=flightControlArmed&&isVehicleInFlight();
+    const pitchInput=armed?(keys.s?1:0)-(keys.w?1:0):0;
+    const rollInput=armed?(keys.a?1:0)-(keys.d?1:0):0;
+    if(localAttachment){
+      for(const jet of localAttachment.liftFlames){
+        const firing=state.lift||(rollInput<0&&jet.side==="left")||(rollInput>0&&jet.side==="right")||(pitchInput>0&&jet.end==="rear")||(pitchInput<0&&jet.end==="front");
+        setColdGasJet(jet.plume,firing,now);
       }
-      for (const flame of localAttachment.forwardFlames) {
-        flame.visible = state.forward;
-        flame.scale.setScalar(state.forward ? 0.90 + Math.sin(now * 0.045) * 0.12 : 1);
-      }
+      for(const jet of localAttachment.forwardFlames)setColdGasJet(jet,state.forward,now);
     }
   }
-
   function renderBuilder() {
     document.querySelectorAll("[data-sandbox-part]").forEach((button) => {
       const equipped = loadout.has(button.dataset.sandboxPart);
@@ -263,6 +267,7 @@ export function createSandboxSystem(game) {
   function clearHeldControls() {
     held.lift = false;
     held.forward = false;
+    flightControlArmed = false;
     updateThrusterVisuals(performance.now());
     renderControlHints();
   }
@@ -552,7 +557,12 @@ export function createSandboxSystem(game) {
   function postPhysicsUpdate(delta) {
     const state = getThrusterState();
     const inFlight = active && inMap && !game.isPaused?.() && isVehicleInFlight();
-    if (!state.lift && !state.forward && !inFlight) return;
+    const wheels = game.vehicle?.wheelInfos || [];
+    const groundedWheels = wheels.reduce((count,wheel)=>count+(wheel.isInContact?1:0),0);
+    if(state.lift) flightControlArmed=true;
+    else if(!inFlight&&groundedWheels>=2) flightControlArmed=false;
+    const attitudeControlActive=inFlight&&flightControlArmed;
+    if(!state.lift&&!state.forward&&!attitudeControlActive)return;
 
     // Work in the truck's local coordinate frame: X = pitch, Y = yaw,
     // Z = roll. Flight inputs are only read while the vehicle is airborne.
@@ -569,7 +579,7 @@ export function createSandboxSystem(game) {
       chassisBody.angularVelocity.z
     ).applyQuaternion(inverseOrientation);
 
-    if (inFlight) {
+    if (attitudeControlActive) {
       const keys = game.controls?.keys || {};
       // W raises the nose, S lowers it. A rolls left, D rolls right.
       const pitchInput = (keys.s ? 1 : 0) - (keys.w ? 1 : 0);
