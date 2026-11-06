@@ -573,16 +573,17 @@ export function createSandboxSystem(game) {
       // W raises the nose, S lowers it. A rolls left, D rolls right.
       const pitchInput = (keys.s ? 1 : 0) - (keys.w ? 1 : 0);
       const rollInput = (keys.a ? 1 : 0) - (keys.d ? 1 : 0);
-      const response = 1 - Math.exp(-10 * Math.max(0, delta));
+      const response = 1 - Math.exp(-18 * Math.max(0, delta));
 
-      const targetPitchRate = pitchInput * 1.55;
-      const targetRollRate = rollInput * 1.75;
+      // Faster attitude response for more immediate mid-air steering.
+      const targetPitchRate = pitchInput * 2.65;
+      const targetRollRate = rollInput * 2.9;
       localAngularVelocity.x += (targetPitchRate - localAngularVelocity.x) * response;
       localAngularVelocity.z += (targetRollRate - localAngularVelocity.z) * response;
       // Keep yaw calm; A/D are reserved for roll while in Sandbox flight.
       localAngularVelocity.y *= Math.exp(-5 * Math.max(0, delta));
-      localAngularVelocity.x = THREE.MathUtils.clamp(localAngularVelocity.x, -1.55, 1.55);
-      localAngularVelocity.z = THREE.MathUtils.clamp(localAngularVelocity.z, -1.75, 1.75);
+      localAngularVelocity.x = THREE.MathUtils.clamp(localAngularVelocity.x, -2.65, 2.65);
+      localAngularVelocity.z = THREE.MathUtils.clamp(localAngularVelocity.z, -2.9, 2.9);
     } else {
       // On the ground, Q must not introduce any pitch or roll. When forward
       // boost is used, damp unwanted rotation without taking over steering.
@@ -618,25 +619,48 @@ export function createSandboxSystem(game) {
       );
 
       if (altitudeScale > 0 && delta > 0) {
-        // Point thrust along the truck's rotated local-up axis. As W/S pitch
-        // or A/D roll the truck, lift follows that new orientation instead of
-        // continuing to push straight up in world space.
+        // Keep the climb rate stable in world-up, while allowing the truck's
+        // tilt to steer the horizontal part of the thrust. Treat the altitude
+        // fade as a soft hover ceiling rather than switching lift off at 7 m;
+        // that avoids the repeated rise/fall cycle near the ceiling.
         const localUp = new CANNON.Vec3(0, 1, 0);
         const thrustDirection = new CANNON.Vec3();
         chassisBody.quaternion.vmult(localUp, thrustDirection);
         thrustDirection.normalize();
 
-        const targetThrustSpeed = 10.5;
-        const speedAlongThrust = chassisBody.velocity.dot(thrustDirection);
-        const neededSpeed = Math.max(0, targetThrustSpeed - speedAlongThrust);
-        const maxThrustAcceleration = 26;
-        const speedChange = Math.min(
-          neededSpeed,
-          maxThrustAcceleration * delta * altitudeScale
+        const targetVerticalSpeed = 10.5 * altitudeScale;
+        const verticalSpeedError = targetVerticalSpeed - chassisBody.velocity.y;
+        const velocityResponse = 1 - Math.exp(-8 * delta);
+        const gravityAcceleration = Math.abs(Number(game.world?.gravity?.y ?? -9.82));
+        const gravityCompensation = gravityAcceleration * delta;
+        const maxVelocityChange = 26 * delta;
+        const verticalVelocityChange = THREE.MathUtils.clamp(
+          gravityCompensation + verticalSpeedError * velocityResponse,
+          -maxVelocityChange,
+          maxVelocityChange
         );
-        chassisBody.velocity.x += thrustDirection.x * speedChange;
-        chassisBody.velocity.y += thrustDirection.y * speedChange;
-        chassisBody.velocity.z += thrustDirection.z * speedChange;
+        chassisBody.velocity.y += verticalVelocityChange;
+
+        // The sideways thrust still follows the rotated local-up direction.
+        // Its influence fades with the same altitude envelope as before.
+        const horizontalDirection = new THREE.Vector3(
+          thrustDirection.x,
+          0,
+          thrustDirection.z
+        );
+        const horizontalTilt = horizontalDirection.length();
+        if (horizontalTilt > 0.0001 && altitudeScale > 0) {
+          horizontalDirection.divideScalar(horizontalTilt);
+          const horizontalRatio = THREE.MathUtils.clamp(
+            horizontalTilt / Math.max(0.35, thrustDirection.y),
+            0,
+            1.25
+          );
+          const horizontalVelocityChange =
+            verticalVelocityChange * horizontalRatio * altitudeScale;
+          chassisBody.velocity.x += horizontalDirection.x * horizontalVelocityChange;
+          chassisBody.velocity.z += horizontalDirection.z * horizontalVelocityChange;
+        }
         chassisBody.wakeUp();
       }
     }
