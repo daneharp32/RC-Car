@@ -539,38 +539,6 @@ export function createSandboxSystem(game) {
     return true;
   }
 
-  function applyJumpThrusters() {
-    const mass = chassisBody.mass || 10.5;
-    const groundY = sampleGroundHeight(chassisBody.position.x, chassisBody.position.z);
-    const heightAboveGround = Math.max(0, chassisBody.position.y - groundY);
-    const altitudeScale = THREE.MathUtils.clamp(
-      (MAX_THRUSTER_ALTITUDE - heightAboveGround) / ALTITUDE_FADE_RANGE,
-      0,
-      1
-    );
-    if (altitudeScale <= 0) return;
-
-    // Apply force only along world-up, at the chassis center of mass.
-    // This changes vertical motion without pushing from an off-center point
-    // or using the truck's tilted local axes.
-    // Give the lift system enough excess force to overcome the suspension
-    // load and make the truck actually leave the ground.
-    const targetClimbSpeed = 8.0;
-    const liftAcceleration = THREE.MathUtils.clamp(
-      (targetClimbSpeed - chassisBody.velocity.y) * 1.4,
-      0,
-      10.0
-    );
-    const liftForce = mass * (9.82 + liftAcceleration) * altitudeScale;
-    // Cannon expects a COM-relative offset here, not the chassis world position.
-    // Zero applies the lift through the center of mass and creates no artificial torque.
-    chassisBody.applyForce(
-      new CANNON.Vec3(0, liftForce, 0),
-      new CANNON.Vec3(0, 0, 0)
-    );
-    chassisBody.wakeUp();
-  }
-
   function postPhysicsUpdate(delta) {
     const state = getThrusterState();
     if (!state.lift && !state.forward) return;
@@ -612,6 +580,31 @@ export function createSandboxSystem(game) {
       localAngularVelocity.y,
       localAngularVelocity.z
     );
+
+    if (state.lift) {
+      const groundY = sampleGroundHeight(chassisBody.position.x, chassisBody.position.z);
+      const heightAboveGround = Math.max(0, chassisBody.position.y - groundY);
+      const altitudeScale = THREE.MathUtils.clamp(
+        (MAX_THRUSTER_ALTITUDE - heightAboveGround) / ALTITUDE_FADE_RANGE,
+        0,
+        1
+      );
+
+      if (altitudeScale > 0 && delta > 0) {
+        // Direct, time-scaled vertical speed control is not cancelled by the
+        // suspension's spring forces. It is applied after physics, through
+        // world-up only, so it cannot create a pitch or roll torque.
+        const targetClimbSpeed = 10.5;
+        const maxUpwardAcceleration = 26;
+        const neededSpeed = Math.max(0, targetClimbSpeed - chassisBody.velocity.y);
+        const speedChange = Math.min(
+          neededSpeed,
+          maxUpwardAcceleration * delta * altitudeScale
+        );
+        chassisBody.velocity.y += speedChange;
+        chassisBody.wakeUp();
+      }
+    }
   }
 
   function isLocalCarNearBeacon(beacon) {
@@ -638,7 +631,6 @@ export function createSandboxSystem(game) {
 
   function update(delta, now = performance.now()) {
     const canDrive = active && inMap && !game.isPaused?.();
-    if (canDrive && held.lift && loadout.has("lift")) applyJumpThrusters();
 
     updateThrusterVisuals(now);
 
