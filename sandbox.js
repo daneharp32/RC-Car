@@ -70,7 +70,7 @@ export function createSandboxSystem(game) {
     for (const [scale, opacity, color] of [[1,0.30,0xdff8ff],[0.68,0.24,0x9feaff],[0.36,0.30,0xffffff]]) {
       const material = new THREE.MeshBasicMaterial({color,transparent:true,opacity,depthWrite:false,blending:THREE.AdditiveBlending,toneMapped:false});
       const mesh = new THREE.Mesh(new THREE.ConeGeometry(radius*scale,length*scale,18,1,true),material);
-      mesh.position.y = -length*scale*0.46;
+      mesh.position.y = length*scale*0.46;
       plume.add(mesh);
       layers.push({material,baseOpacity:opacity});
     }
@@ -80,7 +80,7 @@ export function createSandboxSystem(game) {
         new THREE.SphereGeometry(radius*(0.10+(i%3)*0.035),7,6),
         new THREE.MeshBasicMaterial({color:0xeafaff,transparent:true,opacity:0.34,depthWrite:false,toneMapped:false})
       );
-      particle.position.set(Math.sin(i*2.4)*radius*0.4,-length*(0.25+i*0.11),Math.cos(i*1.7)*radius*0.4);
+      particle.position.set(Math.sin(i*2.4)*radius*0.4,length*(0.25+i*0.11),Math.cos(i*1.7)*radius*0.4);
       plume.add(particle); particles.push(particle);
     }
     plume.visible=false; parent.add(plume);
