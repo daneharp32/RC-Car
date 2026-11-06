@@ -61,33 +61,214 @@ export function createSandboxSystem(game) {
     return mesh;
   }
 
+  function makeGroundWash() {
+    const group = new THREE.Group();
+    group.name = "sandbox-thruster-ground-wash";
+
+    const hazeMaterial = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      toneMapped: false,
+      uniforms: {
+        uTime: { value: 0 },
+        uOpacity: { value: 0 }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float uTime;
+        uniform float uOpacity;
+        varying vec2 vUv;
+        void main() {
+          vec2 p = vUv * 2.0 - 1.0;
+          float radius = length(p);
+          float edge = 1.0 - smoothstep(0.56, 1.0, radius);
+          float center = 1.0 - smoothstep(0.0, 0.86, radius);
+          float angle = atan(p.y, p.x);
+          float wisps = 0.82 + 0.18 * sin(radius * 38.0 - uTime * 7.2 + sin(angle * 7.0) * 1.55);
+          float grain = 0.88 + 0.12 * sin(dot(p, vec2(47.0, 31.0)) + uTime * 3.1);
+          float alpha = edge * (0.11 + 0.16 * center) * wisps * grain * uOpacity;
+          vec3 color = mix(vec3(0.28, 0.21, 0.15), vec3(0.56, 0.46, 0.34), center * 0.42);
+          gl_FragColor = vec4(color, alpha);
+        }
+      `
+    });
+    const haze = new THREE.Mesh(new THREE.CircleGeometry(1, 56), hazeMaterial);
+    haze.rotation.x = -Math.PI / 2;
+    haze.position.y = 0.018;
+    group.add(haze);
+
+    const ringMaterial = new THREE.MeshBasicMaterial({
+      color: 0xc8b49a, transparent: true, opacity: 0,
+      depthWrite: false, side: THREE.DoubleSide, toneMapped: false
+    });
+    const outerRingMaterial = new THREE.MeshBasicMaterial({
+      color: 0x9d8870, transparent: true, opacity: 0,
+      depthWrite: false, side: THREE.DoubleSide, toneMapped: false
+    });
+    const innerRing = new THREE.Mesh(new THREE.RingGeometry(0.38, 0.49, 56), ringMaterial);
+    const outerRing = new THREE.Mesh(new THREE.RingGeometry(0.72, 0.81, 56), outerRingMaterial);
+    innerRing.rotation.x = outerRing.rotation.x = -Math.PI / 2;
+    innerRing.position.y = 0.026;
+    outerRing.position.y = 0.024;
+    group.add(innerRing, outerRing);
+
+    const puffs = [];
+    const puffGeometry = new THREE.SphereGeometry(0.28, 9, 7);
+    const puffSpecs = [
+      [0.00, 0.00, 0.38], [0.62, 0.10, 0.27], [1.22, -0.08, 0.34],
+      [1.92, 0.07, 0.29], [2.58, -0.04, 0.36], [3.18, 0.10, 0.27],
+      [3.86, -0.07, 0.34], [4.55, 0.06, 0.29], [5.22, -0.04, 0.35]
+    ];
+    for (const [angle, height, size] of puffSpecs) {
+      const material = new THREE.MeshBasicMaterial({
+        color: 0x9b8975, transparent: true, opacity: 0,
+        depthWrite: false, toneMapped: false
+      });
+      const mesh = new THREE.Mesh(puffGeometry, material);
+      mesh.position.set(Math.cos(angle) * 0.48, 0.07 + height, Math.sin(angle) * 0.48);
+      mesh.scale.set(size, size * 0.44, size);
+      group.add(mesh);
+      puffs.push({ mesh, material, angle, size });
+    }
+
+    const particles = [];
+    const particleGeometry = new THREE.SphereGeometry(0.075, 7, 6);
+    for (let i = 0; i < 16; i++) {
+      const material = new THREE.MeshBasicMaterial({
+        color: i % 3 === 0 ? 0xc3b19a : 0x8b7a68,
+        transparent: true, opacity: 0,
+        depthWrite: false, toneMapped: false
+      });
+      const mesh = new THREE.Mesh(particleGeometry, material);
+      group.add(mesh);
+      particles.push({
+        mesh, material,
+        angle: i * 2.399963,
+        phase: i / 16,
+        speed: 0.38 + (i % 5) * 0.055,
+        drift: 0.7 + (i % 4) * 0.16
+      });
+    }
+
+    group.visible = false;
+    scene.add(group);
+    return { group, hazeMaterial, innerRing, outerRing, ringMaterial, outerRingMaterial, puffs, particles };
+  }
+
+  function updateGroundWash(wash, position, distance, strength, direction, now) {
+    if (!wash) return;
+    wash.group.visible = strength > 0.015;
+    if (!wash.group.visible) return;
+
+    wash.group.position.copy(position);
+    wash.group.rotation.y = Math.atan2(direction.x, direction.z);
+    const spread = 0.9 + Math.min(distance, 4.2) * 0.22;
+    wash.group.scale.setScalar(spread);
+    wash.hazeMaterial.uniforms.uTime.value = now * 0.001;
+    wash.hazeMaterial.uniforms.uOpacity.value = strength;
+    const flicker = 0.82 + Math.sin(now * 0.021) * 0.08 + Math.sin(now * 0.047) * 0.05;
+    wash.ringMaterial.opacity = strength * (0.22 + flicker * 0.10);
+    wash.outerRingMaterial.opacity = strength * (0.12 + flicker * 0.07);
+    wash.innerRing.scale.setScalar(0.9 + Math.sin(now * 0.012) * 0.08);
+    wash.outerRing.scale.setScalar(0.95 + Math.sin(now * 0.009 + 1.4) * 0.09);
+
+    for (const puff of wash.puffs) {
+      const swell = 0.88 + Math.sin(now * 0.012 + puff.angle * 1.7) * 0.16;
+      puff.mesh.material.opacity = strength * (0.10 + flicker * 0.12);
+      puff.mesh.scale.set(
+        puff.size * swell,
+        puff.size * 0.44 * swell,
+        puff.size * swell
+      );
+    }
+
+    for (const particle of wash.particles) {
+      const progress = (now * 0.001 * particle.speed + particle.phase) % 1;
+      const radius = 0.22 + progress * particle.drift * (0.95 + distance * 0.12);
+      const flutter = Math.sin(now * 0.014 + particle.phase * 18) * 0.09;
+      particle.mesh.position.set(
+        Math.cos(particle.angle) * (radius + flutter),
+        0.035 + progress * 0.24,
+        Math.sin(particle.angle) * (radius - flutter)
+      );
+      particle.mesh.scale.setScalar(0.48 + (1 - progress) * 0.75);
+      particle.material.opacity = strength * (1 - progress) * 0.48;
+    }
+  }
+
   function makeColdGasPlume(parent, position, direction, length, radius) {
     const plume = new THREE.Group();
     plume.position.set(...position);
     if (direction === "down") plume.rotation.z = Math.PI;
     else plume.rotation.x = -Math.PI / 2;
+
+    // Overlapping translucent shells give the cold gas a soft, volumetric core
+    // and a wider feathered edge instead of a single hard-edged cone.
     const layers = [];
-    for (const [scale, opacity, color] of [[1,0.30,0xdff8ff],[0.68,0.24,0x9feaff],[0.36,0.30,0xffffff]]) {
-      const material = new THREE.MeshBasicMaterial({color,transparent:true,opacity,depthWrite:false,blending:THREE.AdditiveBlending,toneMapped:false});
-      const mesh = new THREE.Mesh(new THREE.ConeGeometry(radius*scale,length*scale,18,1,true),material);
-      mesh.position.y = length*scale*0.46;
-      plume.add(mesh);
-      layers.push({material,baseOpacity:opacity});
-    }
-    const particles = [];
-    for(let i=0;i<6;i++){
-      const particle = new THREE.Mesh(
-        new THREE.SphereGeometry(radius*(0.10+(i%3)*0.035),7,6),
-        new THREE.MeshBasicMaterial({color:0xeafaff,transparent:true,opacity:0.34,depthWrite:false,toneMapped:false})
+    const layerSpecs = [
+      { scale: 1.30, opacity: 0.105, color: 0x9edff0 },
+      { scale: 1.00, opacity: 0.19, color: 0xd9f6ff },
+      { scale: 0.67, opacity: 0.23, color: 0xa9eaff },
+      { scale: 0.34, opacity: 0.30, color: 0xffffff }
+    ];
+    for (const spec of layerSpecs) {
+      const material = new THREE.MeshBasicMaterial({
+        color: spec.color, transparent: true, opacity: spec.opacity,
+        depthWrite: false, blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide, toneMapped: false
+      });
+      const mesh = new THREE.Mesh(
+        new THREE.ConeGeometry(radius * spec.scale, length * spec.scale, 24, 12),
+        material
       );
-      particle.position.set(Math.sin(i*2.4)*radius*0.4,length*(0.25+i*0.11),Math.cos(i*1.7)*radius*0.4);
-      plume.add(particle); particles.push(particle);
+      mesh.position.y = length * spec.scale * 0.5;
+      plume.add(mesh);
+      layers.push({ mesh, material, baseOpacity: spec.opacity, scale: spec.scale });
     }
-    plume.visible=false; parent.add(plume);
-    return {group:plume,layers,particles};
+
+    const glowMaterial = new THREE.MeshBasicMaterial({
+      color: 0xe7fbff, transparent: true, opacity: 0.32,
+      depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false
+    });
+    const baseGlow = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), glowMaterial);
+    baseGlow.position.y = length * 0.10;
+    baseGlow.scale.set(radius * 0.82, length * 0.17, radius * 0.82);
+    plume.add(baseGlow);
+
+    const particles = [];
+    for (let i = 0; i < 20; i++) {
+      const material = new THREE.MeshBasicMaterial({
+        color: i % 4 === 0 ? 0xffffff : 0xc9f2ff,
+        transparent: true, opacity: 0.24,
+        depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false
+      });
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(radius * (0.075 + (i % 3) * 0.018), 7, 6),
+        material
+      );
+      plume.add(mesh);
+      particles.push({
+        mesh, material,
+        phase: i / 20,
+        angle: i * 2.399963,
+        speed: 0.52 + (i % 6) * 0.085,
+        spread: 0.34 + (i % 5) * 0.14,
+        seed: i
+      });
+    }
+
+    plume.visible = false;
+    parent.add(plume);
+    return { group: plume, layers, particles, baseGlow, length, radius };
   }
 
-  function makeJumpThrusters(root) {
+  function makeJumpThrusters(root, createGroundEffects = true) {
     const group = new THREE.Group();
     group.name = "sandbox-jump-thrusters";
     const housing = new THREE.MeshStandardMaterial({color:0x202c36,roughness:0.42,metalness:0.82});
@@ -101,7 +282,13 @@ export function createSandboxSystem(game) {
         addCylinder(group,0.052,0.052,0.012,[x,-0.012,z],aperture);
         const rim=new THREE.Mesh(new THREE.TorusGeometry(0.073,0.009,8,24),new THREE.MeshBasicMaterial({color:0x9cecff,transparent:true,opacity:0.55}));
         rim.position.set(x,-0.022,z); rim.rotation.x=Math.PI/2; group.add(rim);
-        jets.push({side:x<0?"left":"right",end:z<0?"rear":"front",plume:makeColdGasPlume(group,[x,-0.035,z],"down",0.48,0.11)});
+        jets.push({
+          side: x < 0 ? "left" : "right",
+          end: z < 0 ? "rear" : "front",
+          position: new THREE.Vector3(x, -0.035, z),
+          plume: makeColdGasPlume(group, [x, -0.035, z], "down", 1.42, 0.145),
+          groundWash: createGroundEffects ? makeGroundWash() : null
+        });
       }
     }
     root.add(group); return jets;
@@ -116,7 +303,7 @@ export function createSandboxSystem(game) {
       addBox(group,[0.19,0.105,0.23],[x,0.22,0.36],housing);
       addCylinder(group,0.079,0.102,0.15,[x,0.22,0.48],nozzle,[Math.PI/2,0,0]);
       addCylinder(group,0.055,0.055,0.012,[x,0.22,0.56],aperture,[Math.PI/2,0,0]);
-      jets.push(makeColdGasPlume(group,[x,0.22,0.57],"back",0.62,0.13));
+      jets.push(makeColdGasPlume(group, [x, 0.22, 0.57], "back", 1.32, 0.17));
     }
     root.add(group); return jets;
   }
@@ -159,11 +346,15 @@ export function createSandboxSystem(game) {
     if (previous) {
       visual.root.remove(previous.group);
       dispose(previous.group);
+      for (const jet of previous.liftFlames || []) {
+        scene.remove(jet.groundWash?.group);
+        if (jet.groundWash?.group) dispose(jet.groundWash.group);
+      }
     }
 
     const group = new THREE.Group();
     group.name = "sandbox-thruster-and-beacon-parts";
-    const liftFlames = ids.includes("lift") ? makeJumpThrusters(group) : [];
+    const liftFlames = ids.includes("lift") ? makeJumpThrusters(group, visual === localCar) : [];
     const forwardFlames = ids.includes("forward") ? makeForwardThrusters(group) : [];
     if (ids.includes("beacon")) makeImpulseBeaconModule(group);
     group.visible = visual === localCar ? active : true;
@@ -195,28 +386,99 @@ export function createSandboxSystem(game) {
     for (const jet of entry.forwardFlames) setColdGasJet(jet,forward,0);
   }
 
-  function setColdGasJet(jet,active,now) {
-    if(!jet?.group)return;
-    jet.group.visible=active;
-    if(!active)return;
-    const pulse=0.94+Math.sin(now*0.026)*0.045+Math.sin(now*0.011)*0.025;
-    jet.group.scale.set(pulse,0.9+pulse*0.12,pulse);
-    for(const layer of jet.layers)layer.material.opacity=layer.baseOpacity*(0.9+Math.sin(now*0.018)*0.08);
-    jet.particles.forEach((particle,index)=>particle.scale.setScalar(0.88+Math.sin(now*0.02+index)*0.18));
+  function setColdGasJet(jet, active, now) {
+    if (!jet?.group) return;
+    jet.group.visible = active;
+    if (!active) return;
+
+    const pulse = 0.96 + Math.sin(now * 0.026) * 0.055 + Math.sin(now * 0.011) * 0.035;
+    const flutter = Math.sin(now * 0.061 + 0.8) * 0.045;
+    jet.group.scale.set(1 + flutter, 0.94 + pulse * 0.08, 1 - flutter * 0.65);
+
+    jet.layers.forEach((layer, index) => {
+      const flicker = 0.76 + Math.sin(now * (0.025 + index * 0.006) + index * 1.7) * 0.16
+        + Math.sin(now * 0.071 + index * 2.4) * 0.08;
+      layer.material.opacity = layer.baseOpacity * flicker;
+      layer.mesh.scale.set(
+        1 + Math.sin(now * 0.033 + index) * 0.055,
+        0.94 + pulse * 0.08,
+        1 + Math.cos(now * 0.029 + index) * 0.05
+      );
+    });
+
+    if (jet.baseGlow) {
+      jet.baseGlow.material.opacity = 0.24 + Math.sin(now * 0.052) * 0.07;
+      jet.baseGlow.scale.x = jet.radius * (0.78 + pulse * 0.08);
+      jet.baseGlow.scale.z = jet.radius * (0.78 + pulse * 0.08);
+    }
+
+    jet.particles.forEach((particle) => {
+      const progress = (now * 0.001 * particle.speed + particle.phase) % 1;
+      const radial = jet.radius * (0.12 + progress * particle.spread);
+      const flicker = Math.sin(now * 0.047 + particle.seed * 2.1) * jet.radius * 0.09;
+      particle.mesh.position.set(
+        Math.cos(particle.angle) * (radial + flicker),
+        jet.length * (0.08 + progress * 0.86),
+        Math.sin(particle.angle) * (radial - flicker)
+      );
+      particle.mesh.scale.setScalar(0.62 + Math.sin(now * 0.039 + particle.seed) * 0.2);
+      particle.material.opacity = (0.12 + (1 - progress) * 0.22)
+        * (0.78 + Math.sin(now * 0.058 + particle.seed) * 0.22);
+    });
   }
 
   function updateThrusterVisuals(now) {
-    const state=getThrusterState();
-    const keys=game.controls?.keys||{};
-    const armed=flightControlArmed&&isVehicleInFlight();
-    const pitchInput=armed?(keys.s?1:0)-(keys.w?1:0):0;
-    const rollInput=armed?(keys.a?1:0)-(keys.d?1:0):0;
-    if(localAttachment){
-      for(const jet of localAttachment.liftFlames){
-        const firing=state.lift||(rollInput<0&&jet.side==="left")||(rollInput>0&&jet.side==="right")||(pitchInput>0&&jet.end==="rear")||(pitchInput<0&&jet.end==="front");
-        setColdGasJet(jet.plume,firing,now);
+    const state = getThrusterState();
+    const keys = game.controls?.keys || {};
+    const armed = flightControlArmed && isVehicleInFlight();
+    const pitchInput = armed ? (keys.s ? 1 : 0) - (keys.w ? 1 : 0) : 0;
+    const rollInput = armed ? (keys.a ? 1 : 0) - (keys.d ? 1 : 0) : 0;
+
+    if (!localAttachment) return;
+    localCar.root.updateMatrixWorld(true);
+    const exhaustDirection = new THREE.Vector3(0, -1, 0)
+      .applyQuaternion(localCar.root.quaternion)
+      .normalize();
+
+    for (const jet of localAttachment.liftFlames) {
+      const firing = state.lift ||
+        (rollInput < 0 && jet.side === "left") ||
+        (rollInput > 0 && jet.side === "right") ||
+        (pitchInput > 0 && jet.end === "rear") ||
+        (pitchInput < 0 && jet.end === "front");
+      setColdGasJet(jet.plume, firing, now);
+
+      // When a downward-facing nozzle is close enough to the surface, project
+      // its exhaust onto the terrain and animate a spreading dust/debris wash.
+      const wash = jet.groundWash;
+      if (!firing || exhaustDirection.y > -0.18) {
+        if (wash) wash.group.visible = false;
+        continue;
       }
-      for(const jet of localAttachment.forwardFlames)setColdGasJet(jet,state.forward,now);
+
+      const nozzleWorld = localCar.root.localToWorld(jet.position.clone());
+      const groundBelowNozzle = sampleGroundHeight(nozzleWorld.x, nozzleWorld.z);
+      const nozzleClearance = nozzleWorld.y - groundBelowNozzle;
+      if (nozzleClearance < 0.06 || nozzleClearance > 4.6) {
+        if (wash) wash.group.visible = false;
+        continue;
+      }
+
+      const distance = nozzleClearance / -exhaustDirection.y;
+      if (distance > 4.8) {
+        if (wash) wash.group.visible = false;
+        continue;
+      }
+
+      const impact = nozzleWorld.clone().addScaledVector(exhaustDirection, distance);
+      impact.y = sampleGroundHeight(impact.x, impact.z) + 0.028;
+      const alignment = THREE.MathUtils.clamp((-exhaustDirection.y - 0.14) / 0.76, 0, 1);
+      const strength = THREE.MathUtils.clamp(1 - distance / 5.0, 0, 1) * alignment;
+      updateGroundWash(wash, impact, distance, strength, exhaustDirection, now);
+    }
+
+    for (const jet of localAttachment.forwardFlames) {
+      setColdGasJet(jet, state.forward, now);
     }
   }
   function renderBuilder() {
