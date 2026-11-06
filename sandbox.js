@@ -618,7 +618,7 @@ export function createSandboxSystem(game) {
         1
       );
 
-      if (altitudeScale > 0 && delta > 0) {
+      if (delta > 0) {
         // Keep the climb rate stable in world-up, while allowing the truck's
         // tilt to steer the horizontal part of the thrust. Treat the altitude
         // fade as a soft hover ceiling rather than switching lift off at 7 m;
