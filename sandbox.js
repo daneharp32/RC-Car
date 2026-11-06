@@ -550,7 +550,7 @@ export function createSandboxSystem(game) {
 
   function postPhysicsUpdate(delta) {
     const state = getThrusterState();
-    const inFlight = active && inMap && isVehicleInFlight();
+    const inFlight = active && inMap && !game.isPaused?.() && isVehicleInFlight();
     if (!state.lift && !state.forward && !inFlight) return;
 
     // Work in the truck's local coordinate frame: X = pitch, Y = yaw,
