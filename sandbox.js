@@ -12,8 +12,9 @@ export function createSandboxSystem(game) {
   const cooldowns = { beacon: 0 };
   const BEACON_ARM_DELAY = 3000;
   const BEACON_TRIGGER_RADIUS = 8;
-  const MAX_THRUSTER_ALTITUDE = 7;
-  const ALTITUDE_FADE_RANGE = 2;
+  // Constant acceleration while Q is held. This is a directional thruster,
+  // not a height- or speed-hold controller.
+  const JUMP_THRUSTER_ACCELERATION = 26;
   const PARTS = [
     { id: "lift", title: "JUMP THRUSTERS" },
     { id: "forward", title: "FORWARD THRUSTERS" },
@@ -573,17 +574,18 @@ export function createSandboxSystem(game) {
       // W raises the nose, S lowers it. A rolls left, D rolls right.
       const pitchInput = (keys.s ? 1 : 0) - (keys.w ? 1 : 0);
       const rollInput = (keys.a ? 1 : 0) - (keys.d ? 1 : 0);
-      const response = 1 - Math.exp(-18 * Math.max(0, delta));
+      const response = 1 - Math.exp(-24 * Math.max(0, delta));
 
-      // Faster attitude response for more immediate mid-air steering.
-      const targetPitchRate = pitchInput * 2.65;
-      const targetRollRate = rollInput * 2.9;
+      // Faster attitude response gives the driver enough authority to redirect
+      // the jump-thruster vector quickly while airborne.
+      const targetPitchRate = pitchInput * 3.4;
+      const targetRollRate = rollInput * 3.7;
       localAngularVelocity.x += (targetPitchRate - localAngularVelocity.x) * response;
       localAngularVelocity.z += (targetRollRate - localAngularVelocity.z) * response;
       // Keep yaw calm; A/D are reserved for roll while in Sandbox flight.
       localAngularVelocity.y *= Math.exp(-5 * Math.max(0, delta));
-      localAngularVelocity.x = THREE.MathUtils.clamp(localAngularVelocity.x, -2.65, 2.65);
-      localAngularVelocity.z = THREE.MathUtils.clamp(localAngularVelocity.z, -2.9, 2.9);
+      localAngularVelocity.x = THREE.MathUtils.clamp(localAngularVelocity.x, -3.4, 3.4);
+      localAngularVelocity.z = THREE.MathUtils.clamp(localAngularVelocity.z, -3.7, 3.7);
     } else {
       // On the ground, Q must not introduce any pitch or roll. When forward
       // boost is used, damp unwanted rotation without taking over steering.
@@ -609,64 +611,22 @@ export function createSandboxSystem(game) {
       localAngularVelocity.z
     );
 
-    if (state.lift) {
-      const groundY = sampleGroundHeight(chassisBody.position.x, chassisBody.position.z);
-      const heightAboveGround = Math.max(0, chassisBody.position.y - groundY);
-      const altitudeScale = THREE.MathUtils.clamp(
-        (MAX_THRUSTER_ALTITUDE - heightAboveGround) / ALTITUDE_FADE_RANGE,
-        0,
-        1
-      );
+    if (state.lift && delta > 0) {
+      // Q applies continuous acceleration along the truck's actual local-up
+      // axis. Pitching nose-down redirects it forward; rolling redirects it
+      // sideways; flipping over points it toward the ground. There is no
+      // altitude ceiling or target-speed controller, so the car keeps
+      // accelerating in the direction it is aimed for as long as Q is held.
+      const localUp = new CANNON.Vec3(0, 1, 0);
+      const thrustDirection = new CANNON.Vec3();
+      chassisBody.quaternion.vmult(localUp, thrustDirection);
+      thrustDirection.normalize();
 
-      if (delta > 0) {
-        // Keep the climb rate stable in world-up, while allowing the truck's
-        // tilt to steer the horizontal part of the thrust. Treat the altitude
-        // fade as a soft hover ceiling rather than switching lift off at 7 m;
-        // that avoids the repeated rise/fall cycle near the ceiling.
-        const localUp = new CANNON.Vec3(0, 1, 0);
-        const thrustDirection = new CANNON.Vec3();
-        chassisBody.quaternion.vmult(localUp, thrustDirection);
-        thrustDirection.normalize();
-
-        const targetVerticalSpeed = 10.5 * altitudeScale;
-        const gravityAcceleration = Math.abs(Number(game.world?.gravity?.y ?? -9.82));
-        const gravityCompensation = gravityAcceleration * delta;
-        // postPhysicsUpdate runs after world.step has applied gravity. Add
-        // that step back when measuring the speed error so the hover feedback
-        // does not slowly over-correct and drift upward.
-        const verticalSpeedBeforeGravity = chassisBody.velocity.y + gravityCompensation;
-        const verticalSpeedError = targetVerticalSpeed - verticalSpeedBeforeGravity;
-        const velocityResponse = 1 - Math.exp(-8 * delta);
-        const maxVelocityChange = 26 * delta;
-        const verticalVelocityChange = THREE.MathUtils.clamp(
-          gravityCompensation + verticalSpeedError * velocityResponse,
-          -maxVelocityChange,
-          maxVelocityChange
-        );
-        chassisBody.velocity.y += verticalVelocityChange;
-
-        // The sideways thrust still follows the rotated local-up direction.
-        // Its influence fades with the same altitude envelope as before.
-        const horizontalDirection = new THREE.Vector3(
-          thrustDirection.x,
-          0,
-          thrustDirection.z
-        );
-        const horizontalTilt = horizontalDirection.length();
-        if (horizontalTilt > 0.0001 && altitudeScale > 0) {
-          horizontalDirection.divideScalar(horizontalTilt);
-          const horizontalRatio = THREE.MathUtils.clamp(
-            horizontalTilt / Math.max(0.35, thrustDirection.y),
-            0,
-            1.25
-          );
-          const horizontalVelocityChange =
-            verticalVelocityChange * horizontalRatio * altitudeScale;
-          chassisBody.velocity.x += horizontalDirection.x * horizontalVelocityChange;
-          chassisBody.velocity.z += horizontalDirection.z * horizontalVelocityChange;
-        }
-        chassisBody.wakeUp();
-      }
+      const velocityChange = JUMP_THRUSTER_ACCELERATION * delta;
+      chassisBody.velocity.x += thrustDirection.x * velocityChange;
+      chassisBody.velocity.y += thrustDirection.y * velocityChange;
+      chassisBody.velocity.z += thrustDirection.z * velocityChange;
+      chassisBody.wakeUp();
     }
   }
 
