@@ -676,7 +676,7 @@ export function createSandboxSystem(game) {
         else if (id === "beacon") label.textContent = "PRESS TO PLACE";
         else if (id === "orbital-laser") label.textContent =
           isLaserActive ? "SEQUENCE ACTIVE" :
-            performance.now() < cooldowns.orbitalLaser ? "RECHARGING" : "ACTIVATE MAP RESET";
+            Date.now() < cooldowns.orbitalLaser ? "RECHARGING" : "ACTIVATE MAP RESET";
         else if (isCharging) label.textContent = "CHARGING " + Math.round(launcherCharge.charge * 100) + "%";
         else if (performance.now() < cooldowns.launcher) label.textContent = "RECHARGING";
         else label.textContent = "HOLD · RELEASE TO FIRE";
