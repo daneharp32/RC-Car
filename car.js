@@ -662,14 +662,14 @@ function makeCarVisual(color, playerName = "") {
 
   // Slash-inspired short-course polycarbonate shell. The lofted orange skin,
   // black roof/hood, gray rear quarters, windows and trim are separate parts.
-  function makeBodyShell() {
+  function makeBodyShell(parent = shellGroup) {
     // Clean, low-profile short-course shell. The body is one continuous
     // faceted surface; the separate pieces below are limited to windows,
     // subtle livery, lamps, and bumpers so the silhouette remains readable.
     const shellGeometryGroup = new THREE.Group();
     shellGeometryGroup.name = "shell-geometry";
-    shellGeometryGroup.scale.z = 0.75;
-    shellGroup.add(shellGeometryGroup);
+    shellGeometryGroup.scale.z = classicShellDepthScale;
+    parent.add(shellGeometryGroup);
 
     const orange = new THREE.MeshStandardMaterial({
       color: 0xff4b0b,
@@ -733,7 +733,11 @@ function makeCarVisual(color, playerName = "") {
       wheelInfo.chassisConnectionPointLocal.y -
       wheelInfo.suspensionRestLength + 0.028;
     const visualTireRadius = 0.158;
-    const shellWheelCenters = [-0.29 / 0.75, 0.29 / 0.75];
+    const classicShellDepthScale = 0.75;
+    const shellWheelCenters = [
+      frontAxleZ / classicShellDepthScale,
+      rearAxleZ / classicShellDepthScale
+    ];
     const wheelArchHalfLength = 0.18;
     const lowerSillY = -0.055;
     const wheelArchTopY = wheelCenterY + visualTireRadius + 0.014;
@@ -741,8 +745,8 @@ function makeCarVisual(color, playerName = "") {
     // Longitudinal body blockout. Width, hood height, cab roof and bed top
     // are deliberately kept low and broad. Each row is [z, halfWidth, topY].
     const stations = [
-      [-0.670, 0.235, 0.105],
-      [-0.635, 0.292, 0.118],
+      [-0.840, 0.235, 0.105],
+      [-0.635, 0.365, 0.118],
       [-0.550, 0.340, 0.128],
       [-0.465, 0.365, 0.140],
       [-0.385, 0.370, 0.142],
@@ -754,8 +758,8 @@ function makeCarVisual(color, playerName = "") {
       [0.370, 0.368, 0.132],
       [0.455, 0.370, 0.140],
       [0.550, 0.340, 0.120],
-      [0.635, 0.288, 0.102],
-      [0.670, 0.228, 0.090]
+      [0.635, 0.365, 0.102],
+      [0.840, 0.228, 0.090]
     ];
 
     function profileAt(z) {
@@ -844,7 +848,7 @@ function makeCarVisual(color, playerName = "") {
     const sampleCount = 200;
 
     for (let row = 0; row <= sampleCount; row++) {
-      const z = THREE.MathUtils.lerp(-0.670, 0.670, row / sampleCount);
+      const z = THREE.MathUtils.lerp(-0.840, 0.840, row / sampleCount);
       const profile = profileAt(z);
       const width = profile.width;
       const top = profile.top;
@@ -879,9 +883,9 @@ function makeCarVisual(color, playerName = "") {
 
     // Close the front and rear ends with triangle fans.
     const startCap = ringPositions.length / 3;
-    ringPositions.push(0, (stations[0][2] + lowerSillY) * 0.5, -0.670);
+    ringPositions.push(0, (stations[0][2] + lowerSillY) * 0.5, -0.840);
     const endCap = ringPositions.length / 3;
-    ringPositions.push(0, (stations[stations.length - 1][2] + lowerSillY) * 0.5, 0.670);
+    ringPositions.push(0, (stations[stations.length - 1][2] + lowerSillY) * 0.5, 0.840);
     for (let column = 0; column < ringSize; column++) {
       const nextColumn = (column + 1) % ringSize;
       ringIndices.push(startCap, nextColumn, column);
@@ -1032,30 +1036,30 @@ function makeCarVisual(color, playerName = "") {
 
     // Thin grille, small headlights and simple full-width impact bumpers.
     addBox(mainShell, [0.405, 0.030, 0.012],
-      [0, 0.096, -0.646], charcoal);
+      [0, 0.096, -0.816], charcoal);
     for (let i = 0; i < 5; i++) {
       addBox(mainShell, [0.010, 0.021, 0.005],
-        [-0.12 + i * 0.060, 0.096, -0.654], silver);
+        [-0.12 + i * 0.060, 0.096, -0.822], silver);
     }
     for (const side of [-1, 1]) {
       addBox(mainShell, [0.070, 0.028, 0.012],
-        [side * 0.240, 0.102, -0.636], headlamp);
+        [side * 0.240, 0.102, -0.810], headlamp);
       addBox(mainShell, [0.065, 0.032, 0.010],
-        [side * 0.245, 0.090, 0.646], tailLamp);
+        [side * 0.245, 0.090, 0.810], tailLamp);
     }
     addBox(mainShell, [0.735, 0.050, 0.060],
-      [0, 0.035, -0.642], graphite);
+      [0, 0.035, -0.820], graphite);
     addBox(mainShell, [0.735, 0.050, 0.060],
-      [0, 0.035, 0.642], graphite);
+      [0, 0.035, 0.820], graphite);
   }
 
+  const prerunnerShellVisual = makePart(
+    shellGroup,
+    "prerunner-shell-visual",
+    "Concept4 Desert Racer prerunner shell",
+    "Painted blue Concept4 Desert Racer shell with its black hood and roof, racing number, grille, headlights, rear lamps and roof LED bar."
+  );
   if (shellModel) {
-    const importedShell = makePart(
-      shellGroup,
-      "concept4-desert-racer-shell",
-      "Concept4 Desert Racer prerunner shell",
-      "The painted blue Concept4 prerunner body, including its black hood and roof, open cab windows, racing number, grille, headlights, rear lamps and roof LED bar. The shell keeps its original proportions and is uniformly scaled to the chassis wheel-arch spacing."
-    );
     const importedShellVisual = shellModel.clone(true);
     importedShellVisual.name = "Concept4 Desert Racer painted body";
     importedShellVisual.traverse((object) => {
@@ -1064,28 +1068,48 @@ function makeCarVisual(color, playerName = "") {
       object.receiveShadow = false;
       object.frustumCulled = true;
     });
-    importedShell.add(importedShellVisual);
-  } else {
-    makeBodyShell();
+    prerunnerShellVisual.add(importedShellVisual);
   }
 
-  // All internal chassis components remain present and retain their original
-  // dimensions. The shell mesh is lifted to provide the required clearance.
+  const classicShellVisual = makePart(
+    shellGroup,
+    "classic-orange-shell-visual",
+    "Classic orange short-course shell",
+    "The original orange, black and graphite short-course shell, including its low cab, front and rear windows, side number panel, wheel arches, grille and bumpers."
+  );
+  makeBodyShell(classicShellVisual);
 
-  // All painted shell surfaces share one garage hover identity. The chassis
-  // retains its own individual component labels when the shell is removed.
-  shellGroup.userData.partInfo = {
-    id: "short-course-body-shell",
-    label: shellModel ? "Concept4 Desert Racer prerunner shell" : "Short-course truck body shell",
-    description: shellModel
-      ? "Painted blue Concept4 Desert Racer shell with its original shape preserved and uniformly fitted to the existing wheelbase."
-      : "Complete orange, black and graphite-gray short-course body shell, including the hood, cab, windows, rear bed, fenders and exterior trim."
-  };
+  // Keep both body options available. The old shell is generated around the
+  // current wheelbase, so its wheel arches line up without distorting it.
+  let shellStyle = "prerunner";
+  function setShellStyle(style) {
+    const requested = style === "classic" ? "classic" : "prerunner";
+    shellStyle = requested === "prerunner" && shellModel ? "prerunner" : "classic";
+    prerunnerShellVisual.visible = shellStyle === "prerunner";
+    classicShellVisual.visible = shellStyle === "classic";
+    shellGroup.userData.partInfo = shellStyle === "classic"
+      ? {
+          id: "short-course-body-shell",
+          label: "Classic orange short-course shell",
+          description: "The original orange, black and graphite short-course shell, with its original styling restored and its wheel arches fitted to the current chassis."
+        }
+      : {
+          id: "short-course-body-shell",
+          label: "Concept4 Desert Racer prerunner shell",
+          description: "Painted blue Concept4 Desert Racer shell with its original proportions preserved and uniformly fitted to the chassis."
+        };
+    return shellStyle;
+  }
+
   shellGroup.traverse((object) => {
     if (object !== shellGroup && object.userData) {
       delete object.userData.partInfo;
     }
   });
+  setShellStyle(shellModel ? "prerunner" : "classic");
+
+  // All internal chassis components remain present and retain their original
+  // dimensions; either body shell can be removed to inspect the running gear.
 
   let playerNameSprite = null;
   function setPlayerName(name, visible = true) {
@@ -1162,6 +1186,8 @@ function makeCarVisual(color, playerName = "") {
     shellGroup,
     chassisGroup,
     setShellVisible(visible) { shellGroup.visible = !!visible; },
+    setShellStyle,
+    get shellStyle() { return shellStyle; },
     setPlayerName
   };
 }
