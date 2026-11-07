@@ -21,6 +21,7 @@ export function createSandboxSystem(game) {
   const LAUNCHER_COOLDOWN_MS = 900;
   const ORB_GRAVITY = 9.82;
   const ORB_RADIUS = 0.22;
+  const GRAVITY_ORB_ELEVATION = 0.34;
   // Constant acceleration while Q is held. This is a directional thruster,
   // not a height- or speed-hold controller.
   const JUMP_THRUSTER_ACCELERATION = 26;
@@ -304,18 +305,30 @@ export function createSandboxSystem(game) {
     root.add(group); return jets;
   }
   function makeForwardThrusters(root) {
-    const group=new THREE.Group(); group.name="sandbox-forward-thrusters";
-    const housing=new THREE.MeshStandardMaterial({color:0x18242e,roughness:0.38,metalness:0.84});
-    const nozzle=new THREE.MeshStandardMaterial({color:0x9aadb7,roughness:0.23,metalness:0.9});
-    const aperture=new THREE.MeshStandardMaterial({color:0x07131c,roughness:0.28,metalness:0.55});
-    const jets=[];
-    for(const x of [-0.22,0.22]){
-      addBox(group,[0.19,0.105,0.23],[x,0.22,0.36],housing);
-      addCylinder(group,0.079,0.102,0.15,[x,0.22,0.48],nozzle,[Math.PI/2,0,0]);
-      addCylinder(group,0.055,0.055,0.012,[x,0.22,0.56],aperture,[Math.PI/2,0,0]);
-      jets.push(makeColdGasPlume(group, [x, 0.22, 0.57], "back", 1.32, 0.17));
+    const group = new THREE.Group();
+    group.name = "sandbox-forward-thrusters";
+    const housing = new THREE.MeshStandardMaterial({
+      color: 0x18242e, roughness: 0.38, metalness: 0.84
+    });
+    const nozzle = new THREE.MeshStandardMaterial({
+      color: 0x9aadb7, roughness: 0.23, metalness: 0.9
+    });
+    const aperture = new THREE.MeshStandardMaterial({
+      color: 0x07131c, roughness: 0.28, metalness: 0.55
+    });
+    const jets = [];
+    for (const x of [-0.22, 0.22]) {
+      // Mount these at the rear of the chassis. The nozzle, aperture, and plume
+      // all share the same axis, with the exhaust extending rearward (-Z).
+      addBox(group, [0.19, 0.105, 0.23], [x, 0.22, -0.36], housing);
+      addCylinder(group, 0.079, 0.102, 0.15, [x, 0.22, -0.48], nozzle,
+        [-Math.PI / 2, 0, 0]);
+      addCylinder(group, 0.055, 0.055, 0.012, [x, 0.22, -0.56], aperture,
+        [-Math.PI / 2, 0, 0]);
+      jets.push(makeColdGasPlume(group, [x, 0.22, -0.57], "back", 1.32, 0.17));
     }
-    root.add(group); return jets;
+    root.add(group);
+    return jets;
   }
   function makeImpulseBeaconModule(root) {
     const group = new THREE.Group();
@@ -355,15 +368,23 @@ export function createSandboxSystem(game) {
     });
     addBox(group, [0.48, 0.10, 0.52], [0, 0.24, -0.12], mount);
     addBox(group, [0.13, 0.20, 0.15], [0, 0.39, -0.20], mount);
-    const tube = addCylinder(group, 0.115, 0.15, 0.82, [0, 0.51, -0.42], barrel,
-      [-Math.PI / 2 + 0.70, 0, 0]);
+    const tube = addCylinder(
+      group, 0.115, 0.15, 0.82, [0, 0.51, -0.42], barrel,
+      [-Math.PI / 2 + GRAVITY_ORB_ELEVATION, 0, 0]
+    );
     tube.castShadow = true;
+    // Match the muzzle ring and glowing chamber to the barrel's reduced angle.
+    const muzzlePosition = new THREE.Vector3(
+      0,
+      0.51 + 0.41 * Math.sin(GRAVITY_ORB_ELEVATION),
+      -0.42 - 0.41 * Math.cos(GRAVITY_ORB_ELEVATION)
+    );
     const muzzle = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.018, 8, 28), blue);
-    muzzle.position.set(0, 0.78, -0.72);
-    muzzle.rotation.x = -Math.PI + 0.70;
+    muzzle.position.copy(muzzlePosition);
+    muzzle.rotation.x = GRAVITY_ORB_ELEVATION;
     group.add(muzzle);
     const statusOrb = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 10), blue);
-    statusOrb.position.set(0, 0.78, -0.72);
+    statusOrb.position.copy(muzzlePosition);
     group.add(statusOrb);
     root.add(group);
   }
@@ -407,9 +428,27 @@ export function createSandboxSystem(game) {
     return [...loadout].slice(0, MAX_EQUIPPED_GADGETS);
   }
 
+  function getSlotAssignments() {
+    const equipped = getLoadout();
+    const slots = { q: null, e: null, f: null };
+
+    // Thrusters keep their dedicated controls even when the loadout changes.
+    if (equipped.includes("lift")) slots.q = "lift";
+    if (equipped.includes("forward")) slots.e = "forward";
+
+    // Other gadgets fill the remaining keys in the order they were equipped.
+    const availableKeys = SLOT_KEYS.filter((key) => !slots[key]);
+    for (const id of equipped) {
+      if (id === "lift" || id === "forward") continue;
+      const key = availableKeys.shift();
+      if (!key) break;
+      slots[key] = id;
+    }
+    return slots;
+  }
+
   function getPartForKey(key) {
-    const index = SLOT_KEYS.indexOf(key);
-    return index < 0 ? null : (getLoadout()[index] || null);
+    return getSlotAssignments()[key] || null;
   }
 
   function getThrusterState() {
@@ -525,27 +564,27 @@ export function createSandboxSystem(game) {
     }
   }
   function renderBuilder() {
-    const orderedLoadout = getLoadout();
+    const slotAssignments = getSlotAssignments();
     document.querySelectorAll("[data-sandbox-part]").forEach((button) => {
       const id = button.dataset.sandboxPart;
       const equipped = loadout.has(id);
-      const slotIndex = orderedLoadout.indexOf(id);
+      const assignedKey = SLOT_KEYS.find((key) => slotAssignments[key] === id);
       button.classList.toggle("equipped", equipped);
       button.setAttribute("aria-pressed", equipped ? "true" : "false");
       const label = button.querySelector(".sandbox-part-action");
       if (label) {
         label.textContent = equipped
-          ? SLOT_KEYS[slotIndex].toUpperCase() + " SLOT · REMOVE"
+          ? assignedKey.toUpperCase() + " SLOT · REMOVE"
           : loadout.size >= MAX_EQUIPPED_GADGETS ? "3 SLOTS FULL" : "ADD TO TRUCK";
       }
     });
     const equippedLabel = $("sandboxEquippedValue");
     if (equippedLabel) {
-      equippedLabel.textContent = orderedLoadout.length
-        ? orderedLoadout.map((id, index) =>
-          SLOT_KEYS[index].toUpperCase() + ": " + (PARTS.find((part) => part.id === id)?.title || id)
-        ).join(" · ")
-        : "NO GADGETS EQUIPPED";
+      equippedLabel.textContent = SLOT_KEYS
+        .filter((key) => slotAssignments[key])
+        .map((key) => key.toUpperCase() + ": " +
+          (PARTS.find((part) => part.id === slotAssignments[key])?.title || slotAssignments[key]))
+        .join(" · ") || "NO GADGETS EQUIPPED";
     }
     const mapLabel = $("sandboxBuilderMapLabel");
     if (mapLabel) {
@@ -559,10 +598,11 @@ export function createSandboxSystem(game) {
     if (!controlsPanel) return;
     controlsPanel.style.display = active && inMap ? "flex" : "none";
     const status = getThrusterState();
+    const slotAssignments = getSlotAssignments();
     document.querySelectorAll("[data-sandbox-slot]").forEach((item) => {
       const slotIndex = Number(item.dataset.sandboxSlot);
       const key = SLOT_KEYS[slotIndex];
-      const id = getLoadout()[slotIndex] || null;
+      const id = slotAssignments[key] || null;
       const part = PARTS.find((candidate) => candidate.id === id);
       const keyLabel = item.querySelector("kbd");
       const title = item.querySelector("strong");
@@ -748,10 +788,16 @@ export function createSandboxSystem(game) {
       chassisBody.position.x,
       chassisBody.position.y,
       chassisBody.position.z
-    ).add(new THREE.Vector3(0, 0.78, -0.72).applyQuaternion(orientation));
-    const direction = new THREE.Vector3(0, Math.sin(0.72), -Math.cos(0.72))
-      .applyQuaternion(orientation)
-      .normalize();
+    ).add(new THREE.Vector3(
+      0,
+      0.51 + 0.41 * Math.sin(GRAVITY_ORB_ELEVATION),
+      -0.42 - 0.41 * Math.cos(GRAVITY_ORB_ELEVATION)
+    ).applyQuaternion(orientation));
+    const direction = new THREE.Vector3(
+      0,
+      Math.sin(GRAVITY_ORB_ELEVATION),
+      -Math.cos(GRAVITY_ORB_ELEVATION)
+    ).applyQuaternion(orientation).normalize();
     const speed = 12 + THREE.MathUtils.clamp(charge, 0, 1) * 15;
     return { origin, velocity: direction.multiplyScalar(speed) };
   }
