@@ -354,7 +354,8 @@ function buildMergedPrerunnerVisual(sourceScene) {
     if (front && outerLamp && (
       materialName.includes("light housings") ||
       materialName.includes("silver trim") ||
-      materialName.includes("LED lens")
+      materialName.includes("LED lens") ||
+      materialName.includes("marker LED")
     )) {
       return [0, 0, -0.16];
     }
@@ -379,7 +380,8 @@ function buildMergedPrerunnerVisual(sourceScene) {
     if (rear && outerLamp && (
       materialName.includes("light housings") ||
       materialName.includes("silver trim") ||
-      materialName.includes("rear LED lens")
+      materialName.includes("rear LED lens") ||
+      materialName.includes("marker LED")
     )) {
       return [-side * 0.11, 0, 0];
     }
