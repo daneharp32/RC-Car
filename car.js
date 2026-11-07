@@ -666,6 +666,7 @@ function makeCarVisual(color, playerName = "") {
     // Clean, low-profile short-course shell. The body is one continuous
     // faceted surface; the separate pieces below are limited to windows,
     // subtle livery, lamps, and bumpers so the silhouette remains readable.
+    const classicShellDepthScale = 0.75;
     const shellGeometryGroup = new THREE.Group();
     shellGeometryGroup.name = "shell-geometry";
     shellGeometryGroup.scale.z = classicShellDepthScale;
@@ -733,7 +734,6 @@ function makeCarVisual(color, playerName = "") {
       wheelInfo.chassisConnectionPointLocal.y -
       wheelInfo.suspensionRestLength + 0.028;
     const visualTireRadius = 0.158;
-    const classicShellDepthScale = 0.75;
     const shellWheelCenters = [
       frontAxleZ / classicShellDepthScale,
       rearAxleZ / classicShellDepthScale
