@@ -180,7 +180,13 @@ function updateDrivingControls(delta) {
   const sandboxThrusterState = game.sandbox?.getThrusterState?.();
   const signedForwardSpeed = chassisBody.velocity.dot(worldForwardAxis);
   const boosterSpeedScale = THREE.MathUtils.clamp((15.5 - signedForwardSpeed) / 3.5, 0, 1);
-  const boosterForce = sandboxThrusterState?.forward ? 48 * boosterSpeedScale : 0;
+  const sandboxThrusterTuning = game.sandbox?.getThrusterTuning?.() || {};
+  const forwardThrusterPower = Number.isFinite(sandboxThrusterTuning.forwardPower)
+    ? sandboxThrusterTuning.forwardPower
+    : 48;
+  const boosterForce = sandboxThrusterState?.forward
+    ? forwardThrusterPower * boosterSpeedScale
+    : 0;
   const engineForce = (throttleState * 30 + boosterForce) * speedLimitScale;
   for (let i = 0; i < 4; i++) {
     vehicle.applyEngineForce(engineForce, i);
