@@ -416,6 +416,7 @@ function updateLocalVisual() {
     );
     localPosition.applyQuaternion(inverseRoot);
     localPosition.z *= VISUAL_CHASSIS_LENGTH_SCALE;
+    localPosition.divideScalar(localCar.root.scale.x || 1);
     worldWheelQuaternion.set(
       transform.quaternion.x,
       transform.quaternion.y,

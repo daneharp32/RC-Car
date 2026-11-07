@@ -259,6 +259,84 @@ for (let i = 0; i < 4; i++) {
 }
 vehicle.addToWorld(world);
 
+// Sandbox-only size tuning. Keep base geometry and wheel data so changes are
+// reversible and never accumulate rounding error across slider adjustments.
+const baseChassisMass = chassisBody.mass;
+const baseChassisShapes = chassisBody.shapes.map((shape, index) => ({
+  shape,
+  halfExtents: shape.halfExtents?.clone?.() || null,
+  offset: chassisBody.shapeOffsets[index].clone()
+}));
+const baseWheelSettings = vehicle.wheelInfos.map((wheel) => ({
+  connection: wheel.chassisConnectionPointLocal.clone(),
+  radius: wheel.radius,
+  suspensionRestLength: wheel.suspensionRestLength,
+  maxSuspensionTravel: wheel.maxSuspensionTravel,
+  maxSuspensionForce: wheel.maxSuspensionForce,
+  suspensionStiffness: wheel.suspensionStiffness,
+  dampingCompression: wheel.dampingCompression,
+  dampingRelaxation: wheel.dampingRelaxation
+}));
+let vehicleScale = 1;
+
+function setVehicleScale(value) {
+  const requested = Number(value);
+  if (!Number.isFinite(requested)) return vehicleScale;
+  const nextScale = Math.max(0.6, Math.min(1.8, requested));
+  if (Math.abs(nextScale - vehicleScale) < 0.0001) return vehicleScale;
+
+  const previousScale = vehicleScale;
+  const massScale = nextScale * nextScale * nextScale;
+  vehicleScale = nextScale;
+
+  for (let index = 0; index < baseChassisShapes.length; index++) {
+    const base = baseChassisShapes[index];
+    if (base.halfExtents && base.shape.halfExtents) {
+      base.shape.halfExtents.set(
+        base.halfExtents.x * nextScale,
+        base.halfExtents.y * nextScale,
+        base.halfExtents.z * nextScale
+      );
+      base.shape.updateConvexPolyhedronRepresentation?.();
+      base.shape.updateBoundingSphereRadius?.();
+    }
+    chassisBody.shapeOffsets[index].set(
+      base.offset.x * nextScale,
+      base.offset.y * nextScale,
+      base.offset.z * nextScale
+    );
+  }
+
+  for (let index = 0; index < baseWheelSettings.length; index++) {
+    const base = baseWheelSettings[index];
+    const wheel = vehicle.wheelInfos[index];
+    wheel.chassisConnectionPointLocal.set(
+      base.connection.x * nextScale,
+      base.connection.y * nextScale,
+      base.connection.z * nextScale
+    );
+    wheel.radius = base.radius * nextScale;
+    wheel.suspensionRestLength = base.suspensionRestLength * nextScale;
+    wheel.suspensionLength = base.suspensionRestLength * nextScale;
+    wheel.maxSuspensionTravel = base.maxSuspensionTravel * nextScale;
+    wheel.maxSuspensionForce = base.maxSuspensionForce * massScale;
+    wheel.suspensionStiffness = base.suspensionStiffness * nextScale * nextScale;
+    wheel.dampingCompression = base.dampingCompression * nextScale * nextScale;
+    wheel.dampingRelaxation = base.dampingRelaxation * nextScale * nextScale;
+    vehicle.updateWheelTransform(index);
+  }
+
+  chassisBody.mass = baseChassisMass * massScale;
+  chassisBody.position.y += 0.24 * (nextScale - previousScale);
+  chassisBody.updateMassProperties();
+  chassisBody.updateBoundingRadius();
+  chassisBody.updateInertiaWorld(true);
+  chassisBody.aabbNeedsUpdate = true;
+  chassisBody.wakeUp();
+  world.broadphase.dirty = true;
+  return vehicleScale;
+}
+
 // Matching static boxes make the alternating red/white perimeter curbs solid.
 for (const barrier of trackLayout.barriers) {
   const barrierBody = new CANNON.Body({
@@ -349,6 +427,8 @@ for (const [mapId, layout] of alternateMapLayouts) {
     spawnZ,
     spawnYaw,
     getSpawn,
-    setActiveMap
+    setActiveMap,
+    setVehicleScale,
+    getVehicleScale() { return vehicleScale; }
   };
 }

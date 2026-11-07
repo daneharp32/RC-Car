@@ -58,6 +58,7 @@ export function createMultiplayerSystem(game) {
       race: game.race ? game.race.getNetworkState() : null,
       ...(currentLobby?.mode === "sandbox" ? {
         inMap: game.sandbox?.inMap === true,
+        carScale: game.sandbox?.getVehicleScale?.() ?? 1,
         loadout: game.sandbox?.getLoadout?.() || [],
         thrusters: game.sandbox?.getThrusterState?.() || { lift: false, forward: false }
       } : {})
@@ -265,6 +266,10 @@ export function createMultiplayerSystem(game) {
       remote.lastSeen = performance.now();
       if (currentLobby?.mode === "sandbox") {
         remote.visual.root.visible = data.inMap === true;
+        const remoteCarScale = Number.isFinite(data.carScale)
+          ? Math.max(0.6, Math.min(1.8, data.carScale))
+          : 1;
+        remote.visual.root.scale.setScalar(remoteCarScale);
         game.sandbox?.applyRemoteLoadout?.(remote.visual, data.loadout);
         game.sandbox?.applyRemoteThrusterState?.(remote.visual, data.thrusters);
       }

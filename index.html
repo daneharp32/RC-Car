@@ -248,7 +248,7 @@
     .sandbox-builder-hint { color:#75bfff; font-size:9px; line-height:1.5; letter-spacing:.045em; }
     @media (max-width:700px) { .sandbox-builder-card { left:10px; top:66px; bottom:10px; width:min(330px,calc(100vw - 20px)); padding:15px; gap:9px; } .sandbox-builder-title { font-size:21px; } .sandbox-part-card { min-height:62px; padding:9px; } .sandbox-builder-copy { font-size:10px; } }
     .sandbox-secret-menu {
-      position:absolute; z-index:30; right:22px; top:82px; bottom:22px;
+      position:fixed; z-index:100; right:22px; top:82px; bottom:22px;
       width:min(390px,calc(100vw - 36px)); overflow-y:auto; pointer-events:auto;
       display:none; padding:20px; border:1px solid rgba(91,174,255,.45);
       border-radius:16px; color:#eaf5ff; background:rgba(4,13,27,.96);
@@ -683,18 +683,30 @@
       <button id="sandboxEnterMapButton" class="menu-button" type="button">ENTER MAP</button>
       <button id="sandboxLeaveButton" type="button">LEAVE SANDBOX SESSION</button>
     </div>
-    <div id="sandboxSecretMenu" class="sandbox-secret-menu" role="dialog" aria-label="Secret Sandbox workshop">
+
+  </section>
+
+
+  <div id="sandboxSecretMenu" class="sandbox-secret-menu" role="dialog" aria-label="Sandbox secret menu">
       <div class="sandbox-secret-header">
-        <h2 class="sandbox-secret-title">HIDDEN WORKSHOP</h2>
+        <h2 class="sandbox-secret-title">SANDBOX SECRET MENU</h2>
         <button id="secretMenuClose" class="sandbox-secret-close" type="button" aria-label="Close secret menu">×</button>
       </div>
-      <p class="sandbox-secret-copy">Experimental Sandbox settings. Changes apply to your truck and your own gadget behavior.</p>
+      <p class="sandbox-secret-copy">Sandbox-only live settings. Press D + H again to close. Controls pause while this panel is open.</p>
       <div id="sandboxSecretStatus" class="sandbox-secret-status">STANDARD LIMIT: 3 GADGETS</div>
+      <label class="sandbox-secret-toggle">
+        <input id="secretNoCooldown" type="checkbox">
+        <span>NO COOLDOWN · GADGETS CAN BE REUSED IMMEDIATELY</span>
+      </label>
       <label class="sandbox-secret-toggle">
         <input id="secretInfiniteGadgets" type="checkbox">
         <span>INFINITE GADGETS · REMOVE THE 3-PART LIMIT</span>
       </label>
       <div class="sandbox-secret-settings">
+        <div class="sandbox-secret-setting">
+          <label for="secretCarSize"><span>CAR SIZE</span><strong id="secretCarSizeValue">1.00×</strong></label>
+          <input id="secretCarSize" type="range" min="0.6" max="1.8" step="0.05" value="1">
+        </div>
         <div class="sandbox-secret-setting">
           <label for="secretGravityOrbRadius"><span>GRAVITY ORB BURST RADIUS</span><strong id="secretGravityOrbRadiusValue">1.0×</strong></label>
           <input id="secretGravityOrbRadius" type="range" min="0.5" max="5" step="0.1" value="1">
@@ -719,7 +731,7 @@
         <button id="secretOrbitalLaserButton" type="button">INSTALL ORBITAL LASER</button>
       </div>
     </div>
-  </section>
+
 
   <section id="joinPanel" class="menu-screen" style="display:none">
     <div class="menu-content create-lobby-content">
