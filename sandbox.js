@@ -595,6 +595,11 @@ export function createSandboxSystem(game) {
   function clearHeldControls() {
     held.lift = false;
     held.forward = false;
+    for (const key of Object.keys(heldAssignments)) delete heldAssignments[key];
+    launcherCharge.key = null;
+    launcherCharge.startedAt = 0;
+    launcherCharge.charge = 0;
+    if (gravityOrbAimIndicator) gravityOrbAimIndicator.group.visible = false;
     flightControlArmed = false;
     updateThrusterVisuals(performance.now());
     renderControlHints();
@@ -730,6 +735,310 @@ export function createSandboxSystem(game) {
     const a = rows[x0][z0] * (1 - tz) + rows[x0][z0 + 1] * tz;
     const b = rows[x0 + 1][z0] * (1 - tz) + rows[x0 + 1][z0 + 1] * tz;
     return a * (1 - tx) + b * tx;
+  }
+
+  function getGravityOrbLaunchState(charge) {
+    const orientation = new THREE.Quaternion(
+      chassisBody.quaternion.x,
+      chassisBody.quaternion.y,
+      chassisBody.quaternion.z,
+      chassisBody.quaternion.w
+    );
+    const origin = new THREE.Vector3(
+      chassisBody.position.x,
+      chassisBody.position.y,
+      chassisBody.position.z
+    ).add(new THREE.Vector3(0, 0.60, -0.82).applyQuaternion(orientation));
+    const direction = new THREE.Vector3(0, Math.sin(0.72), -Math.cos(0.72))
+      .applyQuaternion(orientation)
+      .normalize();
+    const speed = 12 + THREE.MathUtils.clamp(charge, 0, 1) * 15;
+    return { origin, velocity: direction.multiplyScalar(speed) };
+  }
+
+  function getOrbPosition(start, velocity, time) {
+    return new THREE.Vector3(
+      start.x + velocity.x * time,
+      start.y + velocity.y * time - 0.5 * ORB_GRAVITY * time * time,
+      start.z + velocity.z * time
+    );
+  }
+
+  function predictOrbImpact(start, velocity) {
+    const step = 0.04;
+    const maxTime = 6;
+    for (let time = step; time <= maxTime; time += step) {
+      const position = getOrbPosition(start, velocity, time);
+      const groundY = sampleGroundHeight(position.x, position.z);
+      if (position.y - ORB_RADIUS <= groundY) {
+        return {
+          time,
+          position: new THREE.Vector3(position.x, groundY + ORB_RADIUS, position.z)
+        };
+      }
+    }
+    const position = getOrbPosition(start, velocity, maxTime);
+    const groundY = sampleGroundHeight(position.x, position.z);
+    return {
+      time: maxTime,
+      position: new THREE.Vector3(position.x, groundY + ORB_RADIUS, position.z)
+    };
+  }
+
+  function makeGravityOrbAimIndicator() {
+    const group = new THREE.Group();
+    group.name = "gravity-orb-landing-indicator";
+    const diskMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff3030, transparent: true, opacity: 0.14,
+      depthWrite: false, side: THREE.DoubleSide, toneMapped: false
+    });
+    const ringMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff4545, transparent: true, opacity: 0.88,
+      depthWrite: false, side: THREE.DoubleSide, toneMapped: false
+    });
+    const centerMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff7777, transparent: true, opacity: 0.92,
+      depthWrite: false, toneMapped: false
+    });
+    const disk = new THREE.Mesh(new THREE.CircleGeometry(1.18, 48), diskMaterial);
+    disk.rotation.x = -Math.PI / 2;
+    disk.position.y = 0.018;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.28, 0.045, 8, 48), ringMaterial);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 0.035;
+    const center = new THREE.Mesh(new THREE.CircleGeometry(0.15, 24), centerMaterial);
+    center.rotation.x = -Math.PI / 2;
+    center.position.y = 0.04;
+    group.add(disk, ring, center);
+    group.visible = false;
+    scene.add(group);
+    return { group, diskMaterial, ringMaterial };
+  }
+
+  function updateGravityOrbAimIndicator(prediction, charge) {
+    if (!gravityOrbAimIndicator || !prediction) return;
+    const indicator = gravityOrbAimIndicator;
+    indicator.group.position.set(
+      prediction.position.x,
+      sampleGroundHeight(prediction.position.x, prediction.position.z) + 0.045,
+      prediction.position.z
+    );
+    indicator.group.scale.setScalar(0.9 + charge * 0.18);
+    indicator.diskMaterial.opacity = 0.10 + charge * 0.12;
+    indicator.ringMaterial.opacity = 0.72 + charge * 0.25;
+    indicator.group.visible = true;
+  }
+
+  function makeGravityOrbVisual() {
+    const group = new THREE.Group();
+    group.name = "bright-blue-gravity-orb";
+    const shellMaterial = new THREE.MeshBasicMaterial({
+      color: 0x168fff, transparent: true, opacity: 0.62,
+      blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false
+    });
+    const coreMaterial = new THREE.MeshBasicMaterial({
+      color: 0xc8f5ff, toneMapped: false
+    });
+    const haloMaterial = new THREE.MeshBasicMaterial({
+      color: 0x087dff, transparent: true, opacity: 0.22,
+      blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false
+    });
+    const halo = new THREE.Mesh(new THREE.SphereGeometry(0.34, 18, 14), haloMaterial);
+    const shell = new THREE.Mesh(new THREE.SphereGeometry(0.25, 18, 14), shellMaterial);
+    const core = new THREE.Mesh(new THREE.SphereGeometry(0.145, 16, 12), coreMaterial);
+    group.add(halo, shell, core);
+    const ringMaterial = new THREE.MeshBasicMaterial({
+      color: 0x5ecaff, transparent: true, opacity: 0.88,
+      blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false
+    });
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.30, 0.022, 7, 28), ringMaterial);
+    ring.rotation.x = Math.PI / 2;
+    group.add(ring);
+    scene.add(group);
+
+    const trailGeometry = new THREE.BufferGeometry();
+    trailGeometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(54), 3));
+    trailGeometry.setDrawRange(0, 0);
+    const trailMaterial = new THREE.LineBasicMaterial({
+      color: 0x168fff, transparent: true, opacity: 0.88,
+      blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false
+    });
+    const trail = new THREE.Line(trailGeometry, trailMaterial);
+    trail.frustumCulled = false;
+    scene.add(trail);
+    return {
+      group, halo, ring, trail, trailGeometry, trailMaterial,
+      trailPoints: [], shellMaterial, haloMaterial, ringMaterial
+    };
+  }
+
+  function updateGravityOrbVisual(visual, position, age) {
+    visual.group.position.copy(position);
+    visual.halo.scale.setScalar(1 + Math.sin(age * 22) * 0.08);
+    visual.ring.rotation.z += 0.11;
+    const points = visual.trailPoints;
+    if (!points.length || points[points.length - 1].distanceToSquared(position) > 0.012) {
+      points.push(position.clone());
+      if (points.length > 18) points.shift();
+    }
+    const attribute = visual.trailGeometry.getAttribute("position");
+    points.forEach((point, index) => attribute.setXYZ(index, point.x, point.y, point.z));
+    attribute.needsUpdate = true;
+    visual.trailGeometry.setDrawRange(0, points.length);
+  }
+
+  function removeGravityOrbVisual(visual) {
+    if (!visual) return;
+    scene.remove(visual.group);
+    scene.remove(visual.trail);
+    dispose(visual.group);
+    visual.trailGeometry.dispose();
+    visual.trailMaterial.dispose();
+  }
+
+  function applyGravityBurst(origin, charge) {
+    const dx = chassisBody.position.x - origin.x;
+    const dz = chassisBody.position.z - origin.z;
+    const radius = 10 + charge * 6;
+    const distance = Math.hypot(dx, dz);
+    if (distance >= radius) return false;
+
+    const falloff = THREE.MathUtils.clamp(1 - distance / radius, 0, 1);
+    const strength = Math.pow(falloff, 0.72);
+    const outward = new THREE.Vector3(dx, 0, dz);
+    if (outward.lengthSq() < 0.0001) outward.set(0.6, 0, -0.4);
+    outward.normalize();
+
+    // A brief upward-and-outward game impulse sends nearby RC cars skyward.
+    // The impulse is mass-scaled by Cannon, so every truck gets the same feel.
+    const horizontalImpulse = (42 + charge * 48) * strength;
+    const verticalImpulse = (135 + charge * 120) * strength;
+    chassisBody.applyImpulse(new CANNON.Vec3(
+      outward.x * horizontalImpulse,
+      verticalImpulse,
+      outward.z * horizontalImpulse
+    ));
+    const spin = (2.5 + charge * 3.5) * strength;
+    chassisBody.angularVelocity.x = THREE.MathUtils.clamp(
+      chassisBody.angularVelocity.x + outward.z * spin, -13, 13
+    );
+    chassisBody.angularVelocity.z = THREE.MathUtils.clamp(
+      chassisBody.angularVelocity.z - outward.x * spin, -13, 13
+    );
+    chassisBody.wakeUp();
+    return true;
+  }
+
+  function triggerGravityOrbImpact(position, charge) {
+    applyGravityBurst(position, charge);
+    createBounceWave(
+      new THREE.Vector3(position.x, position.y + 0.12, position.z),
+      0x168fff,
+      1.28 + charge * 0.48
+    );
+  }
+
+  function createGravityOrbProjectile(event) {
+    if (!validStuntEvent(event) || !rememberEvent(event.id)) return false;
+    const start = new THREE.Vector3(event.x, event.y, event.z);
+    const velocity = new THREE.Vector3(event.vx, event.vy, event.vz);
+    const charge = THREE.MathUtils.clamp(event.charge, 0, 1);
+    const impact = predictOrbImpact(start, velocity);
+    const age = Math.max(0, Math.min(7, (Date.now() - event.launchedAt) / 1000));
+
+    if (age >= impact.time) {
+      triggerGravityOrbImpact(impact.position, charge);
+      return true;
+    }
+
+    const visual = makeGravityOrbVisual();
+    const projectile = { id: event.id, start, velocity, charge, age, impact, visual };
+    projectiles.push(projectile);
+    updateGravityOrbVisual(visual, getOrbPosition(start, velocity, age), age);
+    return true;
+  }
+
+  function launchGravityOrb(charge) {
+    const launch = getGravityOrbLaunchState(charge);
+    const event = {
+      id: makeEventId(),
+      type: "gravity-orb",
+      x: launch.origin.x,
+      y: launch.origin.y,
+      z: launch.origin.z,
+      vx: launch.velocity.x,
+      vy: launch.velocity.y,
+      vz: launch.velocity.z,
+      charge: THREE.MathUtils.clamp(charge, 0, 1),
+      launchedAt: Date.now()
+    };
+    if (!createGravityOrbProjectile(event)) return false;
+    game.multiplayer?.sendSandboxEvent?.(event);
+    game.showToast("Gravity orb launched");
+    return true;
+  }
+
+  function beginGravityOrbCharge(key, now) {
+    if (now < cooldowns.launcher) {
+      game.showToast("Gravity Orb Launcher is recharging");
+      return false;
+    }
+    launcherCharge.key = key;
+    launcherCharge.startedAt = now;
+    launcherCharge.charge = 0;
+    launcherCharge.lastUiAt = 0;
+    const launch = getGravityOrbLaunchState(0);
+    const prediction = predictOrbImpact(launch.origin, launch.velocity);
+    updateGravityOrbAimIndicator(prediction, 0);
+    renderControlHints();
+    return true;
+  }
+
+  function updateGravityOrbCharge(now) {
+    if (!launcherCharge.key) {
+      gravityOrbAimIndicator.group.visible = false;
+      return;
+    }
+    launcherCharge.charge = THREE.MathUtils.clamp(
+      (now - launcherCharge.startedAt) / LAUNCHER_MAX_CHARGE_MS, 0, 1
+    );
+    const launch = getGravityOrbLaunchState(launcherCharge.charge);
+    const prediction = predictOrbImpact(launch.origin, launch.velocity);
+    updateGravityOrbAimIndicator(prediction, launcherCharge.charge);
+    if (now - launcherCharge.lastUiAt >= 100) {
+      launcherCharge.lastUiAt = now;
+      renderControlHints();
+    }
+  }
+
+  function releaseGravityOrbCharge(key, now) {
+    if (launcherCharge.key !== key) return false;
+    const charge = THREE.MathUtils.clamp(
+      (now - launcherCharge.startedAt) / LAUNCHER_MAX_CHARGE_MS, 0, 1
+    );
+    launcherCharge.key = null;
+    launcherCharge.startedAt = 0;
+    launcherCharge.charge = 0;
+    gravityOrbAimIndicator.group.visible = false;
+    cooldowns.launcher = now + LAUNCHER_COOLDOWN_MS;
+    launchGravityOrb(charge);
+    renderControlHints();
+    return true;
+  }
+
+  function updateGravityOrbProjectiles(delta) {
+    for (let i = projectiles.length - 1; i >= 0; i--) {
+      const projectile = projectiles[i];
+      projectile.age += Math.max(0, delta);
+      if (projectile.age >= projectile.impact.time) {
+        triggerGravityOrbImpact(projectile.impact.position, projectile.charge);
+        removeGravityOrbVisual(projectile.visual);
+        projectiles.splice(i, 1);
+        continue;
+      }
+      const position = getOrbPosition(projectile.start, projectile.velocity, projectile.age);
+      updateGravityOrbVisual(projectile.visual, position, projectile.age);
+    }
   }
 
   function createBounceWave(position, color = 0x40c5ff, scale = 1) {
@@ -1003,6 +1312,12 @@ export function createSandboxSystem(game) {
     const canDrive = active && inMap && !game.isPaused?.();
 
     updateThrusterVisuals(now);
+    if (canDrive) {
+      updateGravityOrbCharge(now);
+      updateGravityOrbProjectiles(delta);
+    } else if (gravityOrbAimIndicator) {
+      gravityOrbAimIndicator.group.visible = false;
+    }
 
     for (let i = beacons.length - 1; i >= 0; i--) {
       const beacon = beacons[i];
