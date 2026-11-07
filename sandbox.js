@@ -3,6 +3,8 @@ export function createSandboxSystem(game) {
   const { THREE, CANNON, scene, chassisBody, localCar, $ } = game;
   const builderPanel = $("sandboxBuilderPanel");
   const controlsPanel = $("sandboxControlsCard");
+  const secretMenuPanel = $("sandboxSecretMenu");
+  const secretMenuStatus = $("sandboxSecretStatus");
   const loadout = new Set();
   const attachmentCache = new WeakMap();
   const beacons = [];
@@ -12,13 +14,29 @@ export function createSandboxSystem(game) {
   const held = { lift: false, forward: false };
   const heldAssignments = Object.create(null);
   const launcherCharge = { key: null, startedAt: 0, charge: 0, lastUiAt: 0 };
-  const cooldowns = { beacon: 0, launcher: 0 };
+  const cooldowns = { beacon: 0, launcher: 0, orbitalLaser: 0 };
+  const secretSettings = {
+    infiniteGadgets: false,
+    gravityOrbRadius: 1,
+    gravityOrbPower: 1,
+    jumpThrusterPower: 26,
+    forwardThrusterPower: 48
+  };
+  const secretChordKeys = new Set();
+  const orbitalLaserSequences = [];
+  let secretChordLatched = false;
+  let secretMenuOpen = false;
   const BEACON_ARM_DELAY = 3000;
   const BEACON_TRIGGER_RADIUS = 8;
   const MAX_EQUIPPED_GADGETS = 3;
   const SLOT_KEYS = ["q", "e", "f"];
   const LAUNCHER_MAX_CHARGE_MS = 1800;
   const LAUNCHER_COOLDOWN_MS = 900;
+  const ORBITAL_LASER_COOLDOWN_MS = 28_000;
+  const ORBITAL_LASER_WARNING_MS = 7200;
+  const ORBITAL_LASER_EXPANSION_MS = 900;
+  const ORBITAL_LASER_RESET_MS = ORBITAL_LASER_WARNING_MS + ORBITAL_LASER_EXPANSION_MS;
+  const ORBITAL_LASER_CLEANUP_MS = ORBITAL_LASER_RESET_MS + 2400;
   const ORB_GRAVITY = 9.82;
   const ORB_RADIUS = 0.22;
   const GRAVITY_ORB_ELEVATION = 0.34;
@@ -29,7 +47,8 @@ export function createSandboxSystem(game) {
     { id: "lift", title: "JUMP THRUSTERS" },
     { id: "forward", title: "FORWARD THRUSTERS" },
     { id: "beacon", title: "IMPULSE BEACON" },
-    { id: "gravity-orb", title: "GRAVITY ORB LAUNCHER" }
+    { id: "gravity-orb", title: "GRAVITY ORB LAUNCHER" },
+    { id: "orbital-laser", title: "ORBITAL LASER" }
   ];
 
   let active = false;
@@ -394,7 +413,7 @@ export function createSandboxSystem(game) {
     if (!visual?.root) return;
     const ids = [...new Set((Array.isArray(requested) ? requested : []).filter((id) =>
       PARTS.some((part) => part.id === id)
-    ))].slice(0, MAX_EQUIPPED_GADGETS);
+    ))];
     const key = ids.join("|");
     const previous = attachmentCache.get(visual);
     if (previous?.key === key) {
@@ -417,6 +436,7 @@ export function createSandboxSystem(game) {
     const forwardFlames = ids.includes("forward") ? makeForwardThrusters(group) : [];
     if (ids.includes("beacon")) makeImpulseBeaconModule(group);
     if (ids.includes("gravity-orb")) makeGravityOrbLauncherModule(group);
+    if (ids.includes("orbital-laser")) makeOrbitalLaserModule(group);
     group.visible = visual === localCar ? active : true;
     visual.root.add(group);
 
@@ -426,25 +446,21 @@ export function createSandboxSystem(game) {
   }
 
   function getLoadout() {
-    return [...loadout].slice(0, MAX_EQUIPPED_GADGETS);
+    return [...loadout];
   }
 
   function getSlotAssignments() {
     const equipped = getLoadout();
     const slots = { q: null, e: null, f: null };
 
-    // Thrusters keep their dedicated controls even when the loadout changes.
+    // Thrusters keep Q and E even when the loadout order changes.
     if (equipped.includes("lift")) slots.q = "lift";
     if (equipped.includes("forward")) slots.e = "forward";
 
-    // Other gadgets fill the remaining keys in the order they were equipped.
-    const availableKeys = SLOT_KEYS.filter((key) => !slots[key]);
-    for (const id of equipped) {
-      if (id === "lift" || id === "forward") continue;
-      const key = availableKeys.shift();
-      if (!key) break;
-      slots[key] = id;
-    }
+    // The Orbital Laser takes the available action key when installed.
+    // Other extra gadgets remain mounted even when they have no key slot.
+    const extras = equipped.filter((id) => id !== "lift" && id !== "forward");
+    slots.f = extras.includes("orbital-laser") ? "orbital-laser" : (extras[0] || null);
     return slots;
   }
 
@@ -575,8 +591,10 @@ export function createSandboxSystem(game) {
       const label = button.querySelector(".sandbox-part-action");
       if (label) {
         label.textContent = equipped
-          ? assignedKey.toUpperCase() + " SLOT · REMOVE"
-          : loadout.size >= MAX_EQUIPPED_GADGETS ? "3 SLOTS FULL" : "ADD TO TRUCK";
+          ? (assignedKey ? assignedKey.toUpperCase() + " SLOT · REMOVE" : "MOUNTED · NO KEY")
+          : (!secretSettings.infiniteGadgets && loadout.size >= MAX_EQUIPPED_GADGETS)
+            ? "3 SLOTS FULL"
+            : "ADD TO TRUCK";
       }
     });
     const equippedLabel = $("sandboxEquippedValue");
@@ -585,6 +603,7 @@ export function createSandboxSystem(game) {
         .filter((key) => slotAssignments[key])
         .map((key) => key.toUpperCase() + ": " +
           (PARTS.find((part) => part.id === slotAssignments[key])?.title || slotAssignments[key]))
+        .concat(secretSettings.infiniteGadgets ? ["INFINITE GADGETS"] : [])
         .join(" · ") || "NO GADGETS EQUIPPED";
     }
     const mapLabel = $("sandboxBuilderMapLabel");
@@ -618,6 +637,7 @@ export function createSandboxSystem(game) {
         else if (id === "lift") label.textContent = status.lift ? "ACTIVE" : "HOLD TO LIFT";
         else if (id === "forward") label.textContent = status.forward ? "ACTIVE" : "HOLD TO BOOST";
         else if (id === "beacon") label.textContent = "PRESS TO PLACE";
+        else if (id === "orbital-laser") label.textContent = "ACTIVATE MAP RESET";
         else if (isCharging) label.textContent = "CHARGING " + Math.round(launcherCharge.charge * 100) + "%";
         else if (performance.now() < cooldowns.launcher) label.textContent = "RECHARGING";
         else label.textContent = "HOLD · RELEASE TO FIRE";
