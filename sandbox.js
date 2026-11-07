@@ -360,7 +360,7 @@ export function createSandboxSystem(game) {
     tube.castShadow = true;
     const muzzle = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.018, 8, 28), blue);
     muzzle.position.set(0, 0.78, -0.72);
-    muzzle.rotation.x = Math.PI / 2;
+    muzzle.rotation.x = -Math.PI + 0.70;
     group.add(muzzle);
     const statusOrb = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 10), blue);
     statusOrb.position.set(0, 0.78, -0.72);
@@ -1315,6 +1315,10 @@ export function createSandboxSystem(game) {
     if (canDrive) {
       updateGravityOrbCharge(now);
       updateGravityOrbProjectiles(delta);
+      if (!launcherCharge.key && cooldowns.launcher && now >= cooldowns.launcher) {
+        cooldowns.launcher = 0;
+        renderControlHints();
+      }
     } else if (gravityOrbAimIndicator) {
       gravityOrbAimIndicator.group.visible = false;
     }
