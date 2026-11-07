@@ -898,9 +898,10 @@ export function createSandboxSystem(game) {
 
   function applyGravityBurst(origin, charge) {
     const dx = chassisBody.position.x - origin.x;
+    const dy = (chassisBody.position.y - origin.y) * 0.48;
     const dz = chassisBody.position.z - origin.z;
     const radius = 10 + charge * 6;
-    const distance = Math.hypot(dx, dz);
+    const distance = Math.hypot(dx, dy, dz);
     if (distance >= radius) return false;
 
     const falloff = THREE.MathUtils.clamp(1 - distance / radius, 0, 1);
