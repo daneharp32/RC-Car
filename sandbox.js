@@ -853,6 +853,8 @@ export function createSandboxSystem(game) {
     waves.length = 0;
     for (const projectile of projectiles) removeGravityOrbVisual(projectile.visual);
     projectiles.length = 0;
+    for (const sequence of orbitalLaserSequences) removeOrbitalLaserVisual(sequence.visual);
+    orbitalLaserSequences.length = 0;
     if (gravityOrbAimIndicator) gravityOrbAimIndicator.group.visible = false;
     if (localAttachment) localAttachment.group.visible = false;
     renderControlHints();
@@ -1116,9 +1118,12 @@ export function createSandboxSystem(game) {
         ? 2.5 + (sequence.maxRadius * 1.22 - 2.5) * expansion
         : 0.07 + warning * 2.43;
       const opacity = isExpanding ? 0.34 + expansion * 0.58 : 0.055 + warning * 0.29;
-      const heightScale = isExpanding ? 1 : 0.08 + warning * 0.92;
+      const beamHeight = isExpanding ? 220 : 16 + warning * 204;
+      const heightScale = beamHeight / 220;
       const visual = sequence.visual;
 
+      visual.outerBeam.position.y = beamHeight / 2;
+      visual.innerBeam.position.y = beamHeight / 2;
       visual.outerBeam.scale.set(radius, heightScale, radius);
       visual.innerBeam.scale.set(radius * 0.52, heightScale, radius * 0.52);
       visual.outerMaterial.opacity = opacity;
@@ -1332,11 +1337,16 @@ export function createSandboxSystem(game) {
     visual.trailMaterial.dispose();
   }
 
-  function applyGravityBurst(origin, charge) {
+  function applyGravityBurst(
+    origin,
+    charge,
+    radiusMultiplier = secretSettings.gravityOrbRadius,
+    powerMultiplier = secretSettings.gravityOrbPower
+  ) {
     const dx = chassisBody.position.x - origin.x;
     const dy = (chassisBody.position.y - origin.y) * 0.48;
     const dz = chassisBody.position.z - origin.z;
-    const radius = (10 + charge * 6) * secretSettings.gravityOrbRadius;
+    const radius = (10 + charge * 6) * radiusMultiplier;
     const distance = Math.hypot(dx, dy, dz);
     if (distance >= radius) return false;
 
@@ -1348,8 +1358,8 @@ export function createSandboxSystem(game) {
 
     // A brief upward-and-outward game impulse sends nearby RC cars skyward.
     // The impulse is mass-scaled by Cannon, so every truck gets the same feel.
-    const horizontalImpulse = (42 + charge * 48) * secretSettings.gravityOrbPower * strength;
-    const verticalImpulse = (135 + charge * 120) * secretSettings.gravityOrbPower * strength;
+    const horizontalImpulse = (42 + charge * 48) * powerMultiplier * strength;
+    const verticalImpulse = (135 + charge * 120) * powerMultiplier * strength;
     chassisBody.applyImpulse(new CANNON.Vec3(
       outward.x * horizontalImpulse,
       verticalImpulse,
@@ -1366,8 +1376,13 @@ export function createSandboxSystem(game) {
     return true;
   }
 
-  function triggerGravityOrbImpact(position, charge) {
-    applyGravityBurst(position, charge);
+  function triggerGravityOrbImpact(
+    position,
+    charge,
+    radiusMultiplier = secretSettings.gravityOrbRadius,
+    powerMultiplier = secretSettings.gravityOrbPower
+  ) {
+    applyGravityBurst(position, charge, radiusMultiplier, powerMultiplier);
     createBounceWave(
       new THREE.Vector3(position.x, position.y + 0.12, position.z),
       0x168fff,
@@ -1380,22 +1395,25 @@ export function createSandboxSystem(game) {
     const start = new THREE.Vector3(event.x, event.y, event.z);
     const velocity = new THREE.Vector3(event.vx, event.vy, event.vz);
     const charge = THREE.MathUtils.clamp(event.charge, 0, 1);
-    secretSettings.gravityOrbRadius = THREE.MathUtils.clamp(
+    const radiusMultiplier = THREE.MathUtils.clamp(
       event.radiusMultiplier ?? secretSettings.gravityOrbRadius, 0.25, 5
     );
-    secretSettings.gravityOrbPower = THREE.MathUtils.clamp(
+    const powerMultiplier = THREE.MathUtils.clamp(
       event.powerMultiplier ?? secretSettings.gravityOrbPower, 0.25, 5
     );
     const impact = predictOrbImpact(start, velocity);
     const age = Math.max(0, Math.min(7, (Date.now() - event.launchedAt) / 1000));
 
     if (age >= impact.time) {
-      triggerGravityOrbImpact(impact.position, charge);
+      triggerGravityOrbImpact(impact.position, charge, radiusMultiplier, powerMultiplier);
       return true;
     }
 
     const visual = makeGravityOrbVisual();
-    const projectile = { id: event.id, start, velocity, charge, age, impact, visual };
+    const projectile = {
+      id: event.id, start, velocity, charge, radiusMultiplier, powerMultiplier,
+      age, impact, visual
+    };
     projectiles.push(projectile);
     updateGravityOrbVisual(visual, getOrbPosition(start, velocity, age), age);
     return true;
@@ -1476,7 +1494,12 @@ export function createSandboxSystem(game) {
       const projectile = projectiles[i];
       projectile.age += Math.max(0, delta);
       if (projectile.age >= projectile.impact.time) {
-        triggerGravityOrbImpact(projectile.impact.position, projectile.charge);
+        triggerGravityOrbImpact(
+          projectile.impact.position,
+          projectile.charge,
+          projectile.radiusMultiplier,
+          projectile.powerMultiplier
+        );
         removeGravityOrbVisual(projectile.visual);
         projectiles.splice(i, 1);
         continue;
