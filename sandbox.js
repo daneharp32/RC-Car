@@ -5,6 +5,9 @@ export function createSandboxSystem(game) {
   const controlsPanel = $("sandboxControlsCard");
   const secretMenuPanel = $("sandboxSecretMenu");
   const secretMenuStatus = $("sandboxSecretStatus");
+  if (secretMenuPanel && secretMenuPanel.parentElement !== document.body) {
+    document.body.appendChild(secretMenuPanel);
+  }
   const loadout = new Set();
   const attachmentCache = new WeakMap();
   const beacons = [];
@@ -17,6 +20,8 @@ export function createSandboxSystem(game) {
   const cooldowns = { beacon: 0, launcher: 0, orbitalLaser: 0 };
   const secretSettings = {
     infiniteGadgets: false,
+    noCooldown: false,
+    carSize: 1,
     gravityOrbRadius: 1,
     gravityOrbPower: 1,
     jumpThrusterPower: 26,
@@ -677,9 +682,10 @@ export function createSandboxSystem(game) {
         else if (id === "beacon") label.textContent = "PRESS TO PLACE";
         else if (id === "orbital-laser") label.textContent =
           isLaserActive ? "SEQUENCE ACTIVE" :
-            Date.now() < cooldowns.orbitalLaser ? "RECHARGING" : "ACTIVATE MAP RESET";
+            (!secretSettings.noCooldown && Date.now() < cooldowns.orbitalLaser)
+              ? "RECHARGING" : "ACTIVATE MAP RESET";
         else if (isCharging) label.textContent = "CHARGING " + Math.round(launcherCharge.charge * 100) + "%";
-        else if (performance.now() < cooldowns.launcher) label.textContent = "RECHARGING";
+        else if (!secretSettings.noCooldown && performance.now() < cooldowns.launcher) label.textContent = "RECHARGING";
         else label.textContent = "HOLD · RELEASE TO FIRE";
       }
       item.classList.toggle("equipped", Boolean(part));
@@ -692,7 +698,10 @@ export function createSandboxSystem(game) {
     if (!secretMenuPanel) return;
     const infinite = $("secretInfiniteGadgets");
     if (infinite) infinite.checked = secretSettings.infiniteGadgets;
+    const noCooldown = $("secretNoCooldown");
+    if (noCooldown) noCooldown.checked = secretSettings.noCooldown;
     for (const [id, value] of [
+      ["secretCarSize", secretSettings.carSize],
       ["secretGravityOrbRadius", secretSettings.gravityOrbRadius],
       ["secretGravityOrbPower", secretSettings.gravityOrbPower],
       ["secretJumpThrusterPower", secretSettings.jumpThrusterPower],
@@ -702,6 +711,7 @@ export function createSandboxSystem(game) {
       if (input) input.value = String(value);
     }
     for (const [id, value] of [
+      ["secretCarSizeValue", secretSettings.carSize.toFixed(2) + "×"],
       ["secretGravityOrbRadiusValue", secretSettings.gravityOrbRadius.toFixed(1) + "×"],
       ["secretGravityOrbPowerValue", secretSettings.gravityOrbPower.toFixed(1) + "×"],
       ["secretJumpThrusterPowerValue", String(Math.round(secretSettings.jumpThrusterPower))],
@@ -714,15 +724,21 @@ export function createSandboxSystem(game) {
     if (laserButton) laserButton.textContent = loadout.has("orbital-laser")
       ? "REMOVE ORBITAL LASER" : "INSTALL ORBITAL LASER";
     if (secretMenuStatus) {
-      secretMenuStatus.textContent = secretSettings.infiniteGadgets
-        ? "UNLIMITED GADGET MOUNTS ENABLED"
-        : "STANDARD LIMIT: 3 GADGETS";
+      const statusParts = [
+        secretSettings.infiniteGadgets ? "UNLIMITED GADGETS" : "3-GADGET LIMIT",
+        secretSettings.noCooldown ? "NO COOLDOWNS" : "NORMAL COOLDOWNS",
+        "CAR SIZE " + secretSettings.carSize.toFixed(2) + "×"
+      ];
+      secretMenuStatus.textContent = statusParts.join(" · ");
     }
   }
 
   function setSecretMenuOpen(open) {
-    secretMenuOpen = Boolean(open) && active && !inMap;
-    if (secretMenuPanel) secretMenuPanel.style.display = secretMenuOpen ? "block" : "none";
+    secretMenuOpen = Boolean(open) && active && !game.isPaused?.();
+    if (secretMenuPanel) {
+      secretMenuPanel.style.display = secretMenuOpen ? "block" : "none";
+      secretMenuPanel.classList.toggle("sandbox-secret-menu-in-game", inMap);
+    }
     renderSecretMenu();
   }
 
@@ -734,9 +750,24 @@ export function createSandboxSystem(game) {
     const value = Number(input?.value);
     if (!Number.isFinite(value)) return;
     secretSettings[key] = THREE.MathUtils.clamp(value, minimum, maximum);
+    if (key === "carSize") {
+      const appliedScale = game.physicsSystem?.setVehicleScale?.(secretSettings.carSize);
+      if (Number.isFinite(appliedScale)) secretSettings.carSize = appliedScale;
+      localCar.root.scale.setScalar(secretSettings.carSize);
+      game.updateLocalVisual?.();
+    }
     renderSecretMenu();
     renderBuilder();
     renderControlHints();
+  }
+
+  function toggleNoCooldown(enabled) {
+    secretSettings.noCooldown = enabled === true;
+    renderSecretMenu();
+    renderControlHints();
+    game.showToast(secretSettings.noCooldown
+      ? "Sandbox gadget cooldowns disabled"
+      : "Sandbox gadget cooldowns restored");
   }
 
   function toggleInfiniteGadgets(enabled) {
@@ -862,6 +893,10 @@ export function createSandboxSystem(game) {
     projectiles.length = 0;
     for (const sequence of orbitalLaserSequences) removeOrbitalLaserVisual(sequence.visual);
     orbitalLaserSequences.length = 0;
+    secretSettings.carSize = 1;
+    game.physicsSystem?.setVehicleScale?.(1);
+    localCar.root.scale.setScalar(1);
+    game.updateLocalVisual?.();
     hideOrbitalScreenEffects();
     if (gravityOrbAimIndicator) gravityOrbAimIndicator.group.visible = false;
     if (localAttachment) localAttachment.group.visible = false;
@@ -1352,16 +1387,16 @@ export function createSandboxSystem(game) {
       visual,
       resetDone: false
     });
-    cooldowns.orbitalLaser = Math.max(
-      cooldowns.orbitalLaser,
-      event.startedAt + ORBITAL_LASER_COOLDOWN_MS
-    );
+    cooldowns.orbitalLaser = secretSettings.noCooldown
+      ? 0
+      : Math.max(cooldowns.orbitalLaser, event.startedAt + ORBITAL_LASER_COOLDOWN_MS);
     return true;
   }
 
   function launchOrbitalLaser() {
     const now = Date.now();
-    if (orbitalLaserSequences.length > 0 || now < cooldowns.orbitalLaser) {
+    if (orbitalLaserSequences.length > 0 ||
+        (!secretSettings.noCooldown && now < cooldowns.orbitalLaser)) {
       game.showToast(orbitalLaserSequences.length > 0
         ? "An Orbital Laser sequence is already underway"
         : "Orbital Laser is recharging");
@@ -1377,7 +1412,7 @@ export function createSandboxSystem(game) {
       startedAt: now
     };
     if (!createOrbitalLaserSequence(event)) return false;
-    cooldowns.orbitalLaser = now + ORBITAL_LASER_COOLDOWN_MS;
+    cooldowns.orbitalLaser = secretSettings.noCooldown ? 0 : now + ORBITAL_LASER_COOLDOWN_MS;
     game.multiplayer?.sendSandboxEvent?.(event);
     game.showToast("ORBITAL LASER: ENERGY BUILDUP DETECTED");
     return true;
@@ -1751,7 +1786,7 @@ export function createSandboxSystem(game) {
   }
 
   function beginGravityOrbCharge(key, now) {
-    if (now < cooldowns.launcher) {
+    if (!secretSettings.noCooldown && now < cooldowns.launcher) {
       game.showToast("Gravity Orb Launcher is recharging");
       return false;
     }
@@ -1792,7 +1827,7 @@ export function createSandboxSystem(game) {
     launcherCharge.startedAt = 0;
     launcherCharge.charge = 0;
     gravityOrbAimIndicator.group.visible = false;
-    cooldowns.launcher = now + LAUNCHER_COOLDOWN_MS;
+    cooldowns.launcher = secretSettings.noCooldown ? 0 : now + LAUNCHER_COOLDOWN_MS;
     launchGravityOrb(charge);
     renderControlHints();
     return true;
@@ -2139,18 +2174,28 @@ export function createSandboxSystem(game) {
   }
 
   function handleKeyDown(key, event) {
-    if (active && !inMap && !game.isPaused?.()) {
-      const focused = document.activeElement;
-      if (!focused || !secretMenuPanel?.contains(focused)) {
-        if (key === "d" || key === "h") {
-          secretChordKeys.add(key);
-          if (secretChordKeys.has("d") && secretChordKeys.has("h") && !secretChordLatched) {
-            secretChordLatched = true;
-            event?.preventDefault?.();
-            toggleSecretMenu();
-            return true;
-          }
+    if (active && !game.isPaused?.() && (key === "d" || key === "h")) {
+      secretChordKeys.add(key);
+      if (secretChordKeys.has("d") && secretChordKeys.has("h") && !secretChordLatched) {
+        secretChordLatched = true;
+        if (game.controls?.keys) {
+          game.controls.keys.d = false;
+          game.controls.keys.h = false;
         }
+        event?.preventDefault?.();
+        toggleSecretMenu();
+        return true;
+      }
+    }
+
+    if (active && inMap && secretMenuOpen) {
+      const focusedInsideMenu = secretMenuPanel?.contains(document.activeElement);
+      const gameplayKeys = ["w", "a", "s", "d", " ", "r", "arrowup", "arrowdown",
+        "arrowleft", "arrowright", "q", "e", "f"];
+      if (gameplayKeys.includes(key)) {
+        if (!focusedInsideMenu && game.controls?.keys) game.controls.keys[key] = false;
+        if (!focusedInsideMenu) event?.preventDefault?.();
+        return true;
       }
     }
 
@@ -2171,8 +2216,8 @@ export function createSandboxSystem(game) {
       heldAssignments[key] = part;
     } else if (part === "beacon") {
       const now = performance.now();
-      if (now < cooldowns.beacon) return true;
-      cooldowns.beacon = now + 2200;
+      if (!secretSettings.noCooldown && now < cooldowns.beacon) return true;
+      cooldowns.beacon = secretSettings.noCooldown ? 0 : now + 2200;
       deployImpulseBeacon();
     } else if (part === "gravity-orb") {
       beginGravityOrbCharge(key, performance.now());
@@ -2190,7 +2235,7 @@ export function createSandboxSystem(game) {
       const wasChordKey = secretChordKeys.has(key);
       secretChordKeys.delete(key);
       if (!secretChordKeys.has("d") || !secretChordKeys.has("h")) secretChordLatched = false;
-      if (wasChordKey && active && !inMap) handled = true;
+      if (wasChordKey && active) handled = true;
     }
     const assignedPart = heldAssignments[key];
     delete heldAssignments[key];
@@ -2234,6 +2279,12 @@ export function createSandboxSystem(game) {
   $("secretInfiniteGadgets")?.addEventListener("change", (event) =>
     toggleInfiniteGadgets(event.target.checked)
   );
+  $("secretNoCooldown")?.addEventListener("change", (event) =>
+    toggleNoCooldown(event.target.checked)
+  );
+  $("secretCarSize")?.addEventListener("input", (event) =>
+    updateSecretSetting("carSize", event.target, 0.6, 1.8)
+  );
   $("secretGravityOrbRadius")?.addEventListener("input", (event) =>
     updateSecretSetting("gravityOrbRadius", event.target, 0.5, 5)
   );
@@ -2270,6 +2321,7 @@ export function createSandboxSystem(game) {
       return createImpulseBeacon(event);
     },
     getLoadout,
+    getVehicleScale() { return secretSettings.carSize; },
     getThrusterState,
     getThrusterTuning() {
       return {
