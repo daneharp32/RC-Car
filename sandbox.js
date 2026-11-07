@@ -1073,9 +1073,8 @@ export function createSandboxSystem(game) {
       whiteOpacity = 0.78 + expansion * 0.22;
     }
     if (elapsed >= ORBITAL_LASER_RESET_MS) {
-      whiteOpacity = 1 - smoothStep(
-        (elapsed - ORBITAL_LASER_RESET_MS) / 1600
-      );
+      const fadeOutProgress = (elapsed - ORBITAL_LASER_RESET_MS - 450) / 1600;
+      whiteOpacity = 1 - smoothStep(fadeOutProgress);
     }
 
     ui.root.style.display = elapsed < ORBITAL_LASER_CLEANUP_MS ? "block" : "none";
@@ -1157,7 +1156,7 @@ export function createSandboxSystem(game) {
     return { paths, reach };
   }
 
-  function makeOrbitalCrackGeometry(paths, reach, widthScale, heightOffset) {
+  function makeOrbitalCrackGeometry(paths, widthScale, heightOffset) {
     const positions = [];
     const reveals = [];
     const indices = [];
@@ -1291,8 +1290,8 @@ export function createSandboxSystem(game) {
     // countdown. The dark channel and narrow blue energy seam share a reveal
     // attribute so both grow outward from the impact center in sync.
     const crackData = makeOrbitalCrackPaths(center, maximumRadius);
-    const crackGeometry = makeOrbitalCrackGeometry(crackData.paths, crackData.reach, 1, 0);
-    const crackGlowGeometry = makeOrbitalCrackGeometry(crackData.paths, crackData.reach, 0.22, 0.018);
+    const crackGeometry = makeOrbitalCrackGeometry(crackData.paths, 1, 0);
+    const crackGlowGeometry = makeOrbitalCrackGeometry(crackData.paths, 0.22, 0.018);
     const crackMaterial = makeOrbitalCrackMaterial(0x10151b, false);
     const crackGlowMaterial = makeOrbitalCrackMaterial(0x087dff, true);
     const cracks = new THREE.Mesh(crackGeometry, crackMaterial);
@@ -1419,18 +1418,22 @@ export function createSandboxSystem(game) {
       visual.innerBeam.position.y = beamHeight / 2;
       visual.outerBeam.scale.set(radius, heightScale, radius);
       visual.innerBeam.scale.set(radius * 0.52, heightScale, radius * 0.52);
-      visual.outerMaterial.opacity = opacity;
-      visual.innerMaterial.opacity = Math.min(1, opacity + 0.16);
+      const beamFade = elapsed >= ORBITAL_LASER_RESET_MS
+        ? 1 - smoothStep((elapsed - ORBITAL_LASER_RESET_MS - 450) / 1400)
+        : 1;
+      visual.outerMaterial.opacity = opacity * beamFade;
+      visual.innerMaterial.opacity = Math.min(1, opacity + 0.16) * beamFade;
       visual.groundRing.scale.setScalar(isExpanding
         ? radius
         : 0.5 + warning * 2.2);
-      visual.ringMaterial.opacity = 0.12 + warning * 0.68 + expansion * 0.18;
+      visual.ringMaterial.opacity =
+        (0.12 + warning * 0.68 + expansion * 0.18) * beamFade;
       visual.glowField.scale.set(
         radius * (0.9 + expansion * 0.25),
         0.18 + expansion * 0.48,
         radius * (0.9 + expansion * 0.25)
       );
-      visual.fieldMaterial.opacity = expansion * 0.19;
+      visual.fieldMaterial.opacity = expansion * 0.19 * beamFade;
 
       if (!sequence.resetDone && elapsed >= ORBITAL_LASER_RESET_MS) {
         sequence.resetDone = true;
