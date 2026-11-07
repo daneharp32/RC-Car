@@ -217,6 +217,7 @@ export function createSandboxSystem(game) {
     const plume = new THREE.Group();
     plume.position.set(...position);
     if (direction === "down") plume.rotation.z = Math.PI;
+    else if (direction === "rear") plume.rotation.x = Math.PI / 2;
     else plume.rotation.x = -Math.PI / 2;
 
     // Overlapping translucent shells give the cold gas a soft, volumetric core
@@ -318,14 +319,14 @@ export function createSandboxSystem(game) {
     });
     const jets = [];
     for (const x of [-0.22, 0.22]) {
-      // Mount these at the rear of the chassis. The nozzle, aperture, and plume
-      // all share the same axis, with the exhaust extending rearward (-Z).
-      addBox(group, [0.19, 0.105, 0.23], [x, 0.22, -0.36], housing);
-      addCylinder(group, 0.079, 0.102, 0.15, [x, 0.22, -0.48], nozzle,
-        [-Math.PI / 2, 0, 0]);
-      addCylinder(group, 0.055, 0.055, 0.012, [x, 0.22, -0.56], aperture,
-        [-Math.PI / 2, 0, 0]);
-      jets.push(makeColdGasPlume(group, [x, 0.22, -0.57], "back", 1.32, 0.17));
+      // The truck's front is local -Z, so its rear is local +Z. Keep the
+      // nozzle axis, aperture, and exhaust plume aligned rearward on +Z.
+      addBox(group, [0.19, 0.105, 0.23], [x, 0.22, 0.36], housing);
+      addCylinder(group, 0.079, 0.102, 0.15, [x, 0.22, 0.48], nozzle,
+        [Math.PI / 2, 0, 0]);
+      addCylinder(group, 0.055, 0.055, 0.012, [x, 0.22, 0.56], aperture,
+        [Math.PI / 2, 0, 0]);
+      jets.push(makeColdGasPlume(group, [x, 0.22, 0.57], "rear", 1.32, 0.17));
     }
     root.add(group);
     return jets;
