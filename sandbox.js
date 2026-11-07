@@ -1065,7 +1065,7 @@ export function createSandboxSystem(game) {
 
   function createOrbitalLaserSequence(event) {
     if (!validStuntEvent(event) || event.type !== "orbital-laser" ||
-        !rememberEvent(event.id)) return false;
+        !rememberEvent(event.id) || orbitalLaserSequences.length > 0) return false;
     const center = {
       x: event.x,
       y: event.y,
