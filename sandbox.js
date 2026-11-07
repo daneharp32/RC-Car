@@ -409,6 +409,39 @@ export function createSandboxSystem(game) {
     root.add(group);
   }
 
+  function makeOrbitalLaserModule(root) {
+    const group = new THREE.Group();
+    group.name = "sandbox-orbital-laser-beacon";
+    const dark = new THREE.MeshStandardMaterial({
+      color: 0x182633, roughness: 0.34, metalness: 0.86
+    });
+    const alloy = new THREE.MeshStandardMaterial({
+      color: 0x9fb8c8, roughness: 0.22, metalness: 0.82
+    });
+    const blue = new THREE.MeshBasicMaterial({
+      color: 0x168dff, toneMapped: false
+    });
+    addBox(group, [0.56, 0.12, 0.48], [0, 0.30, 0.04], dark);
+    addCylinder(group, 0.16, 0.20, 0.18, [0, 0.43, 0.04], alloy);
+    addCylinder(group, 0.055, 0.07, 0.68, [0, 0.84, 0.04], dark);
+    const beaconRing = new THREE.Mesh(
+      new THREE.TorusGeometry(0.27, 0.025, 10, 36), blue
+    );
+    beaconRing.position.set(0, 1.13, 0.04);
+    beaconRing.rotation.x = Math.PI / 2;
+    group.add(beaconRing);
+    const emitter = new THREE.Mesh(
+      new THREE.SphereGeometry(0.17, 18, 14),
+      new THREE.MeshBasicMaterial({
+        color: 0xa6e8ff, toneMapped: false
+      })
+    );
+    emitter.position.set(0, 1.23, 0.04);
+    group.add(emitter);
+    addCylinder(group, 0.19, 0.19, 0.045, [0, 1.08, 0.04], blue);
+    root.add(group);
+  }
+
   function applyLoadout(visual, requested) {
     if (!visual?.root) return;
     const ids = [...new Set((Array.isArray(requested) ? requested : []).filter((id) =>
@@ -796,6 +829,239 @@ export function createSandboxSystem(game) {
     const a = rows[x0][z0] * (1 - tz) + rows[x0][z0 + 1] * tz;
     const b = rows[x0 + 1][z0] * (1 - tz) + rows[x0 + 1][z0 + 1] * tz;
     return a * (1 - tx) + b * tx;
+  }
+
+  function getMapCenterAndRadius() {
+    const layout = game.mapLayouts?.[game.activeMapId] || {};
+    const field = layout.heightfield;
+    if (field?.heights?.length) {
+      const count = field.heights.length - 1;
+      const size = count * (Number(field.elementSize) || 1);
+      const centerX = (Number(field.originX) || 0) + size / 2;
+      const centerZ = (Number(field.originZ) || size / 2) - size / 2;
+      return {
+        x: centerX,
+        z: centerZ,
+        y: sampleGroundHeight(centerX, centerZ),
+        radius: Math.hypot(size / 2, size / 2) + 18
+      };
+    }
+
+    const samples = layout.centerlineSamples || [];
+    const xs = samples.map((point) => point.x).filter(Number.isFinite);
+    const zs = samples.map((point) => point.z).filter(Number.isFinite);
+    if (!xs.length || !zs.length) {
+      return { x: 0, z: 0, y: sampleGroundHeight(0, 0), radius: 90 };
+    }
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minZ = Math.min(...zs);
+    const maxZ = Math.max(...zs);
+    const centerX = (minX + maxX) / 2;
+    const centerZ = (minZ + maxZ) / 2;
+    const margin = (Number(layout.trackHalfWidth) || 8) + 22;
+    return {
+      x: centerX,
+      z: centerZ,
+      y: sampleGroundHeight(centerX, centerZ),
+      radius: Math.hypot((maxX - minX) / 2 + margin, (maxZ - minZ) / 2 + margin)
+    };
+  }
+
+  function makeOrbitalLaserVisual(center) {
+    const group = new THREE.Group();
+    group.name = "sandbox-orbital-laser-sequence";
+    group.position.set(center.x, 0, center.z);
+
+    const outerMaterial = new THREE.MeshBasicMaterial({
+      color: 0x147eff, transparent: true, opacity: 0.06,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+      side: THREE.DoubleSide, toneMapped: false
+    });
+    const innerMaterial = new THREE.MeshBasicMaterial({
+      color: 0x76d9ff, transparent: true, opacity: 0.10,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+      side: THREE.DoubleSide, toneMapped: false
+    });
+    const fieldMaterial = new THREE.MeshBasicMaterial({
+      color: 0x168dff, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+      side: THREE.DoubleSide, toneMapped: false
+    });
+    const ringMaterial = new THREE.MeshBasicMaterial({
+      color: 0x5bcaff, transparent: true, opacity: 0.13,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+      side: THREE.DoubleSide, toneMapped: false
+    });
+
+    const outerBeam = new THREE.Mesh(
+      new THREE.CylinderGeometry(1, 1, 220, 48, 1, true),
+      outerMaterial
+    );
+    outerBeam.position.y = 110;
+    const innerBeam = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.34, 0.34, 220, 32, 1, true),
+      innerMaterial
+    );
+    innerBeam.position.y = 110;
+
+    const groundRing = new THREE.Mesh(
+      new THREE.TorusGeometry(1, 0.045, 10, 96),
+      ringMaterial
+    );
+    groundRing.rotation.x = Math.PI / 2;
+    groundRing.position.y = 0.10;
+
+    const glowField = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 28, 18),
+      fieldMaterial
+    );
+    glowField.position.y = 12;
+    glowField.scale.set(1, 0.2, 1);
+
+    group.add(outerBeam, innerBeam, groundRing, glowField);
+    scene.add(group);
+    return {
+      group, outerBeam, innerBeam, groundRing, glowField,
+      outerMaterial, innerMaterial, fieldMaterial, ringMaterial
+    };
+  }
+
+  function removeOrbitalLaserVisual(visual) {
+    if (!visual) return;
+    scene.remove(visual.group);
+    dispose(visual.group);
+  }
+
+  function clearArenaGadgetEffects() {
+    for (const beacon of beacons) {
+      scene.remove(beacon.group);
+      dispose(beacon.group);
+    }
+    beacons.length = 0;
+    for (const wave of waves) {
+      scene.remove(wave.group);
+      dispose(wave.group);
+    }
+    waves.length = 0;
+    for (const projectile of projectiles) removeGravityOrbVisual(projectile.visual);
+    projectiles.length = 0;
+    if (gravityOrbAimIndicator) gravityOrbAimIndicator.group.visible = false;
+    launcherCharge.key = null;
+    launcherCharge.startedAt = 0;
+    launcherCharge.charge = 0;
+  }
+
+  function createOrbitalLaserSequence(event) {
+    if (!validStuntEvent(event) || event.type !== "orbital-laser" ||
+        !rememberEvent(event.id)) return false;
+    const center = {
+      x: event.x,
+      y: event.y,
+      z: event.z
+    };
+    const map = getMapCenterAndRadius();
+    const visual = makeOrbitalLaserVisual(center);
+    orbitalLaserSequences.push({
+      id: event.id,
+      startedAt: event.startedAt,
+      center,
+      maxRadius: Math.max(12, map.radius),
+      visual,
+      resetDone: false
+    });
+    return true;
+  }
+
+  function launchOrbitalLaser() {
+    const now = Date.now();
+    if (now < cooldowns.orbitalLaser) {
+      game.showToast("Orbital Laser is recharging");
+      return false;
+    }
+    const center = getMapCenterAndRadius();
+    const event = {
+      id: makeEventId(),
+      type: "orbital-laser",
+      x: center.x,
+      y: center.y,
+      z: center.z,
+      startedAt: now
+    };
+    if (!createOrbitalLaserSequence(event)) return false;
+    cooldowns.orbitalLaser = now + ORBITAL_LASER_COOLDOWN_MS;
+    game.multiplayer?.sendSandboxEvent?.(event);
+    game.showToast("ORBITAL LASER: ENERGY BUILDUP DETECTED");
+    return true;
+  }
+
+  function smoothStep(value) {
+    const t = THREE.MathUtils.clamp(value, 0, 1);
+    return t * t * (3 - 2 * t);
+  }
+
+  function updateOrbitalLaserSequences(now = Date.now()) {
+    for (let i = orbitalLaserSequences.length - 1; i >= 0; i--) {
+      const sequence = orbitalLaserSequences[i];
+      const elapsed = Math.max(0, now - sequence.startedAt);
+      const warning = smoothStep(elapsed / ORBITAL_LASER_WARNING_MS);
+      const expansion = smoothStep(
+        (elapsed - ORBITAL_LASER_WARNING_MS) / ORBITAL_LASER_EXPANSION_MS
+      );
+      const isExpanding = elapsed >= ORBITAL_LASER_WARNING_MS;
+      const radius = isExpanding
+        ? 2.5 + (sequence.maxRadius * 1.22 - 2.5) * expansion
+        : 0.07 + warning * 2.43;
+      const opacity = isExpanding ? 0.34 + expansion * 0.58 : 0.055 + warning * 0.29;
+      const heightScale = isExpanding ? 1 : 0.08 + warning * 0.92;
+      const visual = sequence.visual;
+
+      visual.outerBeam.scale.set(radius, heightScale, radius);
+      visual.innerBeam.scale.set(radius * 0.52, heightScale, radius * 0.52);
+      visual.outerMaterial.opacity = opacity;
+      visual.innerMaterial.opacity = Math.min(1, opacity + 0.16);
+      visual.groundRing.scale.setScalar(isExpanding
+        ? radius
+        : 0.5 + warning * 2.2);
+      visual.ringMaterial.opacity = 0.12 + warning * 0.68 + expansion * 0.18;
+      visual.glowField.scale.set(
+        radius * (0.9 + expansion * 0.25),
+        0.18 + expansion * 0.48,
+        radius * (0.9 + expansion * 0.25)
+      );
+      visual.fieldMaterial.opacity = expansion * 0.19;
+
+      if (!sequence.resetDone && elapsed >= ORBITAL_LASER_RESET_MS) {
+        sequence.resetDone = true;
+        game.controls?.resetCar?.();
+        clearArenaGadgetEffects();
+        game.showToast("ORBITAL RESET COMPLETE — ALL DRIVERS RETURNED TO SPAWN");
+      }
+
+      if (elapsed >= ORBITAL_LASER_CLEANUP_MS) {
+        removeOrbitalLaserVisual(visual);
+        orbitalLaserSequences.splice(i, 1);
+      }
+    }
+  }
+
+  function getCameraShakeOffset(now = Date.now()) {
+    let intensity = 0;
+    for (const sequence of orbitalLaserSequences) {
+      const elapsed = Math.max(0, now - sequence.startedAt);
+      const warning = smoothStep(elapsed / ORBITAL_LASER_WARNING_MS);
+      const expansion = smoothStep(
+        (elapsed - ORBITAL_LASER_WARNING_MS) / ORBITAL_LASER_EXPANSION_MS
+      );
+      const current = warning * warning * 0.34 + expansion * 0.28;
+      intensity = Math.max(intensity, current);
+    }
+    if (intensity <= 0) return new THREE.Vector3();
+    return new THREE.Vector3(
+      Math.sin(now * 0.031) * intensity,
+      Math.sin(now * 0.047 + 1.3) * intensity * 0.42,
+      Math.cos(now * 0.027 + 0.7) * intensity * 0.34
+    );
   }
 
   function getGravityOrbLaunchState(charge) {
