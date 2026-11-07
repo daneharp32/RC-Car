@@ -675,7 +675,8 @@ export function createSandboxSystem(game) {
         else if (id === "forward") label.textContent = status.forward ? "ACTIVE" : "HOLD TO BOOST";
         else if (id === "beacon") label.textContent = "PRESS TO PLACE";
         else if (id === "orbital-laser") label.textContent =
-          isLaserActive ? "SEQUENCE ACTIVE" : "ACTIVATE MAP RESET";
+          isLaserActive ? "SEQUENCE ACTIVE" :
+            performance.now() < cooldowns.orbitalLaser ? "RECHARGING" : "ACTIVATE MAP RESET";
         else if (isCharging) label.textContent = "CHARGING " + Math.round(launcherCharge.charge * 100) + "%";
         else if (performance.now() < cooldowns.launcher) label.textContent = "RECHARGING";
         else label.textContent = "HOLD · RELEASE TO FIRE";
@@ -1080,13 +1081,19 @@ export function createSandboxSystem(game) {
       visual,
       resetDone: false
     });
+    cooldowns.orbitalLaser = Math.max(
+      cooldowns.orbitalLaser,
+      event.startedAt + ORBITAL_LASER_COOLDOWN_MS
+    );
     return true;
   }
 
   function launchOrbitalLaser() {
     const now = Date.now();
-    if (now < cooldowns.orbitalLaser) {
-      game.showToast("Orbital Laser is recharging");
+    if (orbitalLaserSequences.length > 0 || now < cooldowns.orbitalLaser) {
+      game.showToast(orbitalLaserSequences.length > 0
+        ? "An Orbital Laser sequence is already underway"
+        : "Orbital Laser is recharging");
       return false;
     }
     const center = getMapCenterAndRadius();
@@ -1170,7 +1177,15 @@ export function createSandboxSystem(game) {
       const expansion = smoothStep(
         (elapsed - ORBITAL_LASER_WARNING_MS) / ORBITAL_LASER_EXPANSION_MS
       );
-      const current = warning * warning * 0.34 + expansion * 0.28;
+      let current = warning * warning * 0.34 + expansion * 0.28;
+      if (elapsed >= ORBITAL_LASER_RESET_MS) {
+        const fade = 1 - THREE.MathUtils.clamp(
+          (elapsed - ORBITAL_LASER_RESET_MS) /
+            (ORBITAL_LASER_CLEANUP_MS - ORBITAL_LASER_RESET_MS),
+          0, 1
+        );
+        current *= fade;
+      }
       intensity = Math.max(intensity, current);
     }
     if (intensity <= 0) return new THREE.Vector3();
