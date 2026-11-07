@@ -1,7 +1,7 @@
 import { RoundedBoxGeometry } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/geometries/RoundedBoxGeometry.js";
 
 // Builds the detailed chassis, wheels, and the separately removable shell.
-export function createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellGeometry = null }) {
+export function createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellModel = null }) {
 function makeCarVisual(color, playerName = "") {
   const root = new THREE.Group();
   const chassisGroup = new THREE.Group();
@@ -9,12 +9,13 @@ function makeCarVisual(color, playerName = "") {
   root.add(chassisGroup, shellGroup);
 
   // Fit axle-mounted components at the actual physics attachment points.
-  // Keep the imported Ranger chassis at native proportions: no whole-group stretching.
+  // Keep the chassis at native proportions; the prerunner shell is pre-fitted
+  // with one uniform scale before it reaches this visual factory.
   const frontAxleZ = vehicle.wheelInfos[0].chassisConnectionPointLocal.z;
   const rearAxleZ = vehicle.wheelInfos[2].chassisConnectionPointLocal.z;
-  const chassisLengthScale = shellGeometry ? 1 : VISUAL_CHASSIS_LENGTH_SCALE;
+  const chassisLengthScale = shellModel ? 1 : VISUAL_CHASSIS_LENGTH_SCALE;
   chassisGroup.scale.set(1, 1, chassisLengthScale);
-  shellGroup.scale.set(1, 1, shellGeometry ? 1 : VISUAL_CHASSIS_LENGTH_SCALE);
+  shellGroup.scale.set(1, 1, shellModel ? 1 : VISUAL_CHASSIS_LENGTH_SCALE);
   shellGroup.visible = true;
 
   const carbon = new THREE.MeshStandardMaterial({ color: 0x171e24, roughness: 0.78, metalness: 0.18 });
@@ -1048,23 +1049,22 @@ function makeCarVisual(color, playerName = "") {
       [0, 0.035, 0.642], graphite);
   }
 
-  if (shellGeometry) {
+  if (shellModel) {
     const importedShell = makePart(
       shellGroup,
-      "scx30-single-cab-shell",
-      "SCX30 single-cab Ranger body shell",
-      "The repaired supplied Ranger shell. Its original proportions are preserved and the chassis wheelbase is fitted to its wheel openings."
+      "concept4-desert-racer-shell",
+      "Concept4 Desert Racer prerunner shell",
+      "The painted blue Concept4 prerunner body, including its black hood and roof, open cab windows, racing number, grille, headlights, rear lamps and roof LED bar. The shell keeps its original proportions and is uniformly scaled to the chassis wheel-arch spacing."
     );
-    const importedShellMaterial = new THREE.MeshStandardMaterial({
-      color: 0xff581a,
-      roughness: 0.58,
-      metalness: 0.01,
-      side: THREE.DoubleSide
+    const importedShellVisual = shellModel.clone(true);
+    importedShellVisual.name = "Concept4 Desert Racer painted body";
+    importedShellVisual.traverse((object) => {
+      if (!object.isMesh) return;
+      object.castShadow = false;
+      object.receiveShadow = false;
+      object.frustumCulled = true;
     });
-    const importedShellMesh = addMesh(importedShell, shellGeometry, importedShellMaterial);
-    importedShellMesh.name = "SCX30 Ranger test shell";
-    importedShellMesh.castShadow = false;
-    importedShellMesh.receiveShadow = false;
+    importedShell.add(importedShellVisual);
   } else {
     makeBodyShell();
   }
@@ -1076,9 +1076,9 @@ function makeCarVisual(color, playerName = "") {
   // retains its own individual component labels when the shell is removed.
   shellGroup.userData.partInfo = {
     id: "short-course-body-shell",
-    label: shellGeometry ? "SCX30 single-cab Ranger body shell" : "Short-course truck body shell",
-    description: shellGeometry
-      ? "Repaired imported SCX30 Ranger shell, kept at its original dimensions and fitted to the adjusted chassis."
+    label: shellModel ? "Concept4 Desert Racer prerunner shell" : "Short-course truck body shell",
+    description: shellModel
+      ? "Painted blue Concept4 Desert Racer shell with its original shape preserved and uniformly fitted to the existing wheelbase."
       : "Complete orange, black and graphite-gray short-course body shell, including the hood, cab, windows, rear bed, fenders and exterior trim."
   };
   shellGroup.traverse((object) => {

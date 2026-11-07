@@ -10,13 +10,8 @@ import { createTrackSystem } from "./track.js";
 import { createGravelBasinSystem } from "./gravel-map.js";
 import { createRaceSystem } from "./race.js";
 
-import { cleanRangerShellGeometry } from "./shell-cleanup.js";
-import rangerShellPart0 from "./ranger-shell-data-00.js";
-import rangerShellPart1 from "./ranger-shell-data-01.js";
-import rangerShellPart2 from "./ranger-shell-data-02.js";
-import rangerShellPart3 from "./ranger-shell-data-03.js";
-import rangerShellPart4 from "./ranger-shell-data-04.js";
-import rangerShellPart5 from "./ranger-shell-data-05.js";
+import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/loaders/GLTFLoader.js";
+import { mergeGeometries } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/utils/BufferGeometryUtils.js";
 
 // Main application entry: renderer, track visuals, shared state, and frame loop.
 const $ = (id) => document.getElementById(id);
@@ -264,109 +259,152 @@ const mapLayouts = {
   "gravel-basin": gravelBasinSystem.trackLayout
 };
 
-// Decode the optional Ranger body before creating physics. If the model cannot
-// be decoded, the game automatically uses the original procedural truck instead.
-async function loadRangerShellGeometry() {
-  const encoded = [
-    rangerShellPart0, rangerShellPart1, rangerShellPart2,
-    rangerShellPart3, rangerShellPart4, rangerShellPart5
-  ].join("");
-  if (!encoded || encoded.length % 4 !== 0) {
-    throw new Error("The Ranger test mesh data is incomplete.");
-  }
+// Load the painted prerunner shell before creating physics so its measured
+// envelope can shape the rollover colliders and preserve tire/body clearance.
+// Merge the GLTF's many small pieces by material/attribute layout once.
+// This keeps the paint, decal texture, and lamp materials intact while
+// reducing draw calls for every local and remote vehicle.
+function buildMergedPrerunnerVisual(sourceScene) {
+  sourceScene.updateMatrixWorld(true);
+  const buckets = new Map();
 
-  const compressed = Uint8Array.from(
-    atob(encoded),
-    (character) => character.charCodeAt(0)
-  );
-  if (typeof DecompressionStream !== "function") {
-    throw new Error("This browser does not support the Ranger mesh decompressor.");
-  }
-  const rawStream = new Blob([compressed]).stream()
-    .pipeThrough(new DecompressionStream("deflate-raw"));
-  const buffer = await new Response(rawStream).arrayBuffer();
-  const view = new DataView(buffer);
-  const byteLength = buffer.byteLength;
+  sourceScene.traverse((object) => {
+    if (!object.isMesh || !object.geometry?.attributes?.position) return;
+    const geometry = object.geometry;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    const groups = geometry.groups.length
+      ? geometry.groups
+      : [{
+          start: 0,
+          count: geometry.index?.count ?? geometry.attributes.position.count,
+          materialIndex: 0
+        }];
 
-  if (byteLength < 40 ||
-      view.getUint32(0, false) !== 0x52435351 ||
-      view.getUint32(4, true) !== 1) {
-    throw new Error("The Ranger test mesh has an invalid header.");
-  }
+    const attributeNames = Object.keys(geometry.attributes).sort();
+    const signature = attributeNames.map((name) => {
+      const attribute = geometry.attributes[name];
+      return [
+        name,
+        attribute.itemSize,
+        attribute.normalized ? 1 : 0,
+        attribute.array.constructor.name
+      ].join(":");
+    }).join("|");
 
-  const vertexCount = view.getUint32(8, true);
-  const faceCount = view.getUint32(12, true);
-  if (!vertexCount || !faceCount || vertexCount > 100000 || faceCount > 200000) {
-    throw new Error("The Ranger test mesh has invalid dimensions.");
-  }
+    for (const group of groups) {
+      if (!group.count) continue;
+      const material = materials[group.materialIndex] || materials[0];
+      if (!material) continue;
 
-  const minimum = [
-    view.getFloat32(16, true),
-    view.getFloat32(20, true),
-    view.getFloat32(24, true)
-  ];
-  const maximum = [
-    view.getFloat32(28, true),
-    view.getFloat32(32, true),
-    view.getFloat32(36, true)
-  ];
-  const positionOffset = 40;
-  const normalOffset = positionOffset + vertexCount * 6;
-  const indexOffset = normalOffset + vertexCount * 3 +
-    ((normalOffset + vertexCount * 3) % 2);
-  const indexCount = faceCount * 3;
-  if (indexOffset + indexCount * 2 !== byteLength) {
-    throw new Error("The Ranger test mesh data length does not match its header.");
-  }
+      const key = material.uuid + "|" + signature;
+      let bucket = buckets.get(key);
+      if (!bucket) {
+        bucket = { material, geometries: [] };
+        buckets.set(key, bucket);
+      }
 
-  // Positions are compactly quantized to 16 bits per axis.
-  const positions = new Float32Array(vertexCount * 3);
-  for (let i = 0; i < vertexCount; i++) {
-    for (let axis = 0; axis < 3; axis++) {
-      const quantized = view.getUint16(positionOffset + (i * 3 + axis) * 2, true);
-      positions[i * 3 + axis] =
-        minimum[axis] + (quantized / 65535) * (maximum[axis] - minimum[axis]);
+      const piece = new THREE.BufferGeometry();
+      for (const name of attributeNames) {
+        piece.setAttribute(name, geometry.attributes[name].clone());
+      }
+
+      const sourceIndex = geometry.index?.array;
+      const start = group.start || 0;
+      const count = group.count ?? (sourceIndex?.length ?? geometry.attributes.position.count);
+      const indices = sourceIndex
+        ? sourceIndex.slice(start, start + count)
+        : Uint32Array.from({ length: count }, (_, index) => start + index);
+      piece.setIndex(new THREE.BufferAttribute(indices, 1));
+      piece.applyMatrix4(object.matrixWorld);
+      bucket.geometries.push(piece);
     }
-    // Physically seat the body higher by editing the shell's Y vertices.
-    positions[i * 3 + 1] += 0.15;
-  }
+  });
 
-  // Preserve the repaired, split-edge normals rather than averaging across
-  // sharp body seams, which was a source of the earlier shading artifacts.
-  const normalBytes = new Int8Array(buffer, normalOffset, vertexCount * 3);
-  const normals = new Float32Array(vertexCount * 3);
-  for (let i = 0; i < vertexCount; i++) {
-    const nx = normalBytes[i * 3] / 127;
-    const ny = normalBytes[i * 3 + 1] / 127;
-    const nz = normalBytes[i * 3 + 2] / 127;
-    const magnitude = Math.hypot(nx, ny, nz) || 1;
-    normals[i * 3] = nx / magnitude;
-    normals[i * 3 + 1] = ny / magnitude;
-    normals[i * 3 + 2] = nz / magnitude;
-  }
+  const mergedRoot = new THREE.Group();
+  mergedRoot.name = "Concept4 prerunner shell - optimized shared geometry";
+  let triangleCount = 0;
+  let meshCount = 0;
 
-  const indices = new Uint16Array(buffer, indexOffset, indexCount);
-  for (let i = 0; i < indices.length; i++) {
-    if (indices[i] >= vertexCount) {
-      throw new Error("The Ranger test mesh contains an invalid triangle index.");
+  for (const bucket of buckets.values()) {
+    const merged = bucket.geometries.length > 1
+      ? mergeGeometries(bucket.geometries, false)
+      : bucket.geometries[0];
+
+    if (merged) {
+      if (merged !== bucket.geometries[0]) {
+        for (const geometry of bucket.geometries) geometry.dispose();
+      }
+      const mesh = new THREE.Mesh(merged, bucket.material);
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      mesh.frustumCulled = true;
+      mergedRoot.add(mesh);
+      triangleCount += (merged.index?.count ?? 0) / 3;
+      meshCount++;
+    } else {
+      // Safe fallback for any unusual attribute layout the utility cannot merge.
+      for (const geometry of bucket.geometries) {
+        const mesh = new THREE.Mesh(geometry, bucket.material);
+        mesh.castShadow = false;
+        mesh.receiveShadow = false;
+        mergedRoot.add(mesh);
+        triangleCount += (geometry.index?.count ?? 0) / 3;
+        meshCount++;
+      }
     }
   }
 
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
-  geometry.setIndex(new THREE.BufferAttribute(indices, 1));
-  geometry.computeBoundingBox();
-  geometry.computeBoundingSphere();
-  return cleanRangerShellGeometry(THREE, geometry);
+  return { visual: mergedRoot, triangleCount, meshCount };
 }
 
+async function loadPrerunnerShell() {
+  const loader = new GLTFLoader();
+  const gltf = await loader.loadAsync("./FF_SC_Concept4_Desert_Racer.gltf");
+  const optimized = buildMergedPrerunnerVisual(gltf.scene);
+
+  // Measured wheel-arch centers in the source GLTF: rear -1.70, front +1.55.
+  // A single uniform scale fits that 3.25-unit spacing to the existing
+  // 0.951282-unit chassis wheelbase. The body is rotated to the game's -Z
+  // forward axis, then centered between the two arches without deforming it.
+  const sourceRearArchZ = -1.70;
+  const sourceFrontArchZ = 1.55;
+  const sourceCenterZ = (sourceRearArchZ + sourceFrontArchZ) * 0.5;
+  const shellScale = 0.9512820513 / (sourceFrontArchZ - sourceRearArchZ);
+
+  const shellModel = new THREE.Group();
+  shellModel.name = "Concept4 Desert Racer fitted shell";
+  shellModel.rotation.y = Math.PI;
+  shellModel.scale.setScalar(shellScale);
+  shellModel.position.set(0, 0.035, sourceCenterZ * shellScale);
+  shellModel.add(optimized.visual);
+  shellModel.updateMatrixWorld(true);
+
+  // Physics receives only this transformed envelope; the visible shell keeps
+  // every original vertex and is never stretched to meet the chassis.
+  const shellBounds = new THREE.Box3().setFromObject(shellModel);
+  const shellGeometry = { boundingBox: shellBounds };
+
+  console.info(
+    "Concept4 prerunner shell loaded:",
+    optimized.meshCount,
+    "merged meshes,",
+    Math.round(optimized.triangleCount),
+    "triangles, uniform scale",
+    shellScale.toFixed(4),
+    "×"
+  );
+  console.info("Prerunner shell fitted bounds:", shellBounds.getSize(new THREE.Vector3()).toArray());
+  return { shellModel, shellGeometry };
+}
+
+let shellModel = null;
 let shellGeometry = null;
 try {
-  shellGeometry = await loadRangerShellGeometry();
-  console.info("Ranger test shell loaded:", shellGeometry.getAttribute("position").count, "vertices");
+  const loadedShell = await loadPrerunnerShell();
+  shellModel = loadedShell.shellModel;
+  shellGeometry = loadedShell.shellGeometry;
 } catch (error) {
-  console.warn("Ranger test shell unavailable; using the stable procedural body:", error);
+  console.warn("Concept4 prerunner shell unavailable; using the stable procedural body:", error);
 }
 
 // Physics: Cannon's RaycastVehicle applies suspension and tire impulses only
@@ -390,7 +428,7 @@ const {
   spawnYaw
 } = physicsSystem;
 
-const makeCarVisual = createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellGeometry });
+const makeCarVisual = createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellModel });
 const localCar = makeCarVisual(0xffa33d);
 
 
