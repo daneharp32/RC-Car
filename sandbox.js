@@ -748,7 +748,7 @@ export function createSandboxSystem(game) {
       chassisBody.position.x,
       chassisBody.position.y,
       chassisBody.position.z
-    ).add(new THREE.Vector3(0, 0.60, -0.82).applyQuaternion(orientation));
+    ).add(new THREE.Vector3(0, 0.78, -0.72).applyQuaternion(orientation));
     const direction = new THREE.Vector3(0, Math.sin(0.72), -Math.cos(0.72))
       .applyQuaternion(orientation)
       .normalize();
