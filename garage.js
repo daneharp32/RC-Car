@@ -261,6 +261,29 @@ function applyGarageShellPose(progress) {
   localCar.shellGroup.scale.lerpVectors(garageShellAttachedScale, garageShellRemovedScale, t);
 }
 
+function updateGarageShellChoiceButtons() {
+  const style = game.getShellStyle?.() === "classic" ? "classic" : "prerunner";
+  for (const [buttonId, buttonStyle] of [
+    ["shellChoiceClassic", "classic"],
+    ["shellChoicePrerunner", "prerunner"]
+  ]) {
+    const button = $(buttonId);
+    if (!button) continue;
+    const active = style === buttonStyle;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  }
+}
+
+function chooseGarageShell(style) {
+  clearGaragePartHover();
+  game.setShellStyle?.(style);
+  updateGarageShellChoiceButtons();
+}
+
+$("shellChoiceClassic").addEventListener("click", () => chooseGarageShell("classic"));
+$("shellChoicePrerunner").addEventListener("click", () => chooseGarageShell("prerunner"));
+
 function resetGarageShellState(visible = true) {
   garageShellAnimation = null;
   garageShellInstalled = !!visible;
@@ -268,6 +291,7 @@ function resetGarageShellState(visible = true) {
   localCar.setShellVisible(garageShellInstalled);
   const button = $("shellToggleButton");
   if (button) button.textContent = garageShellInstalled ? "REMOVE BODY SHELL" : "INSTALL BODY SHELL";
+  updateGarageShellChoiceButtons();
 }
 
 function updateGarageShellAnimation(now) {
@@ -427,6 +451,7 @@ function showGarage() {
   $("topStatus").style.display = "none";
   setArenaVisible(false);
   parkCarForShowroom();
+  updateGarageShellChoiceButtons();
 }
 function setGarageShellVisible(visible) {
   if (garageShellAnimation || visible === garageShellInstalled) return;
@@ -479,6 +504,8 @@ function showDriveScreen() {
     showGarage,
     showDriveScreen,
     setGarageShellVisible,
+    chooseGarageShell,
+    updateGarageShellChoiceButtons,
     updateGarageShellAnimation,
     updateHoverBounds,
     get viewMode() { return viewMode; },

@@ -45,6 +45,7 @@ export function createMultiplayerSystem(game) {
   function makeSnapshot() {
     return {
       name: driverName,
+      shellStyle: game.getShellStyle?.() === "classic" ? "classic" : "prerunner",
       x: chassisBody.position.x,
       y: chassisBody.position.y,
       z: chassisBody.position.z,
@@ -237,6 +238,7 @@ export function createMultiplayerSystem(game) {
     if (!remote) {
       const name = cleanPlayerName(data.name) || "Driver";
       const visual = makeCarVisual(colorForPeer(peerId), name);
+      visual.setShellStyle?.(data.shellStyle === "classic" ? "classic" : "prerunner");
       remote = {
         visual,
         target: null,
@@ -263,6 +265,10 @@ export function createMultiplayerSystem(game) {
         ? data.wheels.slice(0, 4).map((value) => Number.isFinite(value) ? value : 0)
         : remote.wheelRotations;
       remote.steering = Number.isFinite(data.steer) ? data.steer : 0;
+      const remoteShellStyle = data.shellStyle === "classic" ? "classic" : "prerunner";
+      if (remote.visual.shellStyle !== remoteShellStyle) {
+        remote.visual.setShellStyle?.(remoteShellStyle);
+      }
       remote.lastSeen = performance.now();
       if (currentLobby?.mode === "sandbox") {
         remote.visual.root.visible = data.inMap === true;
