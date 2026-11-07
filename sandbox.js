@@ -681,6 +681,96 @@ export function createSandboxSystem(game) {
     });
   }
 
+  function renderSecretMenu() {
+    if (!secretMenuPanel) return;
+    const infinite = $("secretInfiniteGadgets");
+    if (infinite) infinite.checked = secretSettings.infiniteGadgets;
+    for (const [id, value] of [
+      ["secretGravityOrbRadius", secretSettings.gravityOrbRadius],
+      ["secretGravityOrbPower", secretSettings.gravityOrbPower],
+      ["secretJumpThrusterPower", secretSettings.jumpThrusterPower],
+      ["secretForwardThrusterPower", secretSettings.forwardThrusterPower]
+    ]) {
+      const input = $(id);
+      if (input) input.value = String(value);
+    }
+    for (const [id, value] of [
+      ["secretGravityOrbRadiusValue", secretSettings.gravityOrbRadius.toFixed(1) + "×"],
+      ["secretGravityOrbPowerValue", secretSettings.gravityOrbPower.toFixed(1) + "×"],
+      ["secretJumpThrusterPowerValue", String(Math.round(secretSettings.jumpThrusterPower))],
+      ["secretForwardThrusterPowerValue", String(Math.round(secretSettings.forwardThrusterPower))]
+    ]) {
+      const label = $(id);
+      if (label) label.textContent = value;
+    }
+    const laserButton = $("secretOrbitalLaserButton");
+    if (laserButton) laserButton.textContent = loadout.has("orbital-laser")
+      ? "REMOVE ORBITAL LASER" : "INSTALL ORBITAL LASER";
+    if (secretMenuStatus) {
+      secretMenuStatus.textContent = secretSettings.infiniteGadgets
+        ? "UNLIMITED GADGET MOUNTS ENABLED"
+        : "STANDARD LIMIT: 3 GADGETS";
+    }
+  }
+
+  function setSecretMenuOpen(open) {
+    secretMenuOpen = Boolean(open) && active && !inMap;
+    if (secretMenuPanel) secretMenuPanel.style.display = secretMenuOpen ? "block" : "none";
+    renderSecretMenu();
+  }
+
+  function toggleSecretMenu() {
+    setSecretMenuOpen(!secretMenuOpen);
+  }
+
+  function updateSecretSetting(key, input, minimum, maximum) {
+    const value = Number(input?.value);
+    if (!Number.isFinite(value)) return;
+    secretSettings[key] = THREE.MathUtils.clamp(value, minimum, maximum);
+    renderSecretMenu();
+    renderBuilder();
+    renderControlHints();
+  }
+
+  function toggleInfiniteGadgets(enabled) {
+    secretSettings.infiniteGadgets = enabled === true;
+    if (!secretSettings.infiniteGadgets && loadout.size > MAX_EQUIPPED_GADGETS) {
+      const keep = [];
+      for (const id of ["lift", "forward", "orbital-laser"]) {
+        if (loadout.has(id) && keep.length < MAX_EQUIPPED_GADGETS) keep.push(id);
+      }
+      for (const id of loadout) {
+        if (!keep.includes(id) && keep.length < MAX_EQUIPPED_GADGETS) keep.push(id);
+      }
+      loadout.clear();
+      for (const id of keep) loadout.add(id);
+      clearHeldControls();
+      applyLoadout(localCar, getLoadout());
+      if (localAttachment) localAttachment.group.visible = active;
+    }
+    renderSecretMenu();
+    renderBuilder();
+    renderControlHints();
+  }
+
+  function toggleOrbitalLaserGadget() {
+    if (loadout.has("orbital-laser")) {
+      loadout.delete("orbital-laser");
+    } else {
+      if (!secretSettings.infiniteGadgets && loadout.size >= MAX_EQUIPPED_GADGETS) {
+        game.showToast("Your truck has 3 gadget slots. Enable Infinite Gadgets or remove one first.");
+        return;
+      }
+      loadout.add("orbital-laser");
+    }
+    clearHeldControls();
+    applyLoadout(localCar, getLoadout());
+    if (localAttachment) localAttachment.group.visible = active;
+    renderSecretMenu();
+    renderBuilder();
+    renderControlHints();
+  }
+
   function updatePlayerCount(count) {
     playerCount = Math.max(1, Math.min(8, Number(count) || 1));
     renderBuilder();
@@ -689,6 +779,8 @@ export function createSandboxSystem(game) {
   function clearHeldControls() {
     held.lift = false;
     held.forward = false;
+    secretChordKeys.clear();
+    secretChordLatched = false;
     for (const key of Object.keys(heldAssignments)) delete heldAssignments[key];
     launcherCharge.key = null;
     launcherCharge.startedAt = 0;
@@ -703,6 +795,7 @@ export function createSandboxSystem(game) {
     clearHeldControls();
     active = true;
     inMap = false;
+    setSecretMenuOpen(false);
     game.race?.leaveLobby?.();
     game.garage.viewMode = "sandbox-builder";
     game.garage.setArenaVisible(false);
@@ -730,6 +823,7 @@ export function createSandboxSystem(game) {
   function enterMap() {
     if (!active || inMap) return;
     clearHeldControls();
+    setSecretMenuOpen(false);
     chassisBody.angularDamping = 0.32;
     inMap = true;
     builderPanel.style.display = "none";
@@ -744,6 +838,7 @@ export function createSandboxSystem(game) {
     clearHeldControls();
     active = false;
     inMap = false;
+    setSecretMenuOpen(false);
     chassisBody.angularDamping = standardAngularDamping;
     builderPanel.style.display = "none";
     for (const beacon of beacons) {
@@ -774,11 +869,19 @@ export function createSandboxSystem(game) {
     if (event.type === "impulse-beacon") {
       return [event.x, event.y, event.z, event.yaw].every(Number.isFinite);
     }
+    if (event.type === "orbital-laser") {
+      return [event.x, event.y, event.z, event.startedAt].every(Number.isFinite) &&
+        Math.abs(event.startedAt - Date.now()) <= 120_000;
+    }
     return event.type === "gravity-orb" &&
       [event.x, event.y, event.z, event.vx, event.vy, event.vz,
         event.charge, event.launchedAt].every(Number.isFinite) &&
       event.charge >= 0 && event.charge <= 1 &&
-      Math.abs(event.vx) <= 80 && Math.abs(event.vy) <= 80 && Math.abs(event.vz) <= 80;
+      Math.abs(event.vx) <= 80 && Math.abs(event.vy) <= 80 && Math.abs(event.vz) <= 80 &&
+      Number.isFinite(event.radiusMultiplier ?? 1) &&
+      Number.isFinite(event.powerMultiplier ?? 1) &&
+      (event.radiusMultiplier ?? 1) >= 0.25 && (event.radiusMultiplier ?? 1) <= 5 &&
+      (event.powerMultiplier ?? 1) >= 0.25 && (event.powerMultiplier ?? 1) <= 5;
   }
 
   function rememberEvent(id) {
@@ -1233,7 +1336,7 @@ export function createSandboxSystem(game) {
     const dx = chassisBody.position.x - origin.x;
     const dy = (chassisBody.position.y - origin.y) * 0.48;
     const dz = chassisBody.position.z - origin.z;
-    const radius = 10 + charge * 6;
+    const radius = (10 + charge * 6) * secretSettings.gravityOrbRadius;
     const distance = Math.hypot(dx, dy, dz);
     if (distance >= radius) return false;
 
@@ -1245,8 +1348,8 @@ export function createSandboxSystem(game) {
 
     // A brief upward-and-outward game impulse sends nearby RC cars skyward.
     // The impulse is mass-scaled by Cannon, so every truck gets the same feel.
-    const horizontalImpulse = (42 + charge * 48) * strength;
-    const verticalImpulse = (135 + charge * 120) * strength;
+    const horizontalImpulse = (42 + charge * 48) * secretSettings.gravityOrbPower * strength;
+    const verticalImpulse = (135 + charge * 120) * secretSettings.gravityOrbPower * strength;
     chassisBody.applyImpulse(new CANNON.Vec3(
       outward.x * horizontalImpulse,
       verticalImpulse,
@@ -1277,6 +1380,12 @@ export function createSandboxSystem(game) {
     const start = new THREE.Vector3(event.x, event.y, event.z);
     const velocity = new THREE.Vector3(event.vx, event.vy, event.vz);
     const charge = THREE.MathUtils.clamp(event.charge, 0, 1);
+    secretSettings.gravityOrbRadius = THREE.MathUtils.clamp(
+      event.radiusMultiplier ?? secretSettings.gravityOrbRadius, 0.25, 5
+    );
+    secretSettings.gravityOrbPower = THREE.MathUtils.clamp(
+      event.powerMultiplier ?? secretSettings.gravityOrbPower, 0.25, 5
+    );
     const impact = predictOrbImpact(start, velocity);
     const age = Math.max(0, Math.min(7, (Date.now() - event.launchedAt) / 1000));
 
@@ -1304,6 +1413,8 @@ export function createSandboxSystem(game) {
       vy: launch.velocity.y,
       vz: launch.velocity.z,
       charge: THREE.MathUtils.clamp(charge, 0, 1),
+      radiusMultiplier: secretSettings.gravityOrbRadius,
+      powerMultiplier: secretSettings.gravityOrbPower,
       launchedAt: Date.now()
     };
     if (!createGravityOrbProjectile(event)) return false;
@@ -1612,7 +1723,7 @@ export function createSandboxSystem(game) {
       chassisBody.quaternion.vmult(localUp, thrustDirection);
       thrustDirection.normalize();
 
-      const velocityChange = JUMP_THRUSTER_ACCELERATION * delta;
+      const velocityChange = secretSettings.jumpThrusterPower * delta;
       chassisBody.velocity.x += thrustDirection.x * velocityChange;
       chassisBody.velocity.y += thrustDirection.y * velocityChange;
       chassisBody.velocity.z += thrustDirection.z * velocityChange;
