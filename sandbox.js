@@ -1,4 +1,4 @@
-// Multiplayer Sandbox builder, continuous thrusters, and shared impulse beacons.
+// Multiplayer Sandbox builder, vehicle gadgets, and shared physics events.
 export function createSandboxSystem(game) {
   const { THREE, CANNON, scene, chassisBody, localCar, $ } = game;
   const builderPanel = $("sandboxBuilderPanel");
@@ -630,7 +630,7 @@ export function createSandboxSystem(game) {
 
   function beginSession() {
     showBuilder();
-    game.showToast("Sandbox joined — equip your thrusters and beacon before entering");
+    game.showToast("Sandbox joined — equip up to three gadgets before entering");
   }
 
   function enterMap() {
