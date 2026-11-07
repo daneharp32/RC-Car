@@ -636,6 +636,9 @@ export function createSandboxSystem(game) {
         .filter((key) => slotAssignments[key])
         .map((key) => key.toUpperCase() + ": " +
           (PARTS.find((part) => part.id === slotAssignments[key])?.title || slotAssignments[key]))
+        .concat(getLoadout()
+          .filter((id) => !Object.values(slotAssignments).includes(id))
+          .map((id) => "MOUNTED: " + (PARTS.find((part) => part.id === id)?.title || id)))
         .concat(secretSettings.infiniteGadgets ? ["INFINITE GADGETS"] : [])
         .join(" · ") || "NO GADGETS EQUIPPED";
     }
@@ -1141,6 +1144,10 @@ export function createSandboxSystem(game) {
 
       if (!sequence.resetDone && elapsed >= ORBITAL_LASER_RESET_MS) {
         sequence.resetDone = true;
+        for (const key of Object.keys(game.controls?.keys || {})) {
+          game.controls.keys[key] = false;
+        }
+        clearHeldControls();
         game.controls?.resetCar?.();
         clearArenaGadgetEffects();
         game.showToast("ORBITAL RESET COMPLETE — ALL DRIVERS RETURNED TO SPAWN");
