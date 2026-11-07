@@ -267,6 +267,125 @@ const mapLayouts = {
 function buildMergedPrerunnerVisual(sourceScene) {
   sourceScene.updateMatrixWorld(true);
   const buckets = new Map();
+  const detailObjectName = "desert racing details";
+
+  function splitConnectedTriangleComponents(indices) {
+    const parent = new Map();
+    function find(value) {
+      if (!parent.has(value)) parent.set(value, value);
+      let root = value;
+      while (parent.get(root) !== root) root = parent.get(root);
+      let current = value;
+      while (parent.get(current) !== current) {
+        const next = parent.get(current);
+        parent.set(current, root);
+        current = next;
+      }
+      return root;
+    }
+    function unite(left, right) {
+      const a = find(left);
+      const b = find(right);
+      if (a !== b) parent.set(b, a);
+    }
+
+    const triangleCount = Math.floor(indices.length / 3);
+    for (let triangle = 0; triangle < triangleCount; triangle++) {
+      const offset = triangle * 3;
+      const i0 = Number(indices[offset]);
+      const i1 = Number(indices[offset + 1]);
+      const i2 = Number(indices[offset + 2]);
+      unite(i0, i1);
+      unite(i0, i2);
+    }
+
+    const components = new Map();
+    for (let triangle = 0; triangle < triangleCount; triangle++) {
+      const offset = triangle * 3;
+      const i0 = Number(indices[offset]);
+      const root = find(i0);
+      let component = components.get(root);
+      if (!component) {
+        component = [];
+        components.set(root, component);
+      }
+      component.push(i0, Number(indices[offset + 1]), Number(indices[offset + 2]));
+    }
+    return [...components.values()];
+  }
+
+  function makeCompactPiece(sourceGeometry, componentIndices) {
+    const vertexIds = [...new Set(componentIndices)];
+    const remap = new Map(vertexIds.map((vertexId, index) => [vertexId, index]));
+    const piece = new THREE.BufferGeometry();
+
+    for (const [name, attribute] of Object.entries(sourceGeometry.attributes)) {
+      const itemSize = attribute.itemSize;
+      const array = new attribute.array.constructor(vertexIds.length * itemSize);
+      for (let index = 0; index < vertexIds.length; index++) {
+        const sourceOffset = vertexIds[index] * itemSize;
+        const destinationOffset = index * itemSize;
+        array.set(attribute.array.subarray(sourceOffset, sourceOffset + itemSize), destinationOffset);
+      }
+      const copied = new THREE.BufferAttribute(array, itemSize, attribute.normalized);
+      copied.name = attribute.name;
+      piece.setAttribute(name, copied);
+    }
+
+    const remappedIndices = new Uint32Array(componentIndices.length);
+    for (let index = 0; index < componentIndices.length; index++) {
+      remappedIndices[index] = remap.get(componentIndices[index]);
+    }
+    piece.setIndex(new THREE.BufferAttribute(remappedIndices, 1));
+    return { geometry: piece, vertexIds };
+  }
+
+  function detailCorrection(materialName, bounds) {
+    const centerX = (bounds.min.x + bounds.max.x) * 0.5;
+    const centerY = (bounds.min.y + bounds.max.y) * 0.5;
+    const centerZ = (bounds.min.z + bounds.max.z) * 0.5;
+    const side = centerX < 0 ? -1 : 1;
+    const front = bounds.min.z > 2.30;
+    const rear = bounds.max.z < -2.75;
+    const outerLamp = Math.abs(centerX) > 0.38;
+
+    // Front lamp housings, silver bezels, and white lenses were authored
+    // slightly ahead of the nose. Seat them against the body face.
+    if (front && outerLamp && (
+      materialName.includes("light housings") ||
+      materialName.includes("silver trim") ||
+      materialName.includes("LED lens")
+    )) {
+      return [0, 0, -0.16];
+    }
+
+    // The center grille and its horizontal silver bars only need a tiny
+    // setback; the headlights above are corrected independently.
+    if (front && !outerLamp && (
+      materialName.includes("front grille") ||
+      materialName.includes("silver trim")
+    )) {
+      return [0, 0, -0.025];
+    }
+
+    // Lift and recess the front bumper so it meets the lower painted fascia
+    // rather than hanging below and forward of the shell.
+    if (materialName.includes("front bumper")) {
+      return [0, 0.15, -0.16];
+    }
+
+    // The rear lens and its two surrounds sit just outside the tail panel.
+    // Move both assemblies inward laterally so their full housings overlap it.
+    if (rear && outerLamp && (
+      materialName.includes("light housings") ||
+      materialName.includes("silver trim") ||
+      materialName.includes("rear LED lens")
+    )) {
+      return [-side * 0.11, 0, 0];
+    }
+
+    return [0, 0, 0];
+  }
 
   sourceScene.traverse((object) => {
     if (!object.isMesh || !object.geometry?.attributes?.position) return;
@@ -279,44 +398,73 @@ function buildMergedPrerunnerVisual(sourceScene) {
           count: geometry.index?.count ?? geometry.attributes.position.count,
           materialIndex: 0
         }];
-
-    const attributeNames = Object.keys(geometry.attributes).sort();
-    const signature = attributeNames.map((name) => {
-      const attribute = geometry.attributes[name];
-      return [
-        name,
-        attribute.itemSize,
-        attribute.normalized ? 1 : 0,
-        attribute.array.constructor.name
-      ].join(":");
-    }).join("|");
+    const isDetailObject = object.name.toLowerCase().includes(detailObjectName);
 
     for (const group of groups) {
       if (!group.count) continue;
       const material = materials[group.materialIndex] || materials[0];
       if (!material) continue;
 
-      const key = material.uuid + "|" + signature;
-      let bucket = buckets.get(key);
-      if (!bucket) {
-        bucket = { material, geometries: [] };
-        buckets.set(key, bucket);
-      }
-
-      const piece = new THREE.BufferGeometry();
-      for (const name of attributeNames) {
-        piece.setAttribute(name, geometry.attributes[name].clone());
-      }
-
-      const sourceIndex = geometry.index?.array;
       const start = group.start || 0;
-      const count = group.count ?? (sourceIndex?.length ?? geometry.attributes.position.count);
-      const indices = sourceIndex
+      const count = group.count ?? (geometry.index?.count ?? geometry.attributes.position.count);
+      const sourceIndex = geometry.index?.array;
+      const groupIndices = sourceIndex
         ? sourceIndex.slice(start, start + count)
         : Uint32Array.from({ length: count }, (_, index) => start + index);
-      piece.setIndex(new THREE.BufferAttribute(indices, 1));
-      piece.applyMatrix4(object.matrixWorld);
-      bucket.geometries.push(piece);
+      const components = isDetailObject
+        ? splitConnectedTriangleComponents(groupIndices)
+        : [Array.from(groupIndices)];
+
+      for (const componentIndices of components) {
+        if (!componentIndices.length) continue;
+        let piece;
+        let componentVertexIds;
+
+        if (isDetailObject) {
+          const compact = makeCompactPiece(geometry, componentIndices);
+          piece = compact.geometry;
+          componentVertexIds = compact.vertexIds;
+        } else {
+          piece = new THREE.BufferGeometry();
+          for (const [name, attribute] of Object.entries(geometry.attributes)) {
+            piece.setAttribute(name, attribute.clone());
+          }
+          piece.setIndex(new THREE.BufferAttribute(new Uint32Array(componentIndices), 1));
+          componentVertexIds = null;
+        }
+
+        piece.applyMatrix4(object.matrixWorld);
+        if (isDetailObject && componentVertexIds) {
+          const positions = geometry.attributes.position;
+          const points = componentVertexIds.map((vertexId) => new THREE.Vector3(
+            positions.getX(vertexId),
+            positions.getY(vertexId),
+            positions.getZ(vertexId)
+          ));
+          const componentBounds = new THREE.Box3().setFromPoints(points);
+          const [offsetX, offsetY, offsetZ] = detailCorrection(material.name || "", componentBounds);
+          if (offsetX || offsetY || offsetZ) {
+            piece.translate(offsetX, offsetY, offsetZ);
+          }
+        }
+
+        const attributeSignature = Object.keys(piece.attributes).sort().map((name) => {
+          const attribute = piece.attributes[name];
+          return [
+            name,
+            attribute.itemSize,
+            attribute.normalized ? 1 : 0,
+            attribute.array.constructor.name
+          ].join(":");
+        }).join("|");
+        const key = material.uuid + "|" + attributeSignature;
+        let bucket = buckets.get(key);
+        if (!bucket) {
+          bucket = { material, geometries: [] };
+          buckets.set(key, bucket);
+        }
+        bucket.geometries.push(piece);
+      }
     }
   });
 
@@ -354,7 +502,54 @@ function buildMergedPrerunnerVisual(sourceScene) {
     }
   }
 
-  return { visual: mergedRoot, triangleCount, meshCount };
+  // The GLTF left the rear of the cab entirely open. Add a painted rear cab
+  // panel with a compact horizontal window and a dark inset surround.
+  const rearCabBlue = new THREE.MeshStandardMaterial({
+    color: 0x075b8c,
+    roughness: 0.34,
+    metalness: 0.36,
+    side: THREE.DoubleSide
+  });
+  const rearWindowFrame = new THREE.MeshStandardMaterial({
+    color: 0x101820,
+    roughness: 0.44,
+    metalness: 0.18,
+    side: THREE.DoubleSide
+  });
+  const rearWindowGlass = new THREE.MeshStandardMaterial({
+    color: 0x142b3d,
+    roughness: 0.2,
+    metalness: 0.12,
+    transparent: true,
+    opacity: 0.88,
+    side: THREE.DoubleSide
+  });
+  const rearPanel = new THREE.Mesh(
+    new THREE.BoxGeometry(1.38, 0.44, 0.028),
+    rearCabBlue
+  );
+  rearPanel.name = "Concept4 painted rear cab panel";
+  rearPanel.position.set(0, 1.045, -0.738);
+  const rearFrame = new THREE.Mesh(
+    new THREE.BoxGeometry(0.80, 0.265, 0.018),
+    rearWindowFrame
+  );
+  rearFrame.name = "Concept4 rectangular rear-window surround";
+  rearFrame.position.set(0, 1.085, -0.758);
+  const rearGlass = new THREE.Mesh(
+    new THREE.BoxGeometry(0.70, 0.175, 0.02),
+    rearWindowGlass
+  );
+  rearGlass.name = "Concept4 rectangular tinted rear window";
+  rearGlass.position.set(0, 1.085, -0.772);
+  for (const mesh of [rearPanel, rearFrame, rearGlass]) {
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
+    mesh.frustumCulled = true;
+    mergedRoot.add(mesh);
+  }
+
+  return { visual: mergedRoot, triangleCount, meshCount: meshCount + 3 };
 }
 
 async function loadPrerunnerShell() {
@@ -430,6 +625,13 @@ const {
 
 const makeCarVisual = createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellModel });
 const localCar = makeCarVisual(0xffa33d);
+let selectedShellStyle = shellModel ? "prerunner" : "classic";
+function setSelectedShellStyle(style) {
+  selectedShellStyle = style === "classic" ? "classic" : "prerunner";
+  selectedShellStyle = localCar.setShellStyle(selectedShellStyle);
+  return selectedShellStyle;
+}
+localCar.setShellStyle(selectedShellStyle);
 
 
 function updateLocalVisual() {
@@ -506,6 +708,8 @@ const game = {
   arenaVisuals,
   localCar,
   makeCarVisual,
+  getShellStyle: () => selectedShellStyle,
+  setShellStyle: setSelectedShellStyle,
   updateLocalVisual,
   showToast
 };
