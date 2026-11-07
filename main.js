@@ -259,8 +259,8 @@ const mapLayouts = {
   "gravel-basin": gravelBasinSystem.trackLayout
 };
 
-// Decode the optional Ranger body before creating physics. If the model cannot
-// be decoded, the game automatically uses the original procedural truck instead.
+// Load the painted prerunner shell before creating physics so its measured
+// envelope can shape the rollover colliders and preserve tire/body clearance.
 // Merge the GLTF's many small pieces by material/attribute layout once.
 // This keeps the paint, decal texture, and lamp materials intact while
 // reducing draw calls for every local and remote vehicle.
@@ -428,7 +428,7 @@ const {
   spawnYaw
 } = physicsSystem;
 
-const makeCarVisual = createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellGeometry, shellModel });
+const makeCarVisual = createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellModel });
 const localCar = makeCarVisual(0xffa33d);
 
 
