@@ -1,4 +1,4 @@
-// Multiplayer Sandbox builder, continuous thrusters, and shared impulse beacons.
+// Multiplayer Sandbox builder, vehicle gadgets, and shared physics events.
 export function createSandboxSystem(game) {
   const { THREE, CANNON, scene, chassisBody, localCar, $ } = game;
   const builderPanel = $("sandboxBuilderPanel");
@@ -7,18 +7,28 @@ export function createSandboxSystem(game) {
   const attachmentCache = new WeakMap();
   const beacons = [];
   const waves = [];
+  const projectiles = [];
   const seenEvents = new Set();
   const held = { lift: false, forward: false };
-  const cooldowns = { beacon: 0 };
+  const heldAssignments = Object.create(null);
+  const launcherCharge = { key: null, startedAt: 0, charge: 0, lastUiAt: 0 };
+  const cooldowns = { beacon: 0, launcher: 0 };
   const BEACON_ARM_DELAY = 3000;
   const BEACON_TRIGGER_RADIUS = 8;
+  const MAX_EQUIPPED_GADGETS = 3;
+  const SLOT_KEYS = ["q", "e", "f"];
+  const LAUNCHER_MAX_CHARGE_MS = 1800;
+  const LAUNCHER_COOLDOWN_MS = 900;
+  const ORB_GRAVITY = 9.82;
+  const ORB_RADIUS = 0.22;
   // Constant acceleration while Q is held. This is a directional thruster,
   // not a height- or speed-hold controller.
   const JUMP_THRUSTER_ACCELERATION = 26;
   const PARTS = [
     { id: "lift", title: "JUMP THRUSTERS" },
     { id: "forward", title: "FORWARD THRUSTERS" },
-    { id: "beacon", title: "IMPULSE BEACON" }
+    { id: "beacon", title: "IMPULSE BEACON" },
+    { id: "gravity-orb", title: "GRAVITY ORB LAUNCHER" }
   ];
 
   let active = false;
@@ -331,11 +341,38 @@ export function createSandboxSystem(game) {
     root.add(group);
   }
 
+  function makeGravityOrbLauncherModule(root) {
+    const group = new THREE.Group();
+    group.name = "sandbox-gravity-orb-launcher-module";
+    const mount = new THREE.MeshStandardMaterial({
+      color: 0x202b35, roughness: 0.42, metalness: 0.78
+    });
+    const barrel = new THREE.MeshStandardMaterial({
+      color: 0x344b5d, roughness: 0.28, metalness: 0.86
+    });
+    const blue = new THREE.MeshBasicMaterial({
+      color: 0x168fff, toneMapped: false
+    });
+    addBox(group, [0.48, 0.10, 0.52], [0, 0.24, -0.12], mount);
+    addBox(group, [0.13, 0.20, 0.15], [0, 0.39, -0.20], mount);
+    const tube = addCylinder(group, 0.115, 0.15, 0.82, [0, 0.51, -0.42], barrel,
+      [-Math.PI / 2 + 0.70, 0, 0]);
+    tube.castShadow = true;
+    const muzzle = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.018, 8, 28), blue);
+    muzzle.position.set(0, 0.78, -0.72);
+    muzzle.rotation.x = -Math.PI + 0.70;
+    group.add(muzzle);
+    const statusOrb = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 10), blue);
+    statusOrb.position.set(0, 0.78, -0.72);
+    group.add(statusOrb);
+    root.add(group);
+  }
+
   function applyLoadout(visual, requested) {
     if (!visual?.root) return;
     const ids = [...new Set((Array.isArray(requested) ? requested : []).filter((id) =>
       PARTS.some((part) => part.id === id)
-    ))].sort();
+    ))].slice(0, MAX_EQUIPPED_GADGETS);
     const key = ids.join("|");
     const previous = attachmentCache.get(visual);
     if (previous?.key === key) {
@@ -353,10 +390,11 @@ export function createSandboxSystem(game) {
     }
 
     const group = new THREE.Group();
-    group.name = "sandbox-thruster-and-beacon-parts";
+    group.name = "sandbox-gadget-attachments";
     const liftFlames = ids.includes("lift") ? makeJumpThrusters(group, visual === localCar) : [];
     const forwardFlames = ids.includes("forward") ? makeForwardThrusters(group) : [];
     if (ids.includes("beacon")) makeImpulseBeaconModule(group);
+    if (ids.includes("gravity-orb")) makeGravityOrbLauncherModule(group);
     group.visible = visual === localCar ? active : true;
     visual.root.add(group);
 
@@ -366,7 +404,12 @@ export function createSandboxSystem(game) {
   }
 
   function getLoadout() {
-    return [...loadout].sort();
+    return [...loadout].slice(0, MAX_EQUIPPED_GADGETS);
+  }
+
+  function getPartForKey(key) {
+    const index = SLOT_KEYS.indexOf(key);
+    return index < 0 ? null : (getLoadout()[index] || null);
   }
 
   function getThrusterState() {
@@ -482,18 +525,27 @@ export function createSandboxSystem(game) {
     }
   }
   function renderBuilder() {
+    const orderedLoadout = getLoadout();
     document.querySelectorAll("[data-sandbox-part]").forEach((button) => {
-      const equipped = loadout.has(button.dataset.sandboxPart);
+      const id = button.dataset.sandboxPart;
+      const equipped = loadout.has(id);
+      const slotIndex = orderedLoadout.indexOf(id);
       button.classList.toggle("equipped", equipped);
       button.setAttribute("aria-pressed", equipped ? "true" : "false");
       const label = button.querySelector(".sandbox-part-action");
-      if (label) label.textContent = equipped ? "REMOVE PART" : "ADD TO TRUCK";
+      if (label) {
+        label.textContent = equipped
+          ? SLOT_KEYS[slotIndex].toUpperCase() + " SLOT · REMOVE"
+          : loadout.size >= MAX_EQUIPPED_GADGETS ? "3 SLOTS FULL" : "ADD TO TRUCK";
+      }
     });
     const equippedLabel = $("sandboxEquippedValue");
     if (equippedLabel) {
-      equippedLabel.textContent = loadout.size
-        ? getLoadout().map((id) => PARTS.find((part) => part.id === id).title).join(" · ")
-        : "NO THRUSTER OR BEACON PARTS EQUIPPED";
+      equippedLabel.textContent = orderedLoadout.length
+        ? orderedLoadout.map((id, index) =>
+          SLOT_KEYS[index].toUpperCase() + ": " + (PARTS.find((part) => part.id === id)?.title || id)
+        ).join(" · ")
+        : "NO GADGETS EQUIPPED";
     }
     const mapLabel = $("sandboxBuilderMapLabel");
     if (mapLabel) {
@@ -507,17 +559,31 @@ export function createSandboxSystem(game) {
     if (!controlsPanel) return;
     controlsPanel.style.display = active && inMap ? "flex" : "none";
     const status = getThrusterState();
-    document.querySelectorAll("[data-sandbox-control]").forEach((item) => {
-      const id = item.dataset.sandboxControl;
-      const equipped = loadout.has(id);
-      item.classList.toggle("equipped", equipped);
+    document.querySelectorAll("[data-sandbox-slot]").forEach((item) => {
+      const slotIndex = Number(item.dataset.sandboxSlot);
+      const key = SLOT_KEYS[slotIndex];
+      const id = getLoadout()[slotIndex] || null;
+      const part = PARTS.find((candidate) => candidate.id === id);
+      const keyLabel = item.querySelector("kbd");
+      const title = item.querySelector("strong");
       const label = item.querySelector("small");
-      if (!label) return;
-      if (!equipped) label.textContent = "NOT EQUIPPED";
-      else if (id === "lift") label.textContent = status.lift ? "ACTIVE" : "HOLD Q";
-      else if (id === "forward") label.textContent = status.forward ? "ACTIVE" : "HOLD E";
-      else label.textContent = "PRESS F";
-      item.classList.toggle("active", (id === "lift" && status.lift) || (id === "forward" && status.forward));
+      const isCharging = id === "gravity-orb" && launcherCharge.key === key;
+      const isActive = (id === "lift" && status.lift) ||
+        (id === "forward" && status.forward) || isCharging;
+      if (keyLabel) keyLabel.textContent = key ? key.toUpperCase() : "?";
+      if (title) title.textContent = part?.title || "EMPTY SLOT";
+      if (label) {
+        if (!part) label.textContent = "NO GADGET";
+        else if (id === "lift") label.textContent = status.lift ? "ACTIVE" : "HOLD TO LIFT";
+        else if (id === "forward") label.textContent = status.forward ? "ACTIVE" : "HOLD TO BOOST";
+        else if (id === "beacon") label.textContent = "PRESS TO PLACE";
+        else if (isCharging) label.textContent = "CHARGING " + Math.round(launcherCharge.charge * 100) + "%";
+        else if (performance.now() < cooldowns.launcher) label.textContent = "RECHARGING";
+        else label.textContent = "HOLD · RELEASE TO FIRE";
+      }
+      item.classList.toggle("equipped", Boolean(part));
+      item.classList.toggle("active", isActive);
+      item.classList.toggle("charging", isCharging);
     });
   }
 
@@ -529,6 +595,11 @@ export function createSandboxSystem(game) {
   function clearHeldControls() {
     held.lift = false;
     held.forward = false;
+    for (const key of Object.keys(heldAssignments)) delete heldAssignments[key];
+    launcherCharge.key = null;
+    launcherCharge.startedAt = 0;
+    launcherCharge.charge = 0;
+    if (gravityOrbAimIndicator) gravityOrbAimIndicator.group.visible = false;
     flightControlArmed = false;
     updateThrusterVisuals(performance.now());
     renderControlHints();
@@ -559,7 +630,7 @@ export function createSandboxSystem(game) {
 
   function beginSession() {
     showBuilder();
-    game.showToast("Sandbox joined — equip your thrusters and beacon before entering");
+    game.showToast("Sandbox joined — equip up to three gadgets before entering");
   }
 
   function enterMap() {
@@ -572,7 +643,7 @@ export function createSandboxSystem(game) {
     game.garage.showDriveScreen();
     localCar.setPlayerName?.(game.multiplayer?.driverName || "Driver", true);
     renderControlHints();
-    game.showToast("Sandbox: hold Q to fly · hold E to boost · F to place an impulse beacon");
+    game.showToast("Sandbox gadgets use their assigned Q / E / F slots. Hold the Gravity Orb Launcher key, then release to fire.");
   }
 
   function endSession() {
@@ -591,6 +662,9 @@ export function createSandboxSystem(game) {
       dispose(wave.group);
     }
     waves.length = 0;
+    for (const projectile of projectiles) removeGravityOrbVisual(projectile.visual);
+    projectiles.length = 0;
+    if (gravityOrbAimIndicator) gravityOrbAimIndicator.group.visible = false;
     if (localAttachment) localAttachment.group.visible = false;
     renderControlHints();
     seenEvents.clear();
@@ -602,9 +676,15 @@ export function createSandboxSystem(game) {
   }
 
   function validStuntEvent(event) {
-    return event && typeof event.id === "string" && event.id.length <= 80 &&
-      event.type === "impulse-beacon" &&
-      [event.x, event.y, event.z, event.yaw].every(Number.isFinite);
+    if (!event || typeof event.id !== "string" || event.id.length > 80) return false;
+    if (event.type === "impulse-beacon") {
+      return [event.x, event.y, event.z, event.yaw].every(Number.isFinite);
+    }
+    return event.type === "gravity-orb" &&
+      [event.x, event.y, event.z, event.vx, event.vy, event.vz,
+        event.charge, event.launchedAt].every(Number.isFinite) &&
+      event.charge >= 0 && event.charge <= 1 &&
+      Math.abs(event.vx) <= 80 && Math.abs(event.vy) <= 80 && Math.abs(event.vz) <= 80;
   }
 
   function rememberEvent(id) {
@@ -655,6 +735,311 @@ export function createSandboxSystem(game) {
     const a = rows[x0][z0] * (1 - tz) + rows[x0][z0 + 1] * tz;
     const b = rows[x0 + 1][z0] * (1 - tz) + rows[x0 + 1][z0 + 1] * tz;
     return a * (1 - tx) + b * tx;
+  }
+
+  function getGravityOrbLaunchState(charge) {
+    const orientation = new THREE.Quaternion(
+      chassisBody.quaternion.x,
+      chassisBody.quaternion.y,
+      chassisBody.quaternion.z,
+      chassisBody.quaternion.w
+    );
+    const origin = new THREE.Vector3(
+      chassisBody.position.x,
+      chassisBody.position.y,
+      chassisBody.position.z
+    ).add(new THREE.Vector3(0, 0.78, -0.72).applyQuaternion(orientation));
+    const direction = new THREE.Vector3(0, Math.sin(0.72), -Math.cos(0.72))
+      .applyQuaternion(orientation)
+      .normalize();
+    const speed = 12 + THREE.MathUtils.clamp(charge, 0, 1) * 15;
+    return { origin, velocity: direction.multiplyScalar(speed) };
+  }
+
+  function getOrbPosition(start, velocity, time) {
+    return new THREE.Vector3(
+      start.x + velocity.x * time,
+      start.y + velocity.y * time - 0.5 * ORB_GRAVITY * time * time,
+      start.z + velocity.z * time
+    );
+  }
+
+  function predictOrbImpact(start, velocity) {
+    const step = 0.04;
+    const maxTime = 6;
+    for (let time = step; time <= maxTime; time += step) {
+      const position = getOrbPosition(start, velocity, time);
+      const groundY = sampleGroundHeight(position.x, position.z);
+      if (position.y - ORB_RADIUS <= groundY) {
+        return {
+          time,
+          position: new THREE.Vector3(position.x, groundY + ORB_RADIUS, position.z)
+        };
+      }
+    }
+    const position = getOrbPosition(start, velocity, maxTime);
+    const groundY = sampleGroundHeight(position.x, position.z);
+    return {
+      time: maxTime,
+      position: new THREE.Vector3(position.x, groundY + ORB_RADIUS, position.z)
+    };
+  }
+
+  function makeGravityOrbAimIndicator() {
+    const group = new THREE.Group();
+    group.name = "gravity-orb-landing-indicator";
+    const diskMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff3030, transparent: true, opacity: 0.14,
+      depthWrite: false, side: THREE.DoubleSide, toneMapped: false
+    });
+    const ringMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff4545, transparent: true, opacity: 0.88,
+      depthWrite: false, side: THREE.DoubleSide, toneMapped: false
+    });
+    const centerMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff7777, transparent: true, opacity: 0.92,
+      depthWrite: false, toneMapped: false
+    });
+    const disk = new THREE.Mesh(new THREE.CircleGeometry(1.18, 48), diskMaterial);
+    disk.rotation.x = -Math.PI / 2;
+    disk.position.y = 0.018;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.28, 0.045, 8, 48), ringMaterial);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 0.035;
+    const center = new THREE.Mesh(new THREE.CircleGeometry(0.15, 24), centerMaterial);
+    center.rotation.x = -Math.PI / 2;
+    center.position.y = 0.04;
+    group.add(disk, ring, center);
+    group.visible = false;
+    scene.add(group);
+    return { group, diskMaterial, ringMaterial };
+  }
+
+  function updateGravityOrbAimIndicator(prediction, charge) {
+    if (!gravityOrbAimIndicator || !prediction) return;
+    const indicator = gravityOrbAimIndicator;
+    indicator.group.position.set(
+      prediction.position.x,
+      sampleGroundHeight(prediction.position.x, prediction.position.z) + 0.045,
+      prediction.position.z
+    );
+    indicator.group.scale.setScalar(0.9 + charge * 0.18);
+    indicator.diskMaterial.opacity = 0.10 + charge * 0.12;
+    indicator.ringMaterial.opacity = 0.72 + charge * 0.25;
+    indicator.group.visible = true;
+  }
+
+  function makeGravityOrbVisual() {
+    const group = new THREE.Group();
+    group.name = "bright-blue-gravity-orb";
+    const shellMaterial = new THREE.MeshBasicMaterial({
+      color: 0x168fff, transparent: true, opacity: 0.62,
+      blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false
+    });
+    const coreMaterial = new THREE.MeshBasicMaterial({
+      color: 0xc8f5ff, toneMapped: false
+    });
+    const haloMaterial = new THREE.MeshBasicMaterial({
+      color: 0x087dff, transparent: true, opacity: 0.22,
+      blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false
+    });
+    const halo = new THREE.Mesh(new THREE.SphereGeometry(0.34, 18, 14), haloMaterial);
+    const shell = new THREE.Mesh(new THREE.SphereGeometry(0.25, 18, 14), shellMaterial);
+    const core = new THREE.Mesh(new THREE.SphereGeometry(0.145, 16, 12), coreMaterial);
+    group.add(halo, shell, core);
+    const ringMaterial = new THREE.MeshBasicMaterial({
+      color: 0x5ecaff, transparent: true, opacity: 0.88,
+      blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false
+    });
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.30, 0.022, 7, 28), ringMaterial);
+    ring.rotation.x = Math.PI / 2;
+    group.add(ring);
+    scene.add(group);
+
+    const trailGeometry = new THREE.BufferGeometry();
+    trailGeometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(54), 3));
+    trailGeometry.setDrawRange(0, 0);
+    const trailMaterial = new THREE.LineBasicMaterial({
+      color: 0x168fff, transparent: true, opacity: 0.88,
+      blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false
+    });
+    const trail = new THREE.Line(trailGeometry, trailMaterial);
+    trail.frustumCulled = false;
+    scene.add(trail);
+    return {
+      group, halo, ring, trail, trailGeometry, trailMaterial,
+      trailPoints: [], shellMaterial, haloMaterial, ringMaterial
+    };
+  }
+
+  function updateGravityOrbVisual(visual, position, age) {
+    visual.group.position.copy(position);
+    visual.halo.scale.setScalar(1 + Math.sin(age * 22) * 0.08);
+    visual.ring.rotation.z += 0.11;
+    const points = visual.trailPoints;
+    if (!points.length || points[points.length - 1].distanceToSquared(position) > 0.012) {
+      points.push(position.clone());
+      if (points.length > 18) points.shift();
+    }
+    const attribute = visual.trailGeometry.getAttribute("position");
+    points.forEach((point, index) => attribute.setXYZ(index, point.x, point.y, point.z));
+    attribute.needsUpdate = true;
+    visual.trailGeometry.setDrawRange(0, points.length);
+  }
+
+  function removeGravityOrbVisual(visual) {
+    if (!visual) return;
+    scene.remove(visual.group);
+    scene.remove(visual.trail);
+    dispose(visual.group);
+    visual.trailGeometry.dispose();
+    visual.trailMaterial.dispose();
+  }
+
+  function applyGravityBurst(origin, charge) {
+    const dx = chassisBody.position.x - origin.x;
+    const dy = (chassisBody.position.y - origin.y) * 0.48;
+    const dz = chassisBody.position.z - origin.z;
+    const radius = 10 + charge * 6;
+    const distance = Math.hypot(dx, dy, dz);
+    if (distance >= radius) return false;
+
+    const falloff = THREE.MathUtils.clamp(1 - distance / radius, 0, 1);
+    const strength = Math.pow(falloff, 0.72);
+    const outward = new THREE.Vector3(dx, 0, dz);
+    if (outward.lengthSq() < 0.0001) outward.set(0.6, 0, -0.4);
+    outward.normalize();
+
+    // A brief upward-and-outward game impulse sends nearby RC cars skyward.
+    // The impulse is mass-scaled by Cannon, so every truck gets the same feel.
+    const horizontalImpulse = (42 + charge * 48) * strength;
+    const verticalImpulse = (135 + charge * 120) * strength;
+    chassisBody.applyImpulse(new CANNON.Vec3(
+      outward.x * horizontalImpulse,
+      verticalImpulse,
+      outward.z * horizontalImpulse
+    ));
+    const spin = (2.5 + charge * 3.5) * strength;
+    chassisBody.angularVelocity.x = THREE.MathUtils.clamp(
+      chassisBody.angularVelocity.x + outward.z * spin, -13, 13
+    );
+    chassisBody.angularVelocity.z = THREE.MathUtils.clamp(
+      chassisBody.angularVelocity.z - outward.x * spin, -13, 13
+    );
+    chassisBody.wakeUp();
+    return true;
+  }
+
+  function triggerGravityOrbImpact(position, charge) {
+    applyGravityBurst(position, charge);
+    createBounceWave(
+      new THREE.Vector3(position.x, position.y + 0.12, position.z),
+      0x168fff,
+      1.28 + charge * 0.48
+    );
+  }
+
+  function createGravityOrbProjectile(event) {
+    if (!validStuntEvent(event) || !rememberEvent(event.id)) return false;
+    const start = new THREE.Vector3(event.x, event.y, event.z);
+    const velocity = new THREE.Vector3(event.vx, event.vy, event.vz);
+    const charge = THREE.MathUtils.clamp(event.charge, 0, 1);
+    const impact = predictOrbImpact(start, velocity);
+    const age = Math.max(0, Math.min(7, (Date.now() - event.launchedAt) / 1000));
+
+    if (age >= impact.time) {
+      triggerGravityOrbImpact(impact.position, charge);
+      return true;
+    }
+
+    const visual = makeGravityOrbVisual();
+    const projectile = { id: event.id, start, velocity, charge, age, impact, visual };
+    projectiles.push(projectile);
+    updateGravityOrbVisual(visual, getOrbPosition(start, velocity, age), age);
+    return true;
+  }
+
+  function launchGravityOrb(charge) {
+    const launch = getGravityOrbLaunchState(charge);
+    const event = {
+      id: makeEventId(),
+      type: "gravity-orb",
+      x: launch.origin.x,
+      y: launch.origin.y,
+      z: launch.origin.z,
+      vx: launch.velocity.x,
+      vy: launch.velocity.y,
+      vz: launch.velocity.z,
+      charge: THREE.MathUtils.clamp(charge, 0, 1),
+      launchedAt: Date.now()
+    };
+    if (!createGravityOrbProjectile(event)) return false;
+    game.multiplayer?.sendSandboxEvent?.(event);
+    game.showToast("Gravity orb launched");
+    return true;
+  }
+
+  function beginGravityOrbCharge(key, now) {
+    if (now < cooldowns.launcher) {
+      game.showToast("Gravity Orb Launcher is recharging");
+      return false;
+    }
+    launcherCharge.key = key;
+    launcherCharge.startedAt = now;
+    launcherCharge.charge = 0;
+    launcherCharge.lastUiAt = 0;
+    const launch = getGravityOrbLaunchState(0);
+    const prediction = predictOrbImpact(launch.origin, launch.velocity);
+    updateGravityOrbAimIndicator(prediction, 0);
+    renderControlHints();
+    return true;
+  }
+
+  function updateGravityOrbCharge(now) {
+    if (!launcherCharge.key) {
+      gravityOrbAimIndicator.group.visible = false;
+      return;
+    }
+    launcherCharge.charge = THREE.MathUtils.clamp(
+      (now - launcherCharge.startedAt) / LAUNCHER_MAX_CHARGE_MS, 0, 1
+    );
+    const launch = getGravityOrbLaunchState(launcherCharge.charge);
+    const prediction = predictOrbImpact(launch.origin, launch.velocity);
+    updateGravityOrbAimIndicator(prediction, launcherCharge.charge);
+    if (now - launcherCharge.lastUiAt >= 100) {
+      launcherCharge.lastUiAt = now;
+      renderControlHints();
+    }
+  }
+
+  function releaseGravityOrbCharge(key, now) {
+    if (launcherCharge.key !== key) return false;
+    const charge = THREE.MathUtils.clamp(
+      (now - launcherCharge.startedAt) / LAUNCHER_MAX_CHARGE_MS, 0, 1
+    );
+    launcherCharge.key = null;
+    launcherCharge.startedAt = 0;
+    launcherCharge.charge = 0;
+    gravityOrbAimIndicator.group.visible = false;
+    cooldowns.launcher = now + LAUNCHER_COOLDOWN_MS;
+    launchGravityOrb(charge);
+    renderControlHints();
+    return true;
+  }
+
+  function updateGravityOrbProjectiles(delta) {
+    for (let i = projectiles.length - 1; i >= 0; i--) {
+      const projectile = projectiles[i];
+      projectile.age += Math.max(0, delta);
+      if (projectile.age >= projectile.impact.time) {
+        triggerGravityOrbImpact(projectile.impact.position, projectile.charge);
+        removeGravityOrbVisual(projectile.visual);
+        projectiles.splice(i, 1);
+        continue;
+      }
+      const position = getOrbPosition(projectile.start, projectile.velocity, projectile.age);
+      updateGravityOrbVisual(projectile.visual, position, projectile.age);
+    }
   }
 
   function createBounceWave(position, color = 0x40c5ff, scale = 1) {
@@ -928,6 +1313,16 @@ export function createSandboxSystem(game) {
     const canDrive = active && inMap && !game.isPaused?.();
 
     updateThrusterVisuals(now);
+    if (canDrive) {
+      updateGravityOrbCharge(now);
+      updateGravityOrbProjectiles(delta);
+      if (!launcherCharge.key && cooldowns.launcher && now >= cooldowns.launcher) {
+        cooldowns.launcher = 0;
+        renderControlHints();
+      }
+    } else if (gravityOrbAimIndicator) {
+      gravityOrbAimIndicator.group.visible = false;
+    }
 
     for (let i = beacons.length - 1; i >= 0; i--) {
       const beacon = beacons[i];
@@ -969,26 +1364,26 @@ export function createSandboxSystem(game) {
   function handleKeyDown(key, event) {
     if (!active || !inMap || !game.multiplayer?.joined || game.isPaused?.()) return false;
     if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return false;
+    if (!SLOT_KEYS.includes(key)) return false;
 
-    const part = ({ q: "lift", e: "forward", f: "beacon" })[key];
+    const part = getPartForKey(key);
     if (!part) return false;
     event?.preventDefault?.();
+    if (event?.repeat) return true;
 
-    if (!loadout.has(part)) {
-      if (!event?.repeat) {
-        const title = PARTS.find((item) => item.id === part)?.title || "that part";
-        game.showToast("Equip " + title + " in the builder first");
-      }
-      return true;
-    }
-
-    if (part === "lift") held.lift = true;
-    else if (part === "forward") held.forward = true;
-    else if (part === "beacon" && !event?.repeat) {
+    if (part === "lift") {
+      held.lift = true;
+      heldAssignments[key] = part;
+    } else if (part === "forward") {
+      held.forward = true;
+      heldAssignments[key] = part;
+    } else if (part === "beacon") {
       const now = performance.now();
       if (now < cooldowns.beacon) return true;
       cooldowns.beacon = now + 2200;
       deployImpulseBeacon();
+    } else if (part === "gravity-orb") {
+      beginGravityOrbCharge(key, performance.now());
     }
 
     renderControlHints();
@@ -997,11 +1392,17 @@ export function createSandboxSystem(game) {
 
   function handleKeyUp(key) {
     let handled = false;
-    if (key === "q") {
+    const assignedPart = heldAssignments[key];
+    delete heldAssignments[key];
+    if (assignedPart === "lift") {
       held.lift = false;
       handled = true;
-    } else if (key === "e") {
+    } else if (assignedPart === "forward") {
       held.forward = false;
+      handled = true;
+    }
+    if (launcherCharge.key === key) {
+      releaseGravityOrbCharge(key, performance.now());
       handled = true;
     }
     if (handled) renderControlHints();
@@ -1011,8 +1412,15 @@ export function createSandboxSystem(game) {
   document.querySelectorAll("[data-sandbox-part]").forEach((button) => {
     button.addEventListener("click", () => {
       const id = button.dataset.sandboxPart;
-      if (loadout.has(id)) loadout.delete(id);
-      else loadout.add(id);
+      if (loadout.has(id)) {
+        loadout.delete(id);
+      } else {
+        if (loadout.size >= MAX_EQUIPPED_GADGETS) {
+          game.showToast("Your truck has 3 gadget slots. Remove one before adding another.");
+          return;
+        }
+        loadout.add(id);
+      }
       clearHeldControls();
       applyLoadout(localCar, getLoadout());
       if (localAttachment) localAttachment.group.visible = active;
@@ -1023,6 +1431,7 @@ export function createSandboxSystem(game) {
   $("sandboxEnterMapButton").addEventListener("click", enterMap);
   $("sandboxLeaveButton").addEventListener("click", () => game.multiplayer?.leaveArena?.());
 
+  const gravityOrbAimIndicator = makeGravityOrbAimIndicator();
   applyLoadout(localCar, getLoadout());
   renderBuilder();
 
@@ -1037,8 +1446,10 @@ export function createSandboxSystem(game) {
     handleKeyUp,
     clearHeldControls,
     receiveRemoteStuntEvent(peerId, event) {
-      if (!active || typeof peerId !== "string" || !validStuntEvent(event)) return false;
-      return createImpulseBeacon(event);
+      if (!active || !inMap || typeof peerId !== "string" || !validStuntEvent(event)) return false;
+      return event.type === "gravity-orb"
+        ? createGravityOrbProjectile(event)
+        : createImpulseBeacon(event);
     },
     getLoadout,
     getThrusterState,

@@ -307,6 +307,12 @@
       box-shadow: inset 0 0 0 1px rgba(79,218,255,.12);
     }
     .sandbox-control-item.active .sandbox-control-copy small { color: #66e4ff; }
+    .sandbox-control-item.charging {
+      border-color: rgba(255,85,85,.78);
+      background: rgba(192,40,40,.20);
+      box-shadow: inset 0 0 0 1px rgba(255,85,85,.12);
+    }
+    .sandbox-control-item.charging .sandbox-control-copy small { color: #ff8a8a; }
     .sandbox-control-copy { display: grid; gap: 2px; min-width: 0; }
     .sandbox-control-copy strong {
       color: #eaf4fc; font: 800 8px "Orbitron",ui-sans-serif,sans-serif;
@@ -637,17 +643,18 @@
     <div class="sandbox-builder-card">
       <div class="sandbox-builder-kicker">MULTIPLAYER SANDBOX WORKSHOP</div>
       <h2 class="sandbox-builder-title">BUILD YOUR TRUCK</h2>
-      <p class="sandbox-builder-copy">Your truck is displayed in the center. Equip the thrusters and beacon you want, drag the view to inspect your build, and enter the map whenever you are ready.</p>
+      <p class="sandbox-builder-copy">Equip up to three gadgets. The order you add them assigns Q, E, and F from first to third. Drag the view to inspect your truck, then enter the map.</p>
       <div id="sandboxBuilderMapLabel" class="sandbox-map-chip">CLUB DIRT CIRCUIT</div>
       <div id="sandboxPlayerCount" class="sandbox-player-count">1 / 8 DRIVERS CONNECTED</div>
       <div class="sandbox-builder-kicker">AVAILABLE MODULES</div>
       <div class="sandbox-part-list">
-        <button class="sandbox-part-card" type="button" data-sandbox-part="lift" aria-pressed="false"><span class="sandbox-part-copy"><strong>JUMP THRUSTERS</strong><small>Hold Q to rise. While airborne, use W/S to pitch and A/D to roll; lift follows the truck's orientation.</small></span><span class="sandbox-part-action">ADD TO TRUCK</span></button>
-        <button class="sandbox-part-card" type="button" data-sandbox-part="forward" aria-pressed="false"><span class="sandbox-part-copy"><strong>FORWARD THRUSTERS</strong><small>Hold E for a powerful, sustained forward boost.</small></span><span class="sandbox-part-action">ADD TO TRUCK</span></button>
-        <button class="sandbox-part-card" type="button" data-sandbox-part="beacon" aria-pressed="false"><span class="sandbox-part-copy"><strong>IMPULSE BEACON</strong><small>Press F to place a glowing ground beacon. It charges briefly, then emits a wide, non-damaging spring pulse.</small></span><span class="sandbox-part-action">ADD TO TRUCK</span></button>
+        <button class="sandbox-part-card" type="button" data-sandbox-part="lift" aria-pressed="false"><span class="sandbox-part-copy"><strong>JUMP THRUSTERS</strong><small>Hold the assigned key to rise. While airborne, use W/S to pitch and A/D to roll; lift follows the truck's orientation.</small></span><span class="sandbox-part-action">ADD TO TRUCK</span></button>
+        <button class="sandbox-part-card" type="button" data-sandbox-part="forward" aria-pressed="false"><span class="sandbox-part-copy"><strong>FORWARD THRUSTERS</strong><small>Hold the assigned key for a powerful, sustained forward boost.</small></span><span class="sandbox-part-action">ADD TO TRUCK</span></button>
+        <button class="sandbox-part-card" type="button" data-sandbox-part="beacon" aria-pressed="false"><span class="sandbox-part-copy"><strong>IMPULSE BEACON</strong><small>Press the assigned key to place a glowing ground beacon. It charges briefly, then releases a spring pulse when a car gets close.</small></span><span class="sandbox-part-action">ADD TO TRUCK</span></button>
+        <button class="sandbox-part-card" type="button" data-sandbox-part="gravity-orb" aria-pressed="false"><span class="sandbox-part-copy"><strong>GRAVITY ORB LAUNCHER</strong><small>Hold its assigned key to charge a bright blue orb. Release to fire it in a curved arc; the red ground marker previews its landing point and the impact flings nearby cars upward.</small></span><span class="sandbox-part-action">ADD TO TRUCK</span></button>
       </div>
-      <div class="sandbox-equipped-label">CURRENT BUILD<span id="sandboxEquippedValue">NO THRUSTERS OR BEACON EQUIPPED</span></div>
-      <div class="sandbox-builder-hint">DRAG TO ROTATE THE TRUCK · YOU CAN ENTER THE MAP BEFORE OR AFTER OTHER PLAYERS</div>
+      <div class="sandbox-equipped-label">CURRENT BUILD<span id="sandboxEquippedValue">NO GADGETS EQUIPPED</span></div>
+      <div class="sandbox-builder-hint">UP TO 3 GADGETS · FIRST EQUIPPED = Q · SECOND = E · THIRD = F</div>
       <button id="sandboxEnterMapButton" class="menu-button" type="button">ENTER MAP</button>
       <button id="sandboxLeaveButton" type="button">LEAVE SANDBOX SESSION</button>
     </div>
@@ -785,16 +792,16 @@
       <div><kbd>R</kbd> Reset car</div>
     </div>
     <div id="sandboxControlsCard" class="hud-card" aria-label="Sandbox gadget controls" style="display:none">
-      <div class="sandbox-controls-heading">TOOL CONTROLS</div>
+      <div class="sandbox-controls-heading">EQUIPPED GADGETS · Q / E / F</div>
       <div class="sandbox-controls-list">
-        <div class="sandbox-control-item" data-sandbox-control="lift">
-          <kbd>Q</kbd><span class="sandbox-control-copy"><strong>JUMP THRUSTERS</strong><small>NOT EQUIPPED</small></span>
+        <div class="sandbox-control-item" data-sandbox-slot="0">
+          <kbd>Q</kbd><span class="sandbox-control-copy"><strong>EMPTY SLOT</strong><small>NO GADGET</small></span>
         </div>
-        <div class="sandbox-control-item" data-sandbox-control="forward">
-          <kbd>E</kbd><span class="sandbox-control-copy"><strong>FORWARD THRUSTERS</strong><small>NOT EQUIPPED</small></span>
+        <div class="sandbox-control-item" data-sandbox-slot="1">
+          <kbd>E</kbd><span class="sandbox-control-copy"><strong>EMPTY SLOT</strong><small>NO GADGET</small></span>
         </div>
-        <div class="sandbox-control-item" data-sandbox-control="beacon">
-          <kbd>F</kbd><span class="sandbox-control-copy"><strong>IMPULSE BEACON</strong><small>NOT EQUIPPED</small></span>
+        <div class="sandbox-control-item" data-sandbox-slot="2">
+          <kbd>F</kbd><span class="sandbox-control-copy"><strong>EMPTY SLOT</strong><small>NO GADGET</small></span>
         </div>
       </div>
       <div class="sandbox-controls-heading">IN FLIGHT: W/S PITCH · A/D ROLL</div>
