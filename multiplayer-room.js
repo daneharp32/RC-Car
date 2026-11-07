@@ -168,15 +168,31 @@ export class MultiplayerRoom {
           x: event.x, y: event.y, z: event.z, yaw: event.yaw
         };
       } else if (event.type === "gravity-orb") {
-        if (![event.vx, event.vy, event.vz, event.charge, event.launchedAt].every(Number.isFinite) ||
+        const radiusMultiplier = event.radiusMultiplier ?? 1;
+        const powerMultiplier = event.powerMultiplier ?? 1;
+        if (![event.vx, event.vy, event.vz, event.charge, event.launchedAt,
+          radiusMultiplier, powerMultiplier].every(Number.isFinite) ||
             [event.vx, event.vy, event.vz].some((value) => Math.abs(value) > 80) ||
             event.charge < 0 || event.charge > 1 ||
+            radiusMultiplier < 0.25 || radiusMultiplier > 5 ||
+            powerMultiplier < 0.25 || powerMultiplier > 5 ||
             Math.abs(event.launchedAt - Date.now()) > 120_000) return;
         safeEvent = {
           id: event.id, type: event.type,
           x: event.x, y: event.y, z: event.z,
           vx: event.vx, vy: event.vy, vz: event.vz,
-          charge: event.charge, launchedAt: event.launchedAt
+          charge: event.charge,
+          radiusMultiplier,
+          powerMultiplier,
+          launchedAt: event.launchedAt
+        };
+      } else if (event.type === "orbital-laser") {
+        if (!Number.isFinite(event.startedAt) ||
+            Math.abs(event.startedAt - Date.now()) > 120_000) return;
+        safeEvent = {
+          id: event.id, type: event.type,
+          x: event.x, y: event.y, z: event.z,
+          startedAt: event.startedAt
         };
       } else {
         return;
