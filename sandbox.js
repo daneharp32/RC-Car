@@ -26,6 +26,7 @@ export function createSandboxSystem(game) {
   const orbitalLaserSequences = [];
   let secretChordLatched = false;
   let secretMenuOpen = false;
+  let orbitalScreenEffects = null;
   const BEACON_ARM_DELAY = 3000;
   const BEACON_TRIGGER_RADIUS = 8;
   const MAX_EQUIPPED_GADGETS = 3;
@@ -33,7 +34,7 @@ export function createSandboxSystem(game) {
   const LAUNCHER_MAX_CHARGE_MS = 1800;
   const LAUNCHER_COOLDOWN_MS = 900;
   const ORBITAL_LASER_COOLDOWN_MS = 28_000;
-  const ORBITAL_LASER_WARNING_MS = 7200;
+  const ORBITAL_LASER_WARNING_MS = 10_000;
   const ORBITAL_LASER_EXPANSION_MS = 900;
   const ORBITAL_LASER_RESET_MS = ORBITAL_LASER_WARNING_MS + ORBITAL_LASER_EXPANSION_MS;
   const ORBITAL_LASER_CLEANUP_MS = ORBITAL_LASER_RESET_MS + 2400;
@@ -861,6 +862,7 @@ export function createSandboxSystem(game) {
     projectiles.length = 0;
     for (const sequence of orbitalLaserSequences) removeOrbitalLaserVisual(sequence.visual);
     orbitalLaserSequences.length = 0;
+    hideOrbitalScreenEffects();
     if (gravityOrbAimIndicator) gravityOrbAimIndicator.group.visible = false;
     if (localAttachment) localAttachment.group.visible = false;
     renderControlHints();
@@ -979,7 +981,262 @@ export function createSandboxSystem(game) {
     };
   }
 
-  function makeOrbitalLaserVisual(center) {
+
+  function ensureOrbitalScreenEffects() {
+    if (orbitalScreenEffects?.root?.isConnected) return orbitalScreenEffects;
+    const root = document.createElement("div");
+    root.id = "orbitalLaserScreenEffects";
+    Object.assign(root.style, {
+      position: "fixed",
+      inset: "0",
+      zIndex: "2147483000",
+      pointerEvents: "none",
+      overflow: "hidden",
+      display: "none"
+    });
+
+    const whiteout = document.createElement("div");
+    Object.assign(whiteout.style, {
+      position: "absolute",
+      inset: "0",
+      background: "#ffffff",
+      opacity: "0",
+      willChange: "opacity"
+    });
+
+    const countdown = document.createElement("div");
+    Object.assign(countdown.style, {
+      position: "absolute",
+      top: "16%",
+      left: "50%",
+      transform: "translateX(-50%)",
+      display: "none",
+      justifyItems: "center",
+      gap: "9px",
+      width: "min(92vw, 620px)",
+      textAlign: "center",
+      fontFamily: "Orbitron, ui-sans-serif, sans-serif",
+      textShadow: "0 2px 14px rgba(0, 95, 170, .34)"
+    });
+
+    const number = document.createElement("div");
+    Object.assign(number.style, {
+      color: "#087fc4",
+      fontSize: "clamp(58px, 11vw, 116px)",
+      fontWeight: "1000",
+      lineHeight: "0.95",
+      letterSpacing: ".035em",
+      fontVariantNumeric: "tabular-nums",
+      textShadow: "0 0 22px rgba(40, 171, 255, .42), 0 3px 12px rgba(255,255,255,.96)"
+    });
+
+    const title = document.createElement("div");
+    Object.assign(title.style, {
+      color: "#103e5a",
+      fontSize: "clamp(11px, 1.9vw, 17px)",
+      fontWeight: "1000",
+      letterSpacing: ".24em",
+      lineHeight: "1.5"
+    });
+
+    const subtitle = document.createElement("div");
+    Object.assign(subtitle.style, {
+      color: "#28617c",
+      fontSize: "clamp(8px, 1.2vw, 11px)",
+      fontWeight: "900",
+      letterSpacing: ".18em",
+      lineHeight: "1.5"
+    });
+
+    countdown.append(number, title, subtitle);
+    root.append(whiteout, countdown);
+    (document.body || document.documentElement).appendChild(root);
+    orbitalScreenEffects = { root, whiteout, countdown, number, title, subtitle };
+    return orbitalScreenEffects;
+  }
+
+  function hideOrbitalScreenEffects() {
+    if (!orbitalScreenEffects) return;
+    orbitalScreenEffects.root.style.display = "none";
+    orbitalScreenEffects.whiteout.style.opacity = "0";
+    orbitalScreenEffects.countdown.style.display = "none";
+  }
+
+  function updateOrbitalScreenEffects(elapsed) {
+    const ui = ensureOrbitalScreenEffects();
+    const warning = smoothStep(elapsed / ORBITAL_LASER_WARNING_MS);
+    const expansion = smoothStep(
+      (elapsed - ORBITAL_LASER_WARNING_MS) / ORBITAL_LASER_EXPANSION_MS
+    );
+    let whiteOpacity = warning * 0.78;
+    if (elapsed >= ORBITAL_LASER_WARNING_MS) {
+      whiteOpacity = 0.78 + expansion * 0.22;
+    }
+    if (elapsed >= ORBITAL_LASER_RESET_MS) {
+      whiteOpacity = 1 - smoothStep(
+        (elapsed - ORBITAL_LASER_RESET_MS) / 1600
+      );
+    }
+
+    ui.root.style.display = elapsed < ORBITAL_LASER_CLEANUP_MS ? "block" : "none";
+    ui.whiteout.style.opacity = String(THREE.MathUtils.clamp(whiteOpacity, 0, 1));
+
+    if (elapsed < ORBITAL_LASER_WARNING_MS) {
+      ui.countdown.style.display = "grid";
+      ui.number.textContent = String(
+        Math.max(1, Math.ceil((ORBITAL_LASER_WARNING_MS - elapsed) / 1000))
+      );
+      ui.title.textContent = "ORBITAL LASER ACTIVATION";
+      ui.subtitle.textContent = "GROUND FRACTURES DETECTED · MAP RESET IMMINENT";
+    } else if (elapsed < ORBITAL_LASER_RESET_MS) {
+      ui.countdown.style.display = "grid";
+      ui.number.textContent = "0";
+      ui.title.textContent = "ORBITAL LASER ACTIVATED";
+      ui.subtitle.textContent = "MAP RESET INITIATED";
+    } else {
+      ui.countdown.style.display = "none";
+    }
+  }
+
+  function makeOrbitalCrackPaths(center, maximumRadius) {
+    let seed = 0x71c4a29d;
+    const random = () => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+    const reach = Math.max(18, maximumRadius * 0.72);
+    const paths = [];
+
+    const makePoint = (radius, angle) => {
+      const x = Math.cos(angle) * radius;
+      const z = Math.sin(angle) * radius;
+      return {
+        x,
+        z,
+        y: sampleGroundHeight(center.x + x, center.z + z) + 0.055,
+        reveal: THREE.MathUtils.clamp(radius / reach, 0, 1)
+      };
+    };
+
+    const radialCount = 18;
+    for (let i = 0; i < radialCount; i++) {
+      const baseAngle = (i / radialCount) * Math.PI * 2 + (random() - 0.5) * 0.13;
+      const mainLength = reach * (0.79 + random() * 0.19);
+      const mainSteps = 11 + Math.floor(random() * 3);
+      let angle = baseAngle;
+      const main = [makePoint(0.45, angle)];
+
+      for (let step = 1; step <= mainSteps; step++) {
+        angle += (random() - 0.5) * 0.19;
+        const radius = mainLength * step / mainSteps;
+        main.push(makePoint(radius, angle));
+      }
+      paths.push({ points: main, width: 0.16 + random() * 0.105 });
+
+      for (let branch = 0; branch < 2; branch++) {
+        const startIndex = 3 + Math.floor(random() * 6);
+        const origin = main[Math.min(startIndex, main.length - 2)];
+        const originRadius = Math.hypot(origin.x, origin.z);
+        let branchAngle = Math.atan2(origin.z, origin.x) +
+          (branch === 0 ? -1 : 1) * (0.30 + random() * 0.62);
+        const branchLength = reach * (0.105 + random() * 0.17);
+        const branchSteps = 5 + Math.floor(random() * 3);
+        const branchPoints = [origin];
+
+        for (let step = 1; step <= branchSteps; step++) {
+          branchAngle += (random() - 0.5) * 0.24;
+          const radius = Math.min(
+            reach * 0.995,
+            originRadius + branchLength * step / branchSteps
+          );
+          branchPoints.push(makePoint(radius, branchAngle));
+        }
+        paths.push({ points: branchPoints, width: 0.095 + random() * 0.075 });
+      }
+    }
+    return { paths, reach };
+  }
+
+  function makeOrbitalCrackGeometry(paths, reach, widthScale, heightOffset) {
+    const positions = [];
+    const reveals = [];
+    const indices = [];
+
+    for (const path of paths) {
+      for (let i = 0; i < path.points.length - 1; i++) {
+        const a = path.points[i];
+        const b = path.points[i + 1];
+        const dx = b.x - a.x;
+        const dz = b.z - a.z;
+        const length = Math.hypot(dx, dz);
+        if (length < 0.001) continue;
+
+        const perpendicularX = -dz / length;
+        const perpendicularZ = dx / length;
+        const progressA = THREE.MathUtils.clamp(a.reveal, 0, 1);
+        const progressB = THREE.MathUtils.clamp(b.reveal, 0, 1);
+        const taperA = 0.42 + Math.sin(progressA * Math.PI) * 0.58;
+        const taperB = 0.42 + Math.sin(progressB * Math.PI) * 0.58;
+        const halfA = path.width * widthScale * taperA * 0.5;
+        const halfB = path.width * widthScale * taperB * 0.5;
+        const base = positions.length / 3;
+
+        positions.push(
+          a.x + perpendicularX * halfA, a.y + heightOffset, a.z + perpendicularZ * halfA,
+          a.x - perpendicularX * halfA, a.y + heightOffset, a.z - perpendicularZ * halfA,
+          b.x + perpendicularX * halfB, b.y + heightOffset, b.z + perpendicularZ * halfB,
+          b.x - perpendicularX * halfB, b.y + heightOffset, b.z - perpendicularZ * halfB
+        );
+        reveals.push(progressA, progressA, progressB, progressB);
+        indices.push(base, base + 1, base + 2, base + 1, base + 3, base + 2);
+      }
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute("aReveal", new THREE.Float32BufferAttribute(reveals, 1));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    geometry.computeBoundingSphere();
+    return geometry;
+  }
+
+  function makeOrbitalCrackMaterial(color, additive = false) {
+    return new THREE.ShaderMaterial({
+      uniforms: {
+        uColor: { value: new THREE.Color(color) },
+        uProgress: { value: 0 },
+        uOpacity: { value: 0 }
+      },
+      vertexShader: [
+        "attribute float aReveal;",
+        "varying float vReveal;",
+        "void main() {",
+        "  vReveal = aReveal;",
+        "  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);",
+        "}"
+      ].join("\n"),
+      fragmentShader: [
+        "uniform vec3 uColor;",
+        "uniform float uProgress;",
+        "uniform float uOpacity;",
+        "varying float vReveal;",
+        "void main() {",
+        "  float reveal = smoothstep(vReveal - 0.018, vReveal + 0.018, uProgress);",
+        "  float alpha = reveal * uOpacity;",
+        "  if (alpha < 0.002) discard;",
+        "  gl_FragColor = vec4(uColor, alpha);",
+        "}"
+      ].join("\n"),
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+      toneMapped: false
+    });
+  }
+
+  function makeOrbitalLaserVisual(center, maximumRadius) {
     const group = new THREE.Group();
     group.name = "sandbox-orbital-laser-sequence";
     group.position.set(center.x, 0, center.z);
@@ -1030,11 +1287,25 @@ export function createSandboxSystem(game) {
     glowField.position.y = 12;
     glowField.scale.set(1, 0.2, 1);
 
-    group.add(outerBeam, innerBeam, groundRing, glowField);
+    // Jagged fissures spread radially across the dirt during the ten-second
+    // countdown. The dark channel and narrow blue energy seam share a reveal
+    // attribute so both grow outward from the impact center in sync.
+    const crackData = makeOrbitalCrackPaths(center, maximumRadius);
+    const crackGeometry = makeOrbitalCrackGeometry(crackData.paths, crackData.reach, 1, 0);
+    const crackGlowGeometry = makeOrbitalCrackGeometry(crackData.paths, crackData.reach, 0.22, 0.018);
+    const crackMaterial = makeOrbitalCrackMaterial(0x10151b, false);
+    const crackGlowMaterial = makeOrbitalCrackMaterial(0x087dff, true);
+    const cracks = new THREE.Mesh(crackGeometry, crackMaterial);
+    const crackGlow = new THREE.Mesh(crackGlowGeometry, crackGlowMaterial);
+    cracks.frustumCulled = false;
+    crackGlow.frustumCulled = false;
+
+    group.add(outerBeam, innerBeam, groundRing, glowField, cracks, crackGlow);
     scene.add(group);
     return {
       group, outerBeam, innerBeam, groundRing, glowField,
-      outerMaterial, innerMaterial, fieldMaterial, ringMaterial
+      outerMaterial, innerMaterial, fieldMaterial, ringMaterial,
+      crackMaterial, crackGlowMaterial
     };
   }
 
@@ -1072,7 +1343,8 @@ export function createSandboxSystem(game) {
       z: event.z
     };
     const map = getMapCenterAndRadius();
-    const visual = makeOrbitalLaserVisual(center);
+    const visual = makeOrbitalLaserVisual(center, Math.max(12, map.radius));
+    ensureOrbitalScreenEffects();
     orbitalLaserSequences.push({
       id: event.id,
       startedAt: event.startedAt,
@@ -1133,6 +1405,15 @@ export function createSandboxSystem(game) {
       const beamHeight = isExpanding ? 220 : 16 + warning * 204;
       const heightScale = beamHeight / 220;
       const visual = sequence.visual;
+      updateOrbitalScreenEffects(elapsed);
+
+      const crackFade = elapsed >= ORBITAL_LASER_RESET_MS
+        ? 1 - smoothStep((elapsed - ORBITAL_LASER_RESET_MS) / 1100)
+        : 1;
+      visual.crackMaterial.uniforms.uProgress.value = warning;
+      visual.crackGlowMaterial.uniforms.uProgress.value = warning;
+      visual.crackMaterial.uniforms.uOpacity.value = 0.96 * crackFade;
+      visual.crackGlowMaterial.uniforms.uOpacity.value = 0.82 * crackFade;
 
       visual.outerBeam.position.y = beamHeight / 2;
       visual.innerBeam.position.y = beamHeight / 2;
@@ -1165,6 +1446,7 @@ export function createSandboxSystem(game) {
       if (elapsed >= ORBITAL_LASER_CLEANUP_MS) {
         removeOrbitalLaserVisual(visual);
         orbitalLaserSequences.splice(i, 1);
+        if (orbitalLaserSequences.length === 0) hideOrbitalScreenEffects();
       }
     }
   }
