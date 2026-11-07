@@ -2184,17 +2184,28 @@ export function createSandboxSystem(game) {
         }
         event?.preventDefault?.();
         toggleSecretMenu();
+        if (secretMenuOpen && inMap) {
+          clearHeldControls();
+          secretChordKeys.add("d");
+          secretChordKeys.add("h");
+          secretChordLatched = true;
+          for (const controlKey of Object.keys(game.controls?.keys || {})) {
+            game.controls.keys[controlKey] = false;
+          }
+        }
         return true;
       }
     }
 
     if (active && inMap && secretMenuOpen) {
       const focusedInsideMenu = secretMenuPanel?.contains(document.activeElement);
+      const menuInputFocused = focusedInsideMenu &&
+        ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName);
       const gameplayKeys = ["w", "a", "s", "d", " ", "r", "arrowup", "arrowdown",
         "arrowleft", "arrowright", "q", "e", "f"];
       if (gameplayKeys.includes(key)) {
-        if (!focusedInsideMenu && game.controls?.keys) game.controls.keys[key] = false;
-        if (!focusedInsideMenu) event?.preventDefault?.();
+        if (!menuInputFocused && game.controls?.keys) game.controls.keys[key] = false;
+        if (!menuInputFocused) event?.preventDefault?.();
         return true;
       }
     }
