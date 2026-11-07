@@ -908,6 +908,11 @@ function animate(now) {
   }
   }
 
+  // The hidden Sandbox Orbital Laser warning adds a slowly intensifying
+  // camera vibration on every client before the synchronized map reset.
+  const orbitalLaserShake = sandbox.getCameraShakeOffset?.(Date.now());
+  if (orbitalLaserShake?.lengthSq?.() > 0) camera.position.add(orbitalLaserShake);
+
   multiplayer.sendSnapshotIfReady(delta);
 
   // Keep the Gravel Basin shadow frustum centered near the truck. Snapping the
