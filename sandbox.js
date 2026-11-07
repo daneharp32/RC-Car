@@ -7,18 +7,28 @@ export function createSandboxSystem(game) {
   const attachmentCache = new WeakMap();
   const beacons = [];
   const waves = [];
+  const projectiles = [];
   const seenEvents = new Set();
   const held = { lift: false, forward: false };
-  const cooldowns = { beacon: 0 };
+  const heldAssignments = Object.create(null);
+  const launcherCharge = { key: null, startedAt: 0, charge: 0, lastUiAt: 0 };
+  const cooldowns = { beacon: 0, launcher: 0 };
   const BEACON_ARM_DELAY = 3000;
   const BEACON_TRIGGER_RADIUS = 8;
+  const MAX_EQUIPPED_GADGETS = 3;
+  const SLOT_KEYS = ["q", "e", "f"];
+  const LAUNCHER_MAX_CHARGE_MS = 1800;
+  const LAUNCHER_COOLDOWN_MS = 900;
+  const ORB_GRAVITY = 9.82;
+  const ORB_RADIUS = 0.22;
   // Constant acceleration while Q is held. This is a directional thruster,
   // not a height- or speed-hold controller.
   const JUMP_THRUSTER_ACCELERATION = 26;
   const PARTS = [
     { id: "lift", title: "JUMP THRUSTERS" },
     { id: "forward", title: "FORWARD THRUSTERS" },
-    { id: "beacon", title: "IMPULSE BEACON" }
+    { id: "beacon", title: "IMPULSE BEACON" },
+    { id: "gravity-orb", title: "GRAVITY ORB LAUNCHER" }
   ];
 
   let active = false;
@@ -331,11 +341,38 @@ export function createSandboxSystem(game) {
     root.add(group);
   }
 
+  function makeGravityOrbLauncherModule(root) {
+    const group = new THREE.Group();
+    group.name = "sandbox-gravity-orb-launcher-module";
+    const mount = new THREE.MeshStandardMaterial({
+      color: 0x202b35, roughness: 0.42, metalness: 0.78
+    });
+    const barrel = new THREE.MeshStandardMaterial({
+      color: 0x344b5d, roughness: 0.28, metalness: 0.86
+    });
+    const blue = new THREE.MeshBasicMaterial({
+      color: 0x168fff, toneMapped: false
+    });
+    addBox(group, [0.48, 0.10, 0.52], [0, 0.24, -0.12], mount);
+    addBox(group, [0.13, 0.20, 0.15], [0, 0.39, -0.20], mount);
+    const tube = addCylinder(group, 0.115, 0.15, 0.82, [0, 0.51, -0.42], barrel,
+      [-Math.PI / 2 + 0.70, 0, 0]);
+    tube.castShadow = true;
+    const muzzle = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.018, 8, 28), blue);
+    muzzle.position.set(0, 0.78, -0.72);
+    muzzle.rotation.x = Math.PI / 2;
+    group.add(muzzle);
+    const statusOrb = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 10), blue);
+    statusOrb.position.set(0, 0.78, -0.72);
+    group.add(statusOrb);
+    root.add(group);
+  }
+
   function applyLoadout(visual, requested) {
     if (!visual?.root) return;
     const ids = [...new Set((Array.isArray(requested) ? requested : []).filter((id) =>
       PARTS.some((part) => part.id === id)
-    ))].sort();
+    ))].slice(0, MAX_EQUIPPED_GADGETS);
     const key = ids.join("|");
     const previous = attachmentCache.get(visual);
     if (previous?.key === key) {
@@ -353,10 +390,11 @@ export function createSandboxSystem(game) {
     }
 
     const group = new THREE.Group();
-    group.name = "sandbox-thruster-and-beacon-parts";
+    group.name = "sandbox-gadget-attachments";
     const liftFlames = ids.includes("lift") ? makeJumpThrusters(group, visual === localCar) : [];
     const forwardFlames = ids.includes("forward") ? makeForwardThrusters(group) : [];
     if (ids.includes("beacon")) makeImpulseBeaconModule(group);
+    if (ids.includes("gravity-orb")) makeGravityOrbLauncherModule(group);
     group.visible = visual === localCar ? active : true;
     visual.root.add(group);
 
@@ -366,7 +404,12 @@ export function createSandboxSystem(game) {
   }
 
   function getLoadout() {
-    return [...loadout].sort();
+    return [...loadout].slice(0, MAX_EQUIPPED_GADGETS);
+  }
+
+  function getPartForKey(key) {
+    const index = SLOT_KEYS.indexOf(key);
+    return index < 0 ? null : (getLoadout()[index] || null);
   }
 
   function getThrusterState() {
@@ -482,18 +525,27 @@ export function createSandboxSystem(game) {
     }
   }
   function renderBuilder() {
+    const orderedLoadout = getLoadout();
     document.querySelectorAll("[data-sandbox-part]").forEach((button) => {
-      const equipped = loadout.has(button.dataset.sandboxPart);
+      const id = button.dataset.sandboxPart;
+      const equipped = loadout.has(id);
+      const slotIndex = orderedLoadout.indexOf(id);
       button.classList.toggle("equipped", equipped);
       button.setAttribute("aria-pressed", equipped ? "true" : "false");
       const label = button.querySelector(".sandbox-part-action");
-      if (label) label.textContent = equipped ? "REMOVE PART" : "ADD TO TRUCK";
+      if (label) {
+        label.textContent = equipped
+          ? SLOT_KEYS[slotIndex].toUpperCase() + " SLOT · REMOVE"
+          : loadout.size >= MAX_EQUIPPED_GADGETS ? "3 SLOTS FULL" : "ADD TO TRUCK";
+      }
     });
     const equippedLabel = $("sandboxEquippedValue");
     if (equippedLabel) {
-      equippedLabel.textContent = loadout.size
-        ? getLoadout().map((id) => PARTS.find((part) => part.id === id).title).join(" · ")
-        : "NO THRUSTER OR BEACON PARTS EQUIPPED";
+      equippedLabel.textContent = orderedLoadout.length
+        ? orderedLoadout.map((id, index) =>
+          SLOT_KEYS[index].toUpperCase() + ": " + (PARTS.find((part) => part.id === id)?.title || id)
+        ).join(" · ")
+        : "NO GADGETS EQUIPPED";
     }
     const mapLabel = $("sandboxBuilderMapLabel");
     if (mapLabel) {
@@ -507,17 +559,31 @@ export function createSandboxSystem(game) {
     if (!controlsPanel) return;
     controlsPanel.style.display = active && inMap ? "flex" : "none";
     const status = getThrusterState();
-    document.querySelectorAll("[data-sandbox-control]").forEach((item) => {
-      const id = item.dataset.sandboxControl;
-      const equipped = loadout.has(id);
-      item.classList.toggle("equipped", equipped);
+    document.querySelectorAll("[data-sandbox-slot]").forEach((item) => {
+      const slotIndex = Number(item.dataset.sandboxSlot);
+      const key = SLOT_KEYS[slotIndex];
+      const id = getLoadout()[slotIndex] || null;
+      const part = PARTS.find((candidate) => candidate.id === id);
+      const keyLabel = item.querySelector("kbd");
+      const title = item.querySelector("strong");
       const label = item.querySelector("small");
-      if (!label) return;
-      if (!equipped) label.textContent = "NOT EQUIPPED";
-      else if (id === "lift") label.textContent = status.lift ? "ACTIVE" : "HOLD Q";
-      else if (id === "forward") label.textContent = status.forward ? "ACTIVE" : "HOLD E";
-      else label.textContent = "PRESS F";
-      item.classList.toggle("active", (id === "lift" && status.lift) || (id === "forward" && status.forward));
+      const isCharging = id === "gravity-orb" && launcherCharge.key === key;
+      const isActive = (id === "lift" && status.lift) ||
+        (id === "forward" && status.forward) || isCharging;
+      if (keyLabel) keyLabel.textContent = key ? key.toUpperCase() : "?";
+      if (title) title.textContent = part?.title || "EMPTY SLOT";
+      if (label) {
+        if (!part) label.textContent = "NO GADGET";
+        else if (id === "lift") label.textContent = status.lift ? "ACTIVE" : "HOLD TO LIFT";
+        else if (id === "forward") label.textContent = status.forward ? "ACTIVE" : "HOLD TO BOOST";
+        else if (id === "beacon") label.textContent = "PRESS TO PLACE";
+        else if (isCharging) label.textContent = "CHARGING " + Math.round(launcherCharge.charge * 100) + "%";
+        else if (performance.now() < cooldowns.launcher) label.textContent = "RECHARGING";
+        else label.textContent = "HOLD · RELEASE TO FIRE";
+      }
+      item.classList.toggle("equipped", Boolean(part));
+      item.classList.toggle("active", isActive);
+      item.classList.toggle("charging", isCharging);
     });
   }
 
@@ -572,7 +638,7 @@ export function createSandboxSystem(game) {
     game.garage.showDriveScreen();
     localCar.setPlayerName?.(game.multiplayer?.driverName || "Driver", true);
     renderControlHints();
-    game.showToast("Sandbox: hold Q to fly · hold E to boost · F to place an impulse beacon");
+    game.showToast("Sandbox gadgets use their assigned Q / E / F slots. Hold the Gravity Orb Launcher key, then release to fire.");
   }
 
   function endSession() {
@@ -591,6 +657,9 @@ export function createSandboxSystem(game) {
       dispose(wave.group);
     }
     waves.length = 0;
+    for (const projectile of projectiles) removeGravityOrbVisual(projectile.visual);
+    projectiles.length = 0;
+    if (gravityOrbAimIndicator) gravityOrbAimIndicator.group.visible = false;
     if (localAttachment) localAttachment.group.visible = false;
     renderControlHints();
     seenEvents.clear();
@@ -602,9 +671,15 @@ export function createSandboxSystem(game) {
   }
 
   function validStuntEvent(event) {
-    return event && typeof event.id === "string" && event.id.length <= 80 &&
-      event.type === "impulse-beacon" &&
-      [event.x, event.y, event.z, event.yaw].every(Number.isFinite);
+    if (!event || typeof event.id !== "string" || event.id.length > 80) return false;
+    if (event.type === "impulse-beacon") {
+      return [event.x, event.y, event.z, event.yaw].every(Number.isFinite);
+    }
+    return event.type === "gravity-orb" &&
+      [event.x, event.y, event.z, event.vx, event.vy, event.vz,
+        event.charge, event.launchedAt].every(Number.isFinite) &&
+      event.charge >= 0 && event.charge <= 1 &&
+      Math.abs(event.vx) <= 80 && Math.abs(event.vy) <= 80 && Math.abs(event.vz) <= 80;
   }
 
   function rememberEvent(id) {
@@ -969,26 +1044,26 @@ export function createSandboxSystem(game) {
   function handleKeyDown(key, event) {
     if (!active || !inMap || !game.multiplayer?.joined || game.isPaused?.()) return false;
     if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return false;
+    if (!SLOT_KEYS.includes(key)) return false;
 
-    const part = ({ q: "lift", e: "forward", f: "beacon" })[key];
+    const part = getPartForKey(key);
     if (!part) return false;
     event?.preventDefault?.();
+    if (event?.repeat) return true;
 
-    if (!loadout.has(part)) {
-      if (!event?.repeat) {
-        const title = PARTS.find((item) => item.id === part)?.title || "that part";
-        game.showToast("Equip " + title + " in the builder first");
-      }
-      return true;
-    }
-
-    if (part === "lift") held.lift = true;
-    else if (part === "forward") held.forward = true;
-    else if (part === "beacon" && !event?.repeat) {
+    if (part === "lift") {
+      held.lift = true;
+      heldAssignments[key] = part;
+    } else if (part === "forward") {
+      held.forward = true;
+      heldAssignments[key] = part;
+    } else if (part === "beacon") {
       const now = performance.now();
       if (now < cooldowns.beacon) return true;
       cooldowns.beacon = now + 2200;
       deployImpulseBeacon();
+    } else if (part === "gravity-orb") {
+      beginGravityOrbCharge(key, performance.now());
     }
 
     renderControlHints();
@@ -997,11 +1072,17 @@ export function createSandboxSystem(game) {
 
   function handleKeyUp(key) {
     let handled = false;
-    if (key === "q") {
+    const assignedPart = heldAssignments[key];
+    delete heldAssignments[key];
+    if (assignedPart === "lift") {
       held.lift = false;
       handled = true;
-    } else if (key === "e") {
+    } else if (assignedPart === "forward") {
       held.forward = false;
+      handled = true;
+    }
+    if (launcherCharge.key === key) {
+      releaseGravityOrbCharge(key, performance.now());
       handled = true;
     }
     if (handled) renderControlHints();
@@ -1011,8 +1092,15 @@ export function createSandboxSystem(game) {
   document.querySelectorAll("[data-sandbox-part]").forEach((button) => {
     button.addEventListener("click", () => {
       const id = button.dataset.sandboxPart;
-      if (loadout.has(id)) loadout.delete(id);
-      else loadout.add(id);
+      if (loadout.has(id)) {
+        loadout.delete(id);
+      } else {
+        if (loadout.size >= MAX_EQUIPPED_GADGETS) {
+          game.showToast("Your truck has 3 gadget slots. Remove one before adding another.");
+          return;
+        }
+        loadout.add(id);
+      }
       clearHeldControls();
       applyLoadout(localCar, getLoadout());
       if (localAttachment) localAttachment.group.visible = active;
@@ -1023,6 +1111,7 @@ export function createSandboxSystem(game) {
   $("sandboxEnterMapButton").addEventListener("click", enterMap);
   $("sandboxLeaveButton").addEventListener("click", () => game.multiplayer?.leaveArena?.());
 
+  const gravityOrbAimIndicator = makeGravityOrbAimIndicator();
   applyLoadout(localCar, getLoadout());
   renderBuilder();
 
@@ -1037,8 +1126,10 @@ export function createSandboxSystem(game) {
     handleKeyUp,
     clearHeldControls,
     receiveRemoteStuntEvent(peerId, event) {
-      if (!active || typeof peerId !== "string" || !validStuntEvent(event)) return false;
-      return createImpulseBeacon(event);
+      if (!active || !inMap || typeof peerId !== "string" || !validStuntEvent(event)) return false;
+      return event.type === "gravity-orb"
+        ? createGravityOrbProjectile(event)
+        : createImpulseBeacon(event);
     },
     getLoadout,
     getThrusterState,
