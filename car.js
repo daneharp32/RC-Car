@@ -1,7 +1,7 @@
 import { RoundedBoxGeometry } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/geometries/RoundedBoxGeometry.js";
 
 // Builds the detailed chassis, wheels, and the separately removable shell.
-export function createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellGeometry = null, shellModel = null }) {
+export function createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellModel = null }) {
 function makeCarVisual(color, playerName = "") {
   const root = new THREE.Group();
   const chassisGroup = new THREE.Group();
@@ -9,7 +9,8 @@ function makeCarVisual(color, playerName = "") {
   root.add(chassisGroup, shellGroup);
 
   // Fit axle-mounted components at the actual physics attachment points.
-  // Keep the imported Ranger chassis at native proportions: no whole-group stretching.
+  // Keep the chassis at native proportions; the prerunner shell is pre-fitted
+  // with one uniform scale before it reaches this visual factory.
   const frontAxleZ = vehicle.wheelInfos[0].chassisConnectionPointLocal.z;
   const rearAxleZ = vehicle.wheelInfos[2].chassisConnectionPointLocal.z;
   const chassisLengthScale = shellModel ? 1 : VISUAL_CHASSIS_LENGTH_SCALE;
