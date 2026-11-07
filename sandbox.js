@@ -1757,6 +1757,7 @@ export function createSandboxSystem(game) {
     const canDrive = active && inMap && !game.isPaused?.();
 
     updateThrusterVisuals(now);
+    if (active && inMap) updateOrbitalLaserSequences(Date.now());
     if (canDrive) {
       updateGravityOrbCharge(now);
       updateGravityOrbProjectiles(delta);
@@ -1806,6 +1807,21 @@ export function createSandboxSystem(game) {
   }
 
   function handleKeyDown(key, event) {
+    if (active && !inMap && !game.isPaused?.()) {
+      const focused = document.activeElement;
+      if (!focused || !secretMenuPanel?.contains(focused)) {
+        if (key === "d" || key === "h") {
+          secretChordKeys.add(key);
+          if (secretChordKeys.has("d") && secretChordKeys.has("h") && !secretChordLatched) {
+            secretChordLatched = true;
+            event?.preventDefault?.();
+            toggleSecretMenu();
+            return true;
+          }
+        }
+      }
+    }
+
     if (!active || !inMap || !game.multiplayer?.joined || game.isPaused?.()) return false;
     if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return false;
     if (!SLOT_KEYS.includes(key)) return false;
@@ -1828,6 +1844,8 @@ export function createSandboxSystem(game) {
       deployImpulseBeacon();
     } else if (part === "gravity-orb") {
       beginGravityOrbCharge(key, performance.now());
+    } else if (part === "orbital-laser") {
+      launchOrbitalLaser();
     }
 
     renderControlHints();
@@ -1836,6 +1854,12 @@ export function createSandboxSystem(game) {
 
   function handleKeyUp(key) {
     let handled = false;
+    if (key === "d" || key === "h") {
+      const wasChordKey = secretChordKeys.has(key);
+      secretChordKeys.delete(key);
+      if (!secretChordKeys.has("d") || !secretChordKeys.has("h")) secretChordLatched = false;
+      if (wasChordKey && active && !inMap) handled = true;
+    }
     const assignedPart = heldAssignments[key];
     delete heldAssignments[key];
     if (assignedPart === "lift") {
@@ -1859,8 +1883,8 @@ export function createSandboxSystem(game) {
       if (loadout.has(id)) {
         loadout.delete(id);
       } else {
-        if (loadout.size >= MAX_EQUIPPED_GADGETS) {
-          game.showToast("Your truck has 3 gadget slots. Remove one before adding another.");
+        if (!secretSettings.infiniteGadgets && loadout.size >= MAX_EQUIPPED_GADGETS) {
+          game.showToast("Your truck has 3 gadget slots. Enable Infinite Gadgets in the secret menu or remove one.");
           return;
         }
         loadout.add(id);
@@ -1874,10 +1898,28 @@ export function createSandboxSystem(game) {
   });
   $("sandboxEnterMapButton").addEventListener("click", enterMap);
   $("sandboxLeaveButton").addEventListener("click", () => game.multiplayer?.leaveArena?.());
+  $("secretMenuClose")?.addEventListener("click", () => setSecretMenuOpen(false));
+  $("secretInfiniteGadgets")?.addEventListener("change", (event) =>
+    toggleInfiniteGadgets(event.target.checked)
+  );
+  $("secretGravityOrbRadius")?.addEventListener("input", (event) =>
+    updateSecretSetting("gravityOrbRadius", event.target, 0.5, 5)
+  );
+  $("secretGravityOrbPower")?.addEventListener("input", (event) =>
+    updateSecretSetting("gravityOrbPower", event.target, 0.25, 5)
+  );
+  $("secretJumpThrusterPower")?.addEventListener("input", (event) =>
+    updateSecretSetting("jumpThrusterPower", event.target, 8, 90)
+  );
+  $("secretForwardThrusterPower")?.addEventListener("input", (event) =>
+    updateSecretSetting("forwardThrusterPower", event.target, 12, 130)
+  );
+  $("secretOrbitalLaserButton")?.addEventListener("click", toggleOrbitalLaserGadget);
 
   const gravityOrbAimIndicator = makeGravityOrbAimIndicator();
   applyLoadout(localCar, getLoadout());
   renderBuilder();
+  renderSecretMenu();
 
   return {
     beginSession,
@@ -1891,12 +1933,19 @@ export function createSandboxSystem(game) {
     clearHeldControls,
     receiveRemoteStuntEvent(peerId, event) {
       if (!active || !inMap || typeof peerId !== "string" || !validStuntEvent(event)) return false;
-      return event.type === "gravity-orb"
-        ? createGravityOrbProjectile(event)
-        : createImpulseBeacon(event);
+      if (event.type === "gravity-orb") return createGravityOrbProjectile(event);
+      if (event.type === "orbital-laser") return createOrbitalLaserSequence(event);
+      return createImpulseBeacon(event);
     },
     getLoadout,
     getThrusterState,
+    getThrusterTuning() {
+      return {
+        jumpPower: secretSettings.jumpThrusterPower,
+        forwardPower: secretSettings.forwardThrusterPower
+      };
+    },
+    getCameraShakeOffset,
     applyRemoteLoadout: applyLoadout,
     applyRemoteThrusterState,
     updatePlayerCount,
