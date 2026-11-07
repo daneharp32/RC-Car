@@ -664,8 +664,9 @@ export function createSandboxSystem(game) {
       const title = item.querySelector("strong");
       const label = item.querySelector("small");
       const isCharging = id === "gravity-orb" && launcherCharge.key === key;
+      const isLaserActive = id === "orbital-laser" && orbitalLaserSequences.length > 0;
       const isActive = (id === "lift" && status.lift) ||
-        (id === "forward" && status.forward) || isCharging;
+        (id === "forward" && status.forward) || isCharging || isLaserActive;
       if (keyLabel) keyLabel.textContent = key ? key.toUpperCase() : "?";
       if (title) title.textContent = part?.title || "EMPTY SLOT";
       if (label) {
@@ -673,7 +674,8 @@ export function createSandboxSystem(game) {
         else if (id === "lift") label.textContent = status.lift ? "ACTIVE" : "HOLD TO LIFT";
         else if (id === "forward") label.textContent = status.forward ? "ACTIVE" : "HOLD TO BOOST";
         else if (id === "beacon") label.textContent = "PRESS TO PLACE";
-        else if (id === "orbital-laser") label.textContent = "ACTIVATE MAP RESET";
+        else if (id === "orbital-laser") label.textContent =
+          isLaserActive ? "SEQUENCE ACTIVE" : "ACTIVATE MAP RESET";
         else if (isCharging) label.textContent = "CHARGING " + Math.round(launcherCharge.charge * 100) + "%";
         else if (performance.now() < cooldowns.launcher) label.textContent = "RECHARGING";
         else label.textContent = "HOLD · RELEASE TO FIRE";
