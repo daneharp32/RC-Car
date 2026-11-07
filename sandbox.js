@@ -763,6 +763,11 @@ export function createSandboxSystem(game) {
 
   function toggleNoCooldown(enabled) {
     secretSettings.noCooldown = enabled === true;
+    if (secretSettings.noCooldown) {
+      cooldowns.beacon = 0;
+      cooldowns.launcher = 0;
+      cooldowns.orbitalLaser = 0;
+    }
     renderSecretMenu();
     renderControlHints();
     game.showToast(secretSettings.noCooldown
