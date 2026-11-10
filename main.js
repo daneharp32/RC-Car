@@ -351,6 +351,117 @@ function buildMergedPrerunnerVisual(sourceScene) {
     return { geometry: piece, vertexIds };
   }
 
+
+  // Index the real front-shell triangles once so every exposed trim vertex
+  // can be fitted to the curved body instead of shifting a complete part.
+  function buildFrontSurfaceProjector(meshes) {
+    const cellSize = 0.12, cells = new Map(), values = [];
+    const key = (x,y,z) => `${x},${y},${z}`;
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    let count = 0;
+    for (const object of meshes) {
+      const geometry = object.geometry, positions = geometry.attributes.position;
+      const index = geometry.index, elementCount = index ? index.count : positions.count;
+      for (let offset=0; offset+2<elementCount; offset+=3) {
+        const ia=index?index.getX(offset):offset;
+        const ib=index?index.getX(offset+1):offset+1;
+        const ic=index?index.getX(offset+2):offset+2;
+        a.fromBufferAttribute(positions,ia).applyMatrix4(object.matrixWorld);
+        b.fromBufferAttribute(positions,ib).applyMatrix4(object.matrixWorld);
+        c.fromBufferAttribute(positions,ic).applyMatrix4(object.matrixWorld);
+        const cx=(a.x+b.x+c.x)/3, cy=(a.y+b.y+c.y)/3, cz=(a.z+b.z+c.z)/3;
+        if (cz<=1.5 || Math.abs(cx)>=1.5 || cy<=0.04 || cy>=1.25) continue;
+        const id=count++;
+        values.push(a.x,a.y,a.z,b.x,b.y,b.z,c.x,c.y,c.z);
+        const minX=Math.floor(Math.min(a.x,b.x,c.x)/cellSize), maxX=Math.floor(Math.max(a.x,b.x,c.x)/cellSize);
+        const minY=Math.floor(Math.min(a.y,b.y,c.y)/cellSize), maxY=Math.floor(Math.max(a.y,b.y,c.y)/cellSize);
+        const minZ=Math.floor(Math.min(a.z,b.z,c.z)/cellSize), maxZ=Math.floor(Math.max(a.z,b.z,c.z)/cellSize);
+        for(let x=minX;x<=maxX;x++) for(let y=minY;y<=maxY;y++) for(let z=minZ;z<=maxZ;z++) {
+          const k=key(x,y,z); let list=cells.get(k);
+          if(!list){list=[];cells.set(k,list);} list.push(id);
+        }
+      }
+    }
+    if(!count)return null;
+    const data=new Float32Array(values), seen=new Int32Array(count);
+    let stamp=0;
+    const ta=new THREE.Vector3(),tb=new THREE.Vector3(),tc=new THREE.Vector3();
+    const candidate=new THREE.Vector3(),ab=new THREE.Vector3(),ac=new THREE.Vector3();
+    const pa=new THREE.Vector3(),pb=new THREE.Vector3(),pc=new THREE.Vector3(),cb=new THREE.Vector3();
+    function closest(point,a,b,c,target){
+      ab.subVectors(b,a);ac.subVectors(c,a);pa.subVectors(point,a);
+      const d1=ab.dot(pa),d2=ac.dot(pa);
+      if(d1<=0&&d2<=0)return target.copy(a);
+      pb.subVectors(point,b);
+      const d3=ab.dot(pb),d4=ac.dot(pb);
+      if(d3>=0&&d4<=d3)return target.copy(b);
+      const vc=d1*d4-d3*d2;
+      if(vc<=0&&d1>=0&&d3<=0)return target.copy(a).addScaledVector(ab,d1/(d1-d3));
+      pc.subVectors(point,c);
+      const d5=ab.dot(pc),d6=ac.dot(pc);
+      if(d6>=0&&d5<=d6)return target.copy(c);
+      const vb=d5*d2-d1*d6;
+      if(vb<=0&&d2>=0&&d6<=0)return target.copy(a).addScaledVector(ac,d2/(d2-d6));
+      const va=d3*d6-d5*d4;
+      if(va<=0&&d4-d3>=0&&d5-d6>=0){
+        cb.subVectors(c,b);
+        return target.copy(b).addScaledVector(cb,(d4-d3)/((d4-d3)+(d5-d6)));
+      }
+      const inv=1/(va+vb+vc),v=vb*inv,w=vc*inv;
+      return target.copy(a).addScaledVector(ab,v).addScaledVector(ac,w);
+    }
+    function findClosestSurfacePoint(point,target){
+      const ix=Math.floor(point.x/cellSize),iy=Math.floor(point.y/cellSize),iz=Math.floor(point.z/cellSize);
+      let best=Infinity;
+      stamp++;
+      if(stamp>=2147483647){seen.fill(0);stamp=1;}
+      for(let x=ix-4;x<=ix+4;x++)for(let y=iy-4;y<=iy+4;y++)for(let z=iz-4;z<=iz+4;z++){
+        const list=cells.get(key(x,y,z));if(!list)continue;
+        for(const id of list){
+          if(seen[id]===stamp)continue;seen[id]=stamp;
+          const o=id*9;
+          ta.set(data[o],data[o+1],data[o+2]);
+          tb.set(data[o+3],data[o+4],data[o+5]);
+          tc.set(data[o+6],data[o+7],data[o+8]);
+          closest(point,ta,tb,tc,candidate);
+          const d=point.distanceToSquared(candidate);
+          if(d<best){best=d;target.copy(candidate);}
+        }
+      }
+      return Number.isFinite(best)?Math.sqrt(best):null;
+    }
+    console.info("Concept4 front detail surface index:",count,"triangles,",cells.size,"cells");
+    return {findClosestSurfacePoint};
+  }
+
+  function seatFrontDetailComponent(piece, materialName) {
+    const positions=piece.attributes.position;
+    if(!positions||!frontSurfaceProjector)return;
+    let clearance=0.01;
+    if(materialName.includes("light housings"))clearance=0.006;
+    else if(materialName.includes("silver trim"))clearance=0.009;
+    else if(materialName.includes("LED lens"))clearance=0.013;
+    else if(materialName.includes("marker LED"))clearance=0.018;
+    else if(materialName.includes("front grille"))clearance=0.007;
+    else if(materialName.includes("front bumper"))clearance=0.012;
+    else if(materialName.includes("Safety orange accent"))clearance=0.014;
+    const point=new THREE.Vector3(),nearest=new THREE.Vector3(),outward=new THREE.Vector3();
+    const normals=piece.attributes.normal;
+    for(let i=0;i<positions.count;i++){
+      point.fromBufferAttribute(positions,i);
+      const gap=frontSurfaceProjector.findClosestSurfacePoint(point,nearest);
+      if(gap===null||gap>0.4)continue;
+      outward.subVectors(point,nearest);
+      if(outward.lengthSq()<1e-8&&normals)outward.fromBufferAttribute(normals,i);
+      if(outward.lengthSq()<1e-8)outward.set(0,0,1);else outward.normalize();
+      point.copy(nearest).addScaledVector(outward,clearance);
+      positions.setXYZ(i,point.x,point.y,point.z);
+    }
+    positions.needsUpdate=true;
+    piece.computeVertexNormals();
+    piece.computeBoundingBox();
+    piece.computeBoundingSphere();
+  }
   function seatDetailComponent(piece) {
     const positions = piece.attributes.position;
     const normals = piece.attributes.normal;
@@ -405,6 +516,12 @@ function buildMergedPrerunnerVisual(sourceScene) {
 
   sourceScene.traverse((object) => {
     if (!object.isMesh || !object.geometry?.attributes?.position) return;
+    if (!object.name.toLowerCase().includes(detailObjectName)) bodySurfaceMeshes.push(object);
+  });
+  const frontSurfaceProjector = buildFrontSurfaceProjector(bodySurfaceMeshes);
+
+  sourceScene.traverse((object) => {
+    if (!object.isMesh || !object.geometry?.attributes?.position) return;
     const geometry = object.geometry;
     const materials = Array.isArray(object.material) ? object.material : [object.material];
     const groups = geometry.groups.length
@@ -415,7 +532,6 @@ function buildMergedPrerunnerVisual(sourceScene) {
           materialIndex: 0
         }];
     const isDetailObject = object.name.toLowerCase().includes(detailObjectName);
-    if (!isDetailObject) bodySurfaceMeshes.push(object);
 
     for (const group of groups) {
       if (!group.count) continue;
@@ -455,26 +571,43 @@ function buildMergedPrerunnerVisual(sourceScene) {
           const materialName = material.name || "";
           const uv = piece.attributes.uv;
 
-          // glTF V=0 points at the top of its source image. The authored decal
-          // coordinates run bottom-to-top, so invert V on both sides. The
-          // positive-X source side becomes the simulator's left side after the
-          // 180-degree body rotation and also needs U reversed for readable text.
+          // Determine each decal's horizontal orientation from its outward
+          // side normal, and its vertical orientation from the actual UV/Y
+          // relationship in the source surface.
           if (materialName.includes("Printed side race-number decal") && uv) {
-            let centerX = 0;
-            const positions = piece.attributes.position;
-            for (let index = 0; index < positions.count; index++) {
-              centerX += positions.getX(index);
+            const positions = piece.attributes.position, normals = piece.attributes.normal;
+            let normalX = 0, meanY = 0, meanV = 0;
+            for (let i = 0; i < positions.count; i++) {
+              meanY += positions.getY(i);
+              meanV += uv.getY(i);
+              if (normals) normalX += normals.getX(i);
             }
-            const reverseU = centerX / positions.count > 0;
-            for (let index = 0; index < uv.count; index++) {
-              const u = uv.getX(index);
-              const v = uv.getY(index);
-              uv.setXY(index, reverseU ? 1 - u : u, 1 - v);
+            meanY /= positions.count;
+            meanV /= uv.count;
+            let verticalCorrelation = 0;
+            for (let i = 0; i < positions.count; i++) {
+              verticalCorrelation += (positions.getY(i) - meanY) * (uv.getY(i) - meanV);
+            }
+            const reverseU = normalX > 0;
+            const reverseV = verticalCorrelation > 0;
+            for (let i = 0; i < uv.count; i++) {
+              const u = uv.getX(i), v = uv.getY(i);
+              uv.setXY(i, reverseU ? 1 - u : u, reverseV ? 1 - v : v);
             }
             uv.needsUpdate = true;
+            console.info("Corrected side decal mapping:", {
+              sideNormalX: normalX / positions.count, reverseU, reverseV
+            });
           }
 
-          seatDetailComponent(piece);
+          // Fit each front component to the nose's actual curved surface. Keep
+          // the previously stable placement for all non-front details.
+          let centerZ = 0;
+          const positions = piece.attributes.position;
+          for (let i = 0; i < positions.count; i++) centerZ += positions.getZ(i);
+          centerZ /= positions.count;
+          if (centerZ > 1.8) seatFrontDetailComponent(piece, materialName);
+          else seatDetailComponent(piece);
         }
 
         const attributeSignature = Object.keys(piece.attributes).sort().map((name) => {
