@@ -551,7 +551,8 @@ function buildMergedPrerunnerVisual(sourceScene) {
     for (let index = 0; index < positions.count; index++) {
       const y = positions.getY(index);
       // The rear face leans forward as it rises to meet the rear roof edge.
-      const z = -0.7334 + (y - 0.8374) * 0.37 + depthOffset;
+      const rise = y - 0.8374;
+      const z = -0.7334 + rise * 0.24 + rise * rise * 0.30 + depthOffset;
       positions.setZ(index, z);
     }
     positions.needsUpdate = true;
@@ -582,10 +583,26 @@ function buildMergedPrerunnerVisual(sourceScene) {
     side: THREE.DoubleSide
   });
 
-  const rearPanel = new THREE.Mesh(
-    makeRearCabShape(0.735, 0.625, 0.832, 1.292, 0.035, 0.002),
-    rearCabBlue
-  );
+  const rearPanelShape = new THREE.Shape();
+  rearPanelShape.moveTo(-0.742, 0.832);
+  rearPanelShape.lineTo(0.742, 0.832);
+  rearPanelShape.quadraticCurveTo(0.776, 0.868, 0.754, 0.95);
+  rearPanelShape.quadraticCurveTo(0.69, 1.18, 0.625, 1.292);
+  rearPanelShape.lineTo(-0.625, 1.292);
+  rearPanelShape.quadraticCurveTo(-0.69, 1.18, -0.754, 0.95);
+  rearPanelShape.quadraticCurveTo(-0.776, 0.868, -0.742, 0.832);
+  const rearPanelGeometry = new THREE.ShapeGeometry(rearPanelShape, 18);
+  const rearPanelPositions = rearPanelGeometry.attributes.position;
+  for (let index = 0; index < rearPanelPositions.count; index++) {
+    const y = rearPanelPositions.getY(index);
+    const rise = y - 0.8374;
+    rearPanelPositions.setZ(index, -0.7334 + rise * 0.24 + rise * rise * 0.30 + 0.002);
+  }
+  rearPanelPositions.needsUpdate = true;
+  rearPanelGeometry.computeVertexNormals();
+  rearPanelGeometry.computeBoundingBox();
+  rearPanelGeometry.computeBoundingSphere();
+  const rearPanel = new THREE.Mesh(rearPanelGeometry, rearCabBlue);
   rearPanel.name = "Concept4 sloped rear cab panel";
   const rearFrame = new THREE.Mesh(
     makeRearCabShape(0.585, 0.465, 0.895, 1.225, 0.032, -0.008),
