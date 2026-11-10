@@ -262,9 +262,9 @@ function applyGarageShellPose(progress) {
 }
 
 function updateGarageShellChoiceButtons() {
-  const style = game.getShellStyle?.() === "classic" ? "classic" : "prerunner";
+  const style = game.getShellStyle?.() === "ranger" ? "ranger" : "prerunner";
   for (const [buttonId, buttonStyle] of [
-    ["shellChoiceClassic", "classic"],
+    ["shellChoiceRanger", "ranger"],
     ["shellChoicePrerunner", "prerunner"]
   ]) {
     const button = $(buttonId);
@@ -281,7 +281,7 @@ function chooseGarageShell(style) {
   updateGarageShellChoiceButtons();
 }
 
-$("shellChoiceClassic").addEventListener("click", () => chooseGarageShell("classic"));
+$("shellChoiceRanger").addEventListener("click", () => chooseGarageShell("ranger"));
 $("shellChoicePrerunner").addEventListener("click", () => chooseGarageShell("prerunner"));
 
 function resetGarageShellState(visible = true) {

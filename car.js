@@ -1,7 +1,7 @@
 import { RoundedBoxGeometry } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/geometries/RoundedBoxGeometry.js";
 
 // Builds the detailed chassis, wheels, and the separately removable shell.
-export function createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellModel = null }) {
+export function createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellModel = null, rangerShellGeometry = null }) {
 function makeCarVisual(color, playerName = "") {
   const root = new THREE.Group();
   const chassisGroup = new THREE.Group();
@@ -13,9 +13,9 @@ function makeCarVisual(color, playerName = "") {
   // with one uniform scale before it reaches this visual factory.
   const frontAxleZ = vehicle.wheelInfos[0].chassisConnectionPointLocal.z;
   const rearAxleZ = vehicle.wheelInfos[2].chassisConnectionPointLocal.z;
-  const chassisLengthScale = shellModel ? 1 : VISUAL_CHASSIS_LENGTH_SCALE;
+  const chassisLengthScale = shellModel || rangerShellGeometry ? 1 : VISUAL_CHASSIS_LENGTH_SCALE;
   chassisGroup.scale.set(1, 1, chassisLengthScale);
-  shellGroup.scale.set(1, 1, shellModel ? 1 : VISUAL_CHASSIS_LENGTH_SCALE);
+  shellGroup.scale.set(1, 1, shellModel || rangerShellGeometry ? 1 : VISUAL_CHASSIS_LENGTH_SCALE);
   shellGroup.visible = true;
 
   const carbon = new THREE.MeshStandardMaterial({ color: 0x171e24, roughness: 0.78, metalness: 0.18 });
@@ -660,397 +660,28 @@ function makeCarVisual(color, playerName = "") {
   }
 
 
-  // Slash-inspired short-course polycarbonate shell. The lofted orange skin,
-  // black roof/hood, gray rear quarters, windows and trim are separate parts.
-  function makeBodyShell(parent = shellGroup) {
-    // Clean, low-profile short-course shell. The body is one continuous
-    // faceted surface; the separate pieces below are limited to windows,
-    // subtle livery, lamps, and bumpers so the silhouette remains readable.
-    const classicShellDepthScale = 0.75;
-    const shellGeometryGroup = new THREE.Group();
-    shellGeometryGroup.name = "shell-geometry";
-    shellGeometryGroup.scale.z = classicShellDepthScale;
-    parent.add(shellGeometryGroup);
-
-    const orange = new THREE.MeshStandardMaterial({
-      color: 0xff4b0b,
-      roughness: 0.52,
-      metalness: 0.02,
-      side: THREE.DoubleSide
-    });
-    const orangeHighlight = new THREE.MeshStandardMaterial({
-      color: 0xff6829,
-      roughness: 0.5,
-      metalness: 0.02,
-      side: THREE.DoubleSide
-    });
-    const charcoal = new THREE.MeshStandardMaterial({
-      color: 0x20282e,
-      roughness: 0.62,
-      metalness: 0.1,
-      side: THREE.DoubleSide
-    });
-    const black = new THREE.MeshStandardMaterial({
-      color: 0x101519,
-      roughness: 0.58,
-      metalness: 0.06,
-      side: THREE.DoubleSide
-    });
-    const graphite = new THREE.MeshStandardMaterial({
-      color: 0x59636a,
-      roughness: 0.55,
-      metalness: 0.2,
-      side: THREE.DoubleSide
-    });
-    const glass = new THREE.MeshStandardMaterial({
-      color: 0x101c27,
-      roughness: 0.3,
-      metalness: 0.08,
-      side: THREE.DoubleSide
-    });
-    const silver = new THREE.MeshStandardMaterial({
-      color: 0xb7c0c5,
-      roughness: 0.36,
-      metalness: 0.58
-    });
-    const headlamp = new THREE.MeshStandardMaterial({
-      color: 0xf6e8cf,
-      emissive: 0x604323,
-      emissiveIntensity: 0.12
-    });
-    const tailLamp = new THREE.MeshStandardMaterial({
-      color: 0xb72b27,
-      emissive: 0x350605,
-      emissiveIntensity: 0.12
-    });
-
-    // Reference target: Slash proportions are about 568 mm long, 296 mm
-    // wide, 193 mm high, with a 324 mm wheelbase. The visual wheelbase here
-    // is 0.58 * 1.26 = 0.7308 units, so target shell length is ~1.28 units.
-    // This shell spans 1.34 * 0.75 * 1.26 = 1.266 units.
-    // The actual rendered tires are ~0.158 radius and 0.132 wide.
-    const wheelInfo = vehicle.wheelInfos[0];
-    const wheelCenterY =
-      wheelInfo.chassisConnectionPointLocal.y -
-      wheelInfo.suspensionRestLength + 0.028;
-    const visualTireRadius = 0.158;
-    const shellWheelCenters = [
-      frontAxleZ / classicShellDepthScale,
-      rearAxleZ / classicShellDepthScale
-    ];
-    const wheelArchHalfLength = 0.18;
-    const lowerSillY = -0.055;
-    const wheelArchTopY = wheelCenterY + visualTireRadius + 0.014;
-
-    // Longitudinal body blockout. Width, hood height, cab roof and bed top
-    // are deliberately kept low and broad. Each row is [z, halfWidth, topY].
-    const stations = [
-      [-0.840, 0.235, 0.105],
-      [-0.635, 0.365, 0.118],
-      [-0.550, 0.340, 0.128],
-      [-0.465, 0.365, 0.140],
-      [-0.385, 0.370, 0.142],
-      [-0.285, 0.360, 0.118],
-      [-0.195, 0.340, 0.112],
-      [-0.080, 0.292, 0.154],
-      [0.165, 0.292, 0.154],
-      [0.270, 0.340, 0.112],
-      [0.370, 0.368, 0.132],
-      [0.455, 0.370, 0.140],
-      [0.550, 0.340, 0.120],
-      [0.635, 0.365, 0.102],
-      [0.840, 0.228, 0.090]
-    ];
-
-    function profileAt(z) {
-      if (z <= stations[0][0]) {
-        return { width: stations[0][1], top: stations[0][2] };
-      }
-      const last = stations[stations.length - 1];
-      if (z >= last[0]) return { width: last[1], top: last[2] };
-
-      for (let i = 0; i < stations.length - 1; i++) {
-        const a = stations[i];
-        const b = stations[i + 1];
-        if (z >= a[0] && z <= b[0]) {
-          const t = (z - a[0]) / (b[0] - a[0]);
-          return {
-            width: THREE.MathUtils.lerp(a[1], b[1], t),
-            top: THREE.MathUtils.lerp(a[2], b[2], t)
-          };
-        }
-      }
-      return { width: last[1], top: last[2] };
-    }
-
-    function lowerEdgeAt(z) {
-      let lower = lowerSillY;
-      for (const center of shellWheelCenters) {
-        const distance = Math.abs(z - center) / wheelArchHalfLength;
-        if (distance < 1) {
-          const rise = Math.sqrt(Math.max(0, 1 - distance * distance));
-          lower = Math.max(
-            lower,
-            lowerSillY + (wheelArchTopY - lowerSillY) * rise
-          );
-        }
-      }
-      return lower;
-    }
-
-    function addBox(parent, size, position, material, rotation = [0, 0, 0]) {
-      return addMesh(
-        parent,
-        new THREE.BoxGeometry(size[0], size[1], size[2]),
-        material,
-        position,
-        rotation
-      );
-    }
-
-    function addQuad(parent, corners, material) {
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute(
-        "position",
-        new THREE.Float32BufferAttribute(corners.flat(), 3)
-      );
-      geometry.setIndex([0, 1, 2, 0, 2, 3]);
-      geometry.computeVertexNormals();
-      material.side = THREE.DoubleSide;
-      return addMesh(parent, geometry, material);
-    }
-
-    function addSideQuad(parent, side, points, material, offset = 0.008) {
-      const corners = points.map(([z, y]) => {
-        const profile = profileAt(z);
-        return [
-          side * (profile.width + offset),
-          y,
-          z
-        ];
-      });
-      return addQuad(parent, corners, material);
-    }
-
-    const mainShell = makePart(
-      shellGeometryGroup,
-      "shell-low-wide-body",
-      "Low-wide short-course truck shell",
-      "A single molded short-course shell with low hood, broad fenders, compact flat-roof cab, sloped windows and a short rear bed."
+  const rangerShellMaterial = new THREE.MeshStandardMaterial({
+    color: 0xff581a,
+    roughness: 0.58,
+    metalness: 0.01,
+    side: THREE.DoubleSide
+  });
+  const rangerShellVisual = makePart(
+    shellGroup,
+    "uploaded-scx30-ranger-shell",
+    "Orange SCX30 Ranger shell",
+    "The original orange SCX30 single-cab Ranger body shell uploaded for this project. This is the supplied mesh, not the procedural short-course replacement."
+  );
+  if (rangerShellGeometry) {
+    const importedRangerMesh = addMesh(
+      rangerShellVisual,
+      rangerShellGeometry,
+      rangerShellMaterial,
+      [0, 0.15, 0]
     );
-
-    // One closed cross-section per longitudinal sample. The ten vertices
-    // describe a flat hood/roof, short shoulder bevels, vertical sides, and
-    // a shallow underside. Connecting them creates one coherent shell mesh.
-    const ringSize = 10;
-    const ringPositions = [];
-    const ringIndices = [];
-    const sampleCount = 200;
-
-    for (let row = 0; row <= sampleCount; row++) {
-      const z = THREE.MathUtils.lerp(-0.840, 0.840, row / sampleCount);
-      const profile = profileAt(z);
-      const width = profile.width;
-      const top = profile.top;
-      const bottom = lowerEdgeAt(z);
-
-      const ring = [
-        [0, top],
-        [width * 0.78, top],
-        [width, top - 0.018],
-        [width, bottom],
-        [width * 0.78, bottom - 0.012],
-        [0, bottom - 0.020],
-        [-width * 0.78, bottom - 0.012],
-        [-width, bottom],
-        [-width, top - 0.018],
-        [-width * 0.78, top]
-      ];
-
-      for (const [x, y] of ring) ringPositions.push(x, y, z);
-    }
-
-    for (let row = 0; row < sampleCount; row++) {
-      for (let column = 0; column < ringSize; column++) {
-        const nextColumn = (column + 1) % ringSize;
-        const a = row * ringSize + column;
-        const b = row * ringSize + nextColumn;
-        const c = (row + 1) * ringSize + column;
-        const d = (row + 1) * ringSize + nextColumn;
-        ringIndices.push(a, b, c, b, d, c);
-      }
-    }
-
-    // Close the front and rear ends with triangle fans.
-    const startCap = ringPositions.length / 3;
-    ringPositions.push(0, (stations[0][2] + lowerSillY) * 0.5, -0.840);
-    const endCap = ringPositions.length / 3;
-    ringPositions.push(0, (stations[stations.length - 1][2] + lowerSillY) * 0.5, 0.840);
-    for (let column = 0; column < ringSize; column++) {
-      const nextColumn = (column + 1) % ringSize;
-      ringIndices.push(startCap, nextColumn, column);
-      const lastRing = sampleCount * ringSize;
-      ringIndices.push(endCap, lastRing + column, lastRing + nextColumn);
-    }
-
-    const shellGeometry = new THREE.BufferGeometry();
-    shellGeometry.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(ringPositions, 3)
-    );
-    shellGeometry.setIndex(ringIndices);
-    shellGeometry.computeVertexNormals();
-    const shellMesh = addMesh(mainShell, shellGeometry, orange);
-    shellMesh.material.side = THREE.DoubleSide;
-
-    // Four restrained arch-edge strips sit just outside the tire openings.
-    // They follow the actual wheel centres and visual tire radius.
-    for (const side of [-1, 1]) {
-      for (const center of shellWheelCenters) {
-        const archPoints = [];
-        for (let i = 0; i <= 20; i++) {
-          const angle = Math.PI * (i / 20);
-          const z = center + Math.cos(angle) * wheelArchHalfLength;
-          const y = wheelCenterY + visualTireRadius + 0.016 +
-            Math.sin(angle) * 0.004;
-          const profile = profileAt(z);
-          archPoints.push(new THREE.Vector3(
-            side * (profile.width + 0.012),
-            y,
-            z
-          ));
-        }
-        const archCurve = new THREE.CatmullRomCurve3(archPoints);
-        const arch = new THREE.Mesh(
-          new THREE.TubeGeometry(archCurve, 40, 0.006, 6, false),
-          charcoal
-        );
-        arch.castShadow = false;
-        arch.receiveShadow = true;
-        mainShell.add(arch);
-      }
-
-      // Single horizontal lower door stripe, kept below the window line.
-      addSideQuad(mainShell, side, [
-        [-0.105, 0.035],
-        [0.245, 0.035],
-        [0.245, 0.067],
-        [-0.105, 0.067]
-      ], charcoal, 0.012);
-
-      // Small graphite fender-side insert, one per axle.
-      for (const center of shellWheelCenters) {
-        addSideQuad(mainShell, side, [
-          [center - 0.105, 0.095],
-          [center + 0.105, 0.095],
-          [center + 0.105, 0.118],
-          [center - 0.105, 0.118]
-        ], orangeHighlight, 0.013);
-      }
-
-      // Clean side windows: one front pane and one rear pane, with a narrow
-      // body-colour B-pillar left between them.
-      addSideQuad(mainShell, side, [
-        [-0.155, 0.116],
-        [-0.080, 0.150],
-        [0.000, 0.150],
-        [0.000, 0.116]
-      ], glass, 0.014);
-      addSideQuad(mainShell, side, [
-        [0.040, 0.148],
-        [0.155, 0.148],
-        [0.238, 0.123],
-        [0.040, 0.123]
-      ], glass, 0.014);
-
-      // Small black mirror; no extra side plates or layered racing shapes.
-      addBox(mainShell, [0.018, 0.020, 0.035],
-        [side * 0.354, 0.143, -0.170], charcoal);
-    }
-
-    // Windshield and rear window lie on shallow, accurately placed planes.
-    addQuad(mainShell, [
-      [-0.267, 0.109, -0.198],
-      [0.267, 0.109, -0.198],
-      [0.236, 0.150, -0.080],
-      [-0.236, 0.150, -0.080]
-    ], glass);
-    addQuad(mainShell, [
-      [-0.236, 0.150, 0.165],
-      [0.236, 0.150, 0.165],
-      [0.270, 0.109, 0.274],
-      [-0.270, 0.109, 0.274]
-    ], glass);
-
-    // The flat roof is only slightly above the windshield top. It stays
-    // compact and low instead of creating a tall, rounded cab.
-    addBox(mainShell, [0.548, 0.009, 0.225],
-      [0, 0.158, 0.043], charcoal);
-    addBox(mainShell, [0.510, 0.004, 0.195],
-      [0, 0.164, 0.043], black);
-
-    // Flat hood: one subtle dark centre stripe and two narrow orange edges.
-    addBox(mainShell, [0.205, 0.003, 0.215],
-      [0, 0.142, -0.432], charcoal);
-    for (const side of [-1, 1]) {
-      addBox(mainShell, [0.010, 0.003, 0.235],
-        [side * 0.142, 0.142, -0.430], orangeHighlight);
-    }
-
-    // Short flat rear bed with only a shallow graphite insert.
-    addBox(mainShell, [0.535, 0.004, 0.222],
-      [0, 0.143, 0.474], graphite);
-    for (const side of [-1, 1]) {
-      addBox(mainShell, [0.012, 0.009, 0.245],
-        [side * 0.309, 0.149, 0.474], charcoal);
-    }
-
-    // Simple number decal on each door.
-    const numberCanvas = document.createElement("canvas");
-    numberCanvas.width = 128;
-    numberCanvas.height = 96;
-    const numberContext = numberCanvas.getContext("2d");
-    numberContext.fillStyle = "#172027";
-    numberContext.fillRect(0, 0, 128, 96);
-    numberContext.fillStyle = "#f5f4ef";
-    numberContext.font = "bold 68px Arial";
-    numberContext.textAlign = "center";
-    numberContext.textBaseline = "middle";
-    numberContext.fillText("27", 64, 49);
-    const numberTexture = new THREE.CanvasTexture(numberCanvas);
-    numberTexture.colorSpace = THREE.SRGBColorSpace;
-    const numberMaterial = new THREE.MeshBasicMaterial({
-      map: numberTexture,
-      side: THREE.DoubleSide,
-      polygonOffset: true,
-      polygonOffsetFactor: -1
-    });
-    for (const side of [-1, 1]) {
-      addSideQuad(mainShell, side, [
-        [0.040, 0.078],
-        [0.165, 0.078],
-        [0.165, 0.112],
-        [0.040, 0.112]
-      ], numberMaterial, 0.016);
-    }
-
-    // Thin grille, small headlights and simple full-width impact bumpers.
-    addBox(mainShell, [0.405, 0.030, 0.012],
-      [0, 0.096, -0.816], charcoal);
-    for (let i = 0; i < 5; i++) {
-      addBox(mainShell, [0.010, 0.021, 0.005],
-        [-0.12 + i * 0.060, 0.096, -0.822], silver);
-    }
-    for (const side of [-1, 1]) {
-      addBox(mainShell, [0.070, 0.028, 0.012],
-        [side * 0.240, 0.102, -0.810], headlamp);
-      addBox(mainShell, [0.065, 0.032, 0.010],
-        [side * 0.245, 0.090, 0.810], tailLamp);
-    }
-    addBox(mainShell, [0.735, 0.050, 0.060],
-      [0, 0.035, -0.820], graphite);
-    addBox(mainShell, [0.735, 0.050, 0.060],
-      [0, 0.035, 0.820], graphite);
+    importedRangerMesh.name = "Original uploaded SCX30 Ranger shell";
+    importedRangerMesh.castShadow = false;
+    importedRangerMesh.receiveShadow = false;
   }
 
   const prerunnerShellVisual = makePart(
@@ -1071,27 +702,20 @@ function makeCarVisual(color, playerName = "") {
     prerunnerShellVisual.add(importedShellVisual);
   }
 
-  const classicShellVisual = makePart(
-    shellGroup,
-    "classic-orange-shell-visual",
-    "Classic orange short-course shell",
-    "The original orange, black and graphite short-course shell, including its low cab, front and rear windows, side number panel, wheel arches, grille and bumpers."
-  );
-  makeBodyShell(classicShellVisual);
-
-  // Keep both body options available. The old shell is generated around the
-  // current wheelbase, so its wheel arches line up without distorting it.
+  // Keep the two actual uploaded body meshes available as separate choices.
   let shellStyle = "prerunner";
   function setShellStyle(style) {
-    const requested = style === "classic" ? "classic" : "prerunner";
-    shellStyle = requested === "prerunner" && shellModel ? "prerunner" : "classic";
+    const requested = style === "ranger" ? "ranger" : "prerunner";
+    shellStyle = requested === "ranger" && rangerShellGeometry
+      ? "ranger"
+      : "prerunner";
+    rangerShellVisual.visible = shellStyle === "ranger";
     prerunnerShellVisual.visible = shellStyle === "prerunner";
-    classicShellVisual.visible = shellStyle === "classic";
-    shellGroup.userData.partInfo = shellStyle === "classic"
+    shellGroup.userData.partInfo = shellStyle === "ranger"
       ? {
           id: "short-course-body-shell",
-          label: "Classic orange short-course shell",
-          description: "The original orange, black and graphite short-course shell, with its original styling restored and its wheel arches fitted to the current chassis."
+          label: "Orange SCX30 Ranger shell",
+          description: "The original uploaded orange SCX30 single-cab Ranger mesh, preserved as its own body option."
         }
       : {
           id: "short-course-body-shell",
@@ -1106,8 +730,9 @@ function makeCarVisual(color, playerName = "") {
       delete object.userData.partInfo;
     }
   });
-  setShellStyle(shellModel ? "prerunner" : "classic");
+  setShellStyle(shellModel ? "prerunner" : "ranger");
 
+  // The detailed chassis remains unchanged beneath either removable shell.
   // All internal chassis components remain present and retain their original
   // dimensions; either body shell can be removed to inspect the running gear.
 

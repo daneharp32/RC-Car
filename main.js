@@ -12,6 +12,13 @@ import { createRaceSystem } from "./race.js";
 
 import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/loaders/GLTFLoader.js";
 import { mergeGeometries } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/utils/BufferGeometryUtils.js";
+import { cleanRangerShellGeometry } from "./shell-cleanup.js";
+import rangerShellPart0 from "./ranger-shell-data-00.js";
+import rangerShellPart1 from "./ranger-shell-data-01.js";
+import rangerShellPart2 from "./ranger-shell-data-02.js";
+import rangerShellPart3 from "./ranger-shell-data-03.js";
+import rangerShellPart4 from "./ranger-shell-data-04.js";
+import rangerShellPart5 from "./ranger-shell-data-05.js";
 
 // Main application entry: renderer, track visuals, shared state, and frame loop.
 const $ = (id) => document.getElementById(id);
@@ -554,6 +561,117 @@ function buildMergedPrerunnerVisual(sourceScene) {
   return { visual: mergedRoot, triangleCount, meshCount: meshCount + 3 };
 }
 
+// Decode the original uploaded SCX30 single-cab Ranger shell. The source
+// mesh is stored in six compressed modules so the original user-uploaded
+// geometry remains available without re-uploading or procedurally rebuilding it.
+async function loadRangerShellGeometry() {
+  const encoded = [
+    rangerShellPart0, rangerShellPart1, rangerShellPart2,
+    rangerShellPart3, rangerShellPart4, rangerShellPart5
+  ].join("");
+  if (!encoded || encoded.length % 4 !== 0) {
+    throw new Error("The original Ranger shell data is incomplete.");
+  }
+
+  const compressed = Uint8Array.from(
+    atob(encoded),
+    (character) => character.charCodeAt(0)
+  );
+  if (typeof DecompressionStream !== "function") {
+    throw new Error("This browser does not support the Ranger mesh decompressor.");
+  }
+
+  const rawStream = new Blob([compressed]).stream()
+    .pipeThrough(new DecompressionStream("deflate-raw"));
+  const buffer = await new Response(rawStream).arrayBuffer();
+  const view = new DataView(buffer);
+  const byteLength = buffer.byteLength;
+
+  if (byteLength < 40 ||
+      view.getUint32(0, false) !== 0x52435351 ||
+      view.getUint32(4, true) !== 1) {
+    throw new Error("The original Ranger shell has an invalid data header.");
+  }
+
+  const vertexCount = view.getUint32(8, true);
+  const faceCount = view.getUint32(12, true);
+  if (!vertexCount || !faceCount || vertexCount > 100000 || faceCount > 200000) {
+    throw new Error("The original Ranger shell has invalid mesh dimensions.");
+  }
+
+  const minimum = [
+    view.getFloat32(16, true),
+    view.getFloat32(20, true),
+    view.getFloat32(24, true)
+  ];
+  const maximum = [
+    view.getFloat32(28, true),
+    view.getFloat32(32, true),
+    view.getFloat32(36, true)
+  ];
+  const positionOffset = 40;
+  const normalOffset = positionOffset + vertexCount * 6;
+  const indexOffset = normalOffset + vertexCount * 3 +
+    ((normalOffset + vertexCount * 3) % 2);
+  const indexCount = faceCount * 3;
+  if (indexOffset + indexCount * 2 !== byteLength) {
+    throw new Error("The original Ranger shell data length is inconsistent.");
+  }
+
+  const positions = new Float32Array(vertexCount * 3);
+  for (let i = 0; i < vertexCount; i++) {
+    for (let axis = 0; axis < 3; axis++) {
+      const quantized = view.getUint16(positionOffset + (i * 3 + axis) * 2, true);
+      positions[i * 3 + axis] =
+        minimum[axis] + (quantized / 65535) * (maximum[axis] - minimum[axis]);
+    }
+  }
+
+  const normalBytes = new Int8Array(buffer, normalOffset, vertexCount * 3);
+  const normals = new Float32Array(vertexCount * 3);
+  for (let i = 0; i < vertexCount; i++) {
+    const nx = normalBytes[i * 3] / 127;
+    const ny = normalBytes[i * 3 + 1] / 127;
+    const nz = normalBytes[i * 3 + 2] / 127;
+    const magnitude = Math.hypot(nx, ny, nz) || 1;
+    normals[i * 3] = nx / magnitude;
+    normals[i * 3 + 1] = ny / magnitude;
+    normals[i * 3 + 2] = nz / magnitude;
+  }
+
+  const indices = new Uint16Array(buffer, indexOffset, indexCount);
+  for (let i = 0; i < indices.length; i++) {
+    if (indices[i] >= vertexCount) {
+      throw new Error("The original Ranger shell contains an invalid triangle index.");
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
+  geometry.setIndex(new THREE.BufferAttribute(indices, 1));
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+
+  // Preserve the earlier, proven cleanup routine. The +0.15 seating offset
+  // is applied to the shell object's transform later, not by distorting vertices.
+  console.info(
+    "Original orange Ranger shell decoded:",
+    vertexCount,
+    "vertices,",
+    faceCount,
+    "triangles"
+  );
+  return cleanRangerShellGeometry(THREE, geometry);
+}
+
+let rangerShellGeometry = null;
+try {
+  rangerShellGeometry = await loadRangerShellGeometry();
+} catch (error) {
+  console.warn("Original uploaded Ranger shell unavailable:", error);
+}
+
 async function loadPrerunnerShell() {
   const loader = new GLTFLoader();
   const gltf = await loader.loadAsync("./FF_SC_Concept4_Desert_Racer.gltf");
@@ -607,12 +725,19 @@ try {
 // Physics: Cannon's RaycastVehicle applies suspension and tire impulses only
 // when each wheel ray has actually found a surface to touch.
 
+const rangerPhysicsBounds = rangerShellGeometry?.boundingBox?.clone?.() || null;
+if (rangerPhysicsBounds) {
+  rangerPhysicsBounds.translate(new THREE.Vector3(0, 0.15, 0));
+}
+const shellPhysicsGeometry = shellGeometry ||
+  (rangerPhysicsBounds ? { boundingBox: rangerPhysicsBounds } : null);
+
 const physicsSystem = createPhysicsSystem({
   CANNON,
   trackLayout,
   additionalLayouts: { "gravel-basin": gravelBasinSystem.trackLayout },
-  shellFit: !!shellGeometry,
-  shellGeometry
+  shellFit: !!(shellGeometry || rangerShellGeometry),
+  shellGeometry: shellPhysicsGeometry
 });
 const {
   world,
@@ -625,11 +750,11 @@ const {
   spawnYaw
 } = physicsSystem;
 
-const makeCarVisual = createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellModel });
+const makeCarVisual = createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellModel, rangerShellGeometry });
 const localCar = makeCarVisual(0xffa33d);
-let selectedShellStyle = shellModel ? "prerunner" : "classic";
+let selectedShellStyle = shellModel ? "prerunner" : "ranger";
 function setSelectedShellStyle(style) {
-  selectedShellStyle = style === "classic" ? "classic" : "prerunner";
+  selectedShellStyle = style === "ranger" ? "ranger" : "prerunner";
   selectedShellStyle = localCar.setShellStyle(selectedShellStyle);
   return selectedShellStyle;
 }
