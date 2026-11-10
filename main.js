@@ -725,12 +725,19 @@ try {
 // Physics: Cannon's RaycastVehicle applies suspension and tire impulses only
 // when each wheel ray has actually found a surface to touch.
 
+const rangerPhysicsBounds = rangerShellGeometry?.boundingBox?.clone?.() || null;
+if (rangerPhysicsBounds) {
+  rangerPhysicsBounds.translate(new THREE.Vector3(0, 0.15, 0));
+}
+const shellPhysicsGeometry = shellGeometry ||
+  (rangerPhysicsBounds ? { boundingBox: rangerPhysicsBounds } : null);
+
 const physicsSystem = createPhysicsSystem({
   CANNON,
   trackLayout,
   additionalLayouts: { "gravel-basin": gravelBasinSystem.trackLayout },
-  shellFit: !!shellGeometry,
-  shellGeometry
+  shellFit: !!(shellGeometry || rangerShellGeometry),
+  shellGeometry: shellPhysicsGeometry
 });
 const {
   world,
