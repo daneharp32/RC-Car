@@ -275,6 +275,10 @@ function buildMergedPrerunnerVisual(sourceScene) {
   sourceScene.updateMatrixWorld(true);
   const buckets = new Map();
   const detailObjectName = "desert racing details";
+  const bodySurfaceMeshes = [];
+  const detailSeatRaycaster = new THREE.Raycaster();
+  detailSeatRaycaster.near = 0;
+  detailSeatRaycaster.far = 0.9;
 
   function splitConnectedTriangleComponents(indices) {
     const parent = new Map();
@@ -347,53 +351,56 @@ function buildMergedPrerunnerVisual(sourceScene) {
     return { geometry: piece, vertexIds };
   }
 
-  function detailCorrection(materialName, bounds) {
-    const centerX = (bounds.min.x + bounds.max.x) * 0.5;
-    const centerY = (bounds.min.y + bounds.max.y) * 0.5;
-    const centerZ = (bounds.min.z + bounds.max.z) * 0.5;
-    const side = centerX < 0 ? -1 : 1;
-    const front = bounds.min.z > 2.30;
-    const rear = bounds.max.z < -2.75;
-    const outerLamp = Math.abs(centerX) > 0.38;
+  function seatDetailComponent(piece) {
+    const positions = piece.attributes.position;
+    const normals = piece.attributes.normal;
+    if (!positions || !normals || !bodySurfaceMeshes.length) return;
 
-    // Front lamp housings, silver bezels, and white lenses were authored
-    // slightly ahead of the nose. Seat them against the body face.
-    if (front && outerLamp && (
-      materialName.includes("light housings") ||
-      materialName.includes("silver trim") ||
-      materialName.includes("LED lens") ||
-      materialName.includes("marker LED")
-    )) {
-      return [0, 0, -0.16];
+    const center = new THREE.Vector3();
+    const averageNormal = new THREE.Vector3();
+    for (let index = 0; index < positions.count; index++) {
+      center.x += positions.getX(index);
+      center.y += positions.getY(index);
+      center.z += positions.getZ(index);
+      averageNormal.x += normals.getX(index);
+      averageNormal.y += normals.getY(index);
+      averageNormal.z += normals.getZ(index);
+    }
+    center.multiplyScalar(1 / positions.count);
+    if (averageNormal.lengthSq() < 1e-8) return;
+    averageNormal.normalize();
+
+    let normalMin = Infinity;
+    let normalMax = -Infinity;
+    for (let index = 0; index < positions.count; index++) {
+      const point = new THREE.Vector3(
+        positions.getX(index),
+        positions.getY(index),
+        positions.getZ(index)
+      );
+      const distance = point.sub(center).dot(averageNormal);
+      normalMin = Math.min(normalMin, distance);
+      normalMax = Math.max(normalMax, distance);
     }
 
-    // The center grille and its horizontal silver bars only need a tiny
-    // setback; the headlights above are corrected independently.
-    if (front && !outerLamp && (
-      materialName.includes("front grille") ||
-      materialName.includes("silver trim")
-    )) {
-      return [0, 0, -0.025];
-    }
+    // Project each separate lamp, bumper, trim, and decal component back onto
+    // the actual shell surface. This replaces fragile hand-tuned offsets that
+    // could move one part inward while leaving another visibly floating.
+    const rayOrigin = center.clone().addScaledVector(averageNormal, 0.42);
+    detailSeatRaycaster.set(rayOrigin, averageNormal.clone().negate());
+    detailSeatRaycaster.near = 0;
+    detailSeatRaycaster.far = 0.9;
+    const intersections = detailSeatRaycaster.intersectObjects(bodySurfaceMeshes, false);
+    const contact = intersections.find((hit) => hit.distance <= 0.9);
+    if (!contact) return;
 
-    // Lift and recess the front bumper so it meets the lower painted fascia
-    // rather than hanging below and forward of the shell.
-    if (materialName.includes("front bumper")) {
-      return [0, 0.15, -0.16];
-    }
-
-    // The rear lens and its two surrounds sit just outside the tail panel.
-    // Move both assemblies inward laterally so their full housings overlap it.
-    if (rear && outerLamp && (
-      materialName.includes("light housings") ||
-      materialName.includes("silver trim") ||
-      materialName.includes("rear LED lens") ||
-      materialName.includes("marker LED")
-    )) {
-      return [-side * 0.11, 0, 0];
-    }
-
-    return [0, 0, 0];
+    const halfThickness = Math.max(0, normalMax - normalMin) * 0.5;
+    const clearance = Math.max(0.004, halfThickness + 0.003);
+    const offset = contact.point.clone()
+      .addScaledVector(averageNormal, clearance)
+      .sub(center);
+    if (offset.lengthSq() > 0.48 * 0.48) return;
+    piece.translate(offset.x, offset.y, offset.z);
   }
 
   sourceScene.traverse((object) => {
@@ -408,6 +415,7 @@ function buildMergedPrerunnerVisual(sourceScene) {
           materialIndex: 0
         }];
     const isDetailObject = object.name.toLowerCase().includes(detailObjectName);
+    if (!isDetailObject) bodySurfaceMeshes.push(object);
 
     for (const group of groups) {
       if (!group.count) continue;
@@ -444,17 +452,29 @@ function buildMergedPrerunnerVisual(sourceScene) {
 
         piece.applyMatrix4(object.matrixWorld);
         if (isDetailObject && componentVertexIds) {
-          const positions = geometry.attributes.position;
-          const points = componentVertexIds.map((vertexId) => new THREE.Vector3(
-            positions.getX(vertexId),
-            positions.getY(vertexId),
-            positions.getZ(vertexId)
-          ));
-          const componentBounds = new THREE.Box3().setFromPoints(points);
-          const [offsetX, offsetY, offsetZ] = detailCorrection(material.name || "", componentBounds);
-          if (offsetX || offsetY || offsetZ) {
-            piece.translate(offsetX, offsetY, offsetZ);
+          const materialName = material.name || "";
+          const uv = piece.attributes.uv;
+
+          // glTF V=0 points at the top of its source image. The authored decal
+          // coordinates run bottom-to-top, so invert V on both sides. The
+          // positive-X source side becomes the simulator's left side after the
+          // 180-degree body rotation and also needs U reversed for readable text.
+          if (materialName.includes("Printed side race-number decal") && uv) {
+            let centerX = 0;
+            const positions = piece.attributes.position;
+            for (let index = 0; index < positions.count; index++) {
+              centerX += positions.getX(index);
+            }
+            const reverseU = centerX / positions.count > 0;
+            for (let index = 0; index < uv.count; index++) {
+              const u = uv.getX(index);
+              const v = uv.getY(index);
+              uv.setXY(index, reverseU ? 1 - u : u, 1 - v);
+            }
+            uv.needsUpdate = true;
           }
+
+          seatDetailComponent(piece);
         }
 
         const attributeSignature = Object.keys(piece.attributes).sort().map((name) => {
@@ -511,46 +531,73 @@ function buildMergedPrerunnerVisual(sourceScene) {
     }
   }
 
-  // The GLTF left the rear of the cab entirely open. Add a painted rear cab
-  // panel with a compact horizontal window and a dark inset surround.
+  // The source shell has an open rear cab aperture. Build a shallow back
+  // panel that follows the cab's rearward rake and meets the side pillars and
+  // roof, then layer a fitted rubber seal and tinted trapezoidal glass over it.
+  // This replaces the old flat, upright boxes that sat away from the body.
+  function makeRearCabShape(halfWidthBottom, halfWidthTop, bottomY, topY, radius, depthOffset) {
+    const shape = new THREE.Shape();
+    shape.moveTo(-halfWidthBottom + radius, bottomY);
+    shape.lineTo(halfWidthBottom - radius, bottomY);
+    shape.quadraticCurveTo(halfWidthBottom, bottomY, halfWidthBottom, bottomY + radius);
+    shape.lineTo(halfWidthTop, topY - radius);
+    shape.quadraticCurveTo(halfWidthTop, topY, halfWidthTop - radius, topY);
+    shape.lineTo(-halfWidthTop + radius, topY);
+    shape.quadraticCurveTo(-halfWidthTop, topY, -halfWidthTop, topY - radius);
+    shape.lineTo(-halfWidthBottom, bottomY + radius);
+    shape.quadraticCurveTo(-halfWidthBottom, bottomY, -halfWidthBottom + radius, bottomY);
+    const geometry = new THREE.ShapeGeometry(shape, 16);
+    const positions = geometry.attributes.position;
+    for (let index = 0; index < positions.count; index++) {
+      const y = positions.getY(index);
+      // The rear face leans forward as it rises to meet the rear roof edge.
+      const z = -0.7334 + (y - 0.8374) * 0.37 + depthOffset;
+      positions.setZ(index, z);
+    }
+    positions.needsUpdate = true;
+    geometry.computeVertexNormals();
+    geometry.computeBoundingBox();
+    geometry.computeBoundingSphere();
+    return geometry;
+  }
+
   const rearCabBlue = new THREE.MeshStandardMaterial({
-    color: 0x075b8c,
-    roughness: 0.34,
-    metalness: 0.36,
+    color: 0x0872b4,
+    roughness: 0.36,
+    metalness: 0.30,
     side: THREE.DoubleSide
   });
   const rearWindowFrame = new THREE.MeshStandardMaterial({
-    color: 0x101820,
-    roughness: 0.44,
-    metalness: 0.18,
+    color: 0x101923,
+    roughness: 0.40,
+    metalness: 0.20,
     side: THREE.DoubleSide
   });
   const rearWindowGlass = new THREE.MeshStandardMaterial({
-    color: 0x142b3d,
-    roughness: 0.2,
-    metalness: 0.12,
+    color: 0x153247,
+    roughness: 0.18,
+    metalness: 0.10,
     transparent: true,
     opacity: 0.88,
     side: THREE.DoubleSide
   });
+
   const rearPanel = new THREE.Mesh(
-    new THREE.BoxGeometry(1.38, 0.44, 0.028),
+    makeRearCabShape(0.735, 0.625, 0.832, 1.292, 0.035, 0.002),
     rearCabBlue
   );
-  rearPanel.name = "Concept4 painted rear cab panel";
-  rearPanel.position.set(0, 1.045, -0.738);
+  rearPanel.name = "Concept4 sloped rear cab panel";
   const rearFrame = new THREE.Mesh(
-    new THREE.BoxGeometry(0.80, 0.265, 0.018),
+    makeRearCabShape(0.585, 0.465, 0.895, 1.225, 0.032, -0.008),
     rearWindowFrame
   );
-  rearFrame.name = "Concept4 rectangular rear-window surround";
-  rearFrame.position.set(0, 1.085, -0.758);
+  rearFrame.name = "Concept4 fitted rear-window gasket";
   const rearGlass = new THREE.Mesh(
-    new THREE.BoxGeometry(0.70, 0.175, 0.02),
+    makeRearCabShape(0.552, 0.432, 0.925, 1.195, 0.028, -0.013),
     rearWindowGlass
   );
-  rearGlass.name = "Concept4 rectangular tinted rear window";
-  rearGlass.position.set(0, 1.085, -0.772);
+  rearGlass.name = "Concept4 sloped tinted rear window";
+
   for (const mesh of [rearPanel, rearFrame, rearGlass]) {
     mesh.castShadow = false;
     mesh.receiveShadow = false;
