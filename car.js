@@ -903,19 +903,26 @@ function makeCarVisual(color, playerName = "") {
       chassisGroup,
       id,
       label,
-      "Long-travel oil-filled coil-over supports the live axle. Its body, shaft and spring visibly follow axle articulation.",
+      "Long-travel oil-filled coil-over supports the live axle. Its body, shaft, spring seats and preload collar visibly follow axle articulation.",
       "live-axle"
     );
-    addMesh(group, new THREE.CylinderGeometry(0.023, 0.026, 0.62, 14), blueDark);
-    addMesh(group, new THREE.CylinderGeometry(0.008, 0.008, 0.53, 10), alloy)
+    addMesh(group, new THREE.CylinderGeometry(0.023, 0.026, 0.62, 16), blueDark);
+    addMesh(group, new THREE.CylinderGeometry(0.008, 0.008, 0.53, 12), alloy)
       .position.x = side * 0.003;
-    for (let i = 0; i < 7; i++) {
-      const spring = addMesh(group, new THREE.TorusGeometry(0.033, 0.0045, 7, 20), springSilver);
+    for (let i = 0; i < 8; i++) {
+      const spring = addMesh(group, new THREE.TorusGeometry(0.034, 0.0048, 8, 24), springSilver);
       spring.rotation.x = Math.PI / 2;
-      spring.position.y = -0.23 + i * 0.075;
+      spring.position.y = -0.245 + i * 0.070;
     }
-    addMesh(group, new THREE.SphereGeometry(0.029, 12, 10), carbonEdge, [0, -0.30, 0]);
-    addMesh(group, new THREE.SphereGeometry(0.029, 12, 10), red, [0, 0.30, 0]);
+    for (const y of [-0.205, 0.205]) {
+      const seat = addMesh(group, new THREE.TorusGeometry(0.039, 0.006, 8, 24), alloy, [0, y, 0]);
+      seat.rotation.x = Math.PI / 2;
+    }
+    const adjuster = addMesh(group, new THREE.CylinderGeometry(0.032, 0.032, 0.035, 16), red, [0, -0.15, 0]);
+    adjuster.rotation.x = Math.PI / 2;
+    addMesh(group, new THREE.SphereGeometry(0.030, 14, 12), carbonEdge, [0, -0.31, 0]);
+    addMesh(group, new THREE.SphereGeometry(0.030, 14, 12), red, [0, 0.31, 0]);
+    addMesh(group, new THREE.CylinderGeometry(0.013, 0.013, 0.045, 12), alloy, [0, 0.31, 0]);
     return group;
   }
   function updateLiveAxleShock(group, start, end) {
@@ -980,6 +987,25 @@ function makeCarVisual(color, playerName = "") {
     strap.group.userData.isTaut = slack < 0.012;
   }
 
+  const liveAxleDriveshaft = makeLiveAxleSegment(
+    "live-axle-driveshaft",
+    "Rear differential driveshaft",
+    "The longitudinal prop shaft drives the live axle through a sliding coupling and articulated rear universal joint.",
+    0.014,
+    alloy
+  );
+  const driveshaftCoupler = addMesh(
+    liveAxleDriveshaft.group,
+    new THREE.CylinderGeometry(0.022, 0.022, 0.075, 16),
+    darkMetal,
+    [0, 0.12, 0]
+  );
+  const driveshaftJoint = addMesh(
+    liveAxleDriveshaft.group,
+    new THREE.SphereGeometry(0.028, 14, 12),
+    red,
+    [0, 0.48, 0]
+  );
   const liveAxleLinks = [];
   const liveAxleShocks = [];
   const liveAxleStraps = [];
@@ -1013,7 +1039,7 @@ function makeCarVisual(color, playerName = "") {
     });
     liveAxleStraps.push({
       side,
-      group: makeLimitStrap(`rear-${sideName}-limit-strap`, side)
+      ...makeLimitStrap(`rear-${sideName}-limit-strap`, side)
     });
   }
 
@@ -1084,6 +1110,18 @@ function makeCarVisual(color, playerName = "") {
         new THREE.Vector3(side * 0.205 * visualScale, 0.16 * visualScale, (rearAxleZ - 0.075) * visualScale),
         axlePoint(side * 0.215, 0.065, 0)
       );
+    }
+    if (!damageParts.get(liveAxleDriveshaft.group.userData.damagePartId)?.detached) {
+      updateLiveAxleSegment(
+        liveAxleDriveshaft,
+        new THREE.Vector3(0, 0.09 * visualScale, (rearAxleZ - 0.30) * visualScale),
+        axlePoint(0, -0.005, -0.17)
+      );
+      driveshaftCoupler.position.y = 0.18;
+      driveshaftJoint.position.copy(axlePoint(0, -0.005, -0.17))
+        .sub(liveAxleDriveshaft.group.position)
+        .applyQuaternion(liveAxleDriveshaft.group.quaternion.clone().invert())
+        .divide(new THREE.Vector3(1, Math.max(0.001, liveAxleDriveshaft.group.scale.y), 1));
     }
     for (let strapIndex = 0; strapIndex < liveAxleStraps.length; strapIndex++) {
       const strap = liveAxleStraps[strapIndex];
