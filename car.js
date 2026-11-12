@@ -962,9 +962,8 @@ function makeCarVisual(color, playerName = "") {
       direction.normalize()
     );
     segment.group.scale.set(1, length, 1);
-    for (const brace of segment.crossBraces) {
-      brace.scale.y = 1 / length;
-    }
+    // Cross braces span the arm width; only the longitudinal rails use
+    // the animated length scale.
   }
   function makeLiveAxleShock(id, label, side) {
     const group = makePart(
