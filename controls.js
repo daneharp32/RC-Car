@@ -86,8 +86,9 @@ function resetCar() {
     vehicle.wheelInfos[i].rotation = 0;
     vehicle.wheelInfos[i].deltaRotation = 0;
     vehicle.wheelInfos[i].engineForce = 0;
-    vehicle.wheelInfos[i].suspensionStiffness = baseWheelDynamics[i].suspensionStiffness;
-    vehicle.wheelInfos[i].maxSuspensionForce = baseWheelDynamics[i].maxSuspensionForce;
+    const currentScale = game.physicsSystem?.getVehicleScale?.() ?? 1;
+    vehicle.wheelInfos[i].suspensionStiffness = baseWheelDynamics[i].suspensionStiffness * currentScale * currentScale;
+    vehicle.wheelInfos[i].maxSuspensionForce = baseWheelDynamics[i].maxSuspensionForce * currentScale * currentScale * currentScale;
     applyWheelDamageModifiers(i, i < 2 ? FRONT_TIRE_BASE_GRIP : REAR_TIRE_BASE_GRIP);
   }
   showToast("Car reset and repaired");
@@ -152,8 +153,9 @@ function applyWheelDamageModifiers(index, requestedGrip) {
   const tire = partHealth(wheelPartIds[index]);
   const gripHealth = Math.min(structure, tire);
   const base = baseWheelDynamics[index];
-  wheel.suspensionStiffness = base.suspensionStiffness * structure;
-  wheel.maxSuspensionForce = base.maxSuspensionForce * structure;
+  const scale = game.physicsSystem?.getVehicleScale?.() ?? 1;
+  wheel.suspensionStiffness = base.suspensionStiffness * scale * scale * structure;
+  wheel.maxSuspensionForce = base.maxSuspensionForce * scale * scale * scale * structure;
   wheel.frictionSlip = Math.max(0.01, requestedGrip * gripHealth);
   return { drive: gripHealth, structure, tire };
 }
