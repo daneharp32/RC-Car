@@ -694,8 +694,85 @@ export function createSandboxSystem(game) {
     });
   }
 
+  function renderDamageTestControls(message = "") {
+    const select = $("secretDamagePart");
+    const status = $("secretDamagePartStatus");
+    if (!select) return;
+
+    const parts = localCar.getDamagePartOptions?.() || [];
+    const previousValue = select.value || selectedDamageTestPart;
+    select.replaceChildren();
+    for (const part of parts) {
+      const option = document.createElement("option");
+      option.value = part.id;
+      const percent = Math.round((part.health / Math.max(1, part.maxHealth)) * 100);
+      option.textContent = part.label +
+        (part.detached ? " · DETACHED" : !part.visible ? " · INACTIVE SHELL" : " · " + percent + "%");
+      option.disabled = !part.visible && !part.detached;
+      select.appendChild(option);
+    }
+
+    const available = parts.filter((part) => part.visible || part.detached);
+    const selected = available.find((part) => part.id === previousValue) || available[0] || parts[0];
+    selectedDamageTestPart = selected?.id || "";
+    select.value = selectedDamageTestPart;
+    const selectedOption = parts.find((part) => part.id === selectedDamageTestPart);
+    if (status) {
+      if (message) {
+        status.textContent = message;
+      } else if (!selectedOption) {
+        status.textContent = "NO COMPONENTS AVAILABLE";
+      } else if (selectedOption.detached) {
+        status.textContent = selectedOption.label.toUpperCase() + " · DISCONNECTED";
+      } else {
+        const percent = Math.round((selectedOption.health / Math.max(1, selectedOption.maxHealth)) * 100);
+        status.textContent = selectedOption.label.toUpperCase() + " · " + percent + "% DURABILITY";
+      }
+    }
+
+    const damageButton = $("secretDamagePartButton");
+    const detachButton = $("secretDetachPartButton");
+    const repairButton = $("secretRepairAllButton");
+    if (damageButton) damageButton.disabled = !selectedOption || selectedOption.detached || !selectedOption.visible;
+    if (detachButton) detachButton.disabled = !selectedOption || selectedOption.detached || !selectedOption.visible;
+    if (repairButton) repairButton.disabled = !parts.some((part) => part.detached || part.health < part.maxHealth);
+  }
+
+  let selectedDamageTestPart = "";
+
+  function testDamageSelectedPart() {
+    const result = localCar.debugDamagePart?.(selectedDamageTestPart, 0.45);
+    if (!result) {
+      renderDamageTestControls("SELECT AN ATTACHED COMPONENT FIRST");
+      return;
+    }
+    const percent = Math.round((result.health / Math.max(1, result.maxHealth)) * 100);
+    renderDamageTestControls(result.detached
+      ? result.id.toUpperCase() + " DISCONNECTED"
+      : result.id.toUpperCase() + " · " + percent + "% DURABILITY");
+    game.showToast?.(result.detached ? "Component disconnected" : "Test damage applied");
+  }
+
+  function detachSelectedTestPart() {
+    const detached = localCar.debugDetachPart?.(selectedDamageTestPart);
+    if (!detached) {
+      renderDamageTestControls("SELECT AN ATTACHED COMPONENT FIRST");
+      return;
+    }
+    renderDamageTestControls("COMPONENT DISCONNECTED · PHYSICS ACTIVE");
+    game.showToast?.("Test component detached");
+  }
+
+  function repairTestParts() {
+    localCar.repairAll?.();
+    game.impactDamageSystem?.clear?.();
+    renderDamageTestControls("ALL COMPONENTS REPAIRED");
+    game.showToast?.("All vehicle components repaired");
+  }
+
   function renderSecretMenu() {
     if (!secretMenuPanel) return;
+    renderDamageTestControls();
     const infinite = $("secretInfiniteGadgets");
     if (infinite) infinite.checked = secretSettings.infiniteGadgets;
     const noCooldown = $("secretNoCooldown");
@@ -2179,20 +2256,20 @@ export function createSandboxSystem(game) {
   }
 
   function handleKeyDown(key, event) {
-    if (active && !game.isPaused?.() && (key === "d" || key === "h")) {
+    if (active && !game.isPaused?.() && (key === "d" || key === "f")) {
       secretChordKeys.add(key);
-      if (secretChordKeys.has("d") && secretChordKeys.has("h") && !secretChordLatched) {
+      if (secretChordKeys.has("d") && secretChordKeys.has("f") && !secretChordLatched) {
         secretChordLatched = true;
         if (game.controls?.keys) {
           game.controls.keys.d = false;
-          game.controls.keys.h = false;
+          game.controls.keys.f = false;
         }
         event?.preventDefault?.();
         toggleSecretMenu();
         if (secretMenuOpen && inMap) {
           clearHeldControls();
           secretChordKeys.add("d");
-          secretChordKeys.add("h");
+          secretChordKeys.add("f");
           secretChordLatched = true;
           for (const controlKey of Object.keys(game.controls?.keys || {})) {
             game.controls.keys[controlKey] = false;
@@ -2247,10 +2324,10 @@ export function createSandboxSystem(game) {
 
   function handleKeyUp(key) {
     let handled = false;
-    if (key === "d" || key === "h") {
+    if (key === "d" || key === "f") {
       const wasChordKey = secretChordKeys.has(key);
       secretChordKeys.delete(key);
-      if (!secretChordKeys.has("d") || !secretChordKeys.has("h")) secretChordLatched = false;
+      if (!secretChordKeys.has("d") || !secretChordKeys.has("f")) secretChordLatched = false;
       if (wasChordKey && active) handled = true;
     }
     const assignedPart = heldAssignments[key];
@@ -2292,6 +2369,13 @@ export function createSandboxSystem(game) {
   $("sandboxEnterMapButton").addEventListener("click", enterMap);
   $("sandboxLeaveButton").addEventListener("click", () => game.multiplayer?.leaveArena?.());
   $("secretMenuClose")?.addEventListener("click", () => setSecretMenuOpen(false));
+  $("secretDamagePart")?.addEventListener("change", (event) => {
+    selectedDamageTestPart = event.target.value;
+    renderDamageTestControls();
+  });
+  $("secretDamagePartButton")?.addEventListener("click", testDamageSelectedPart);
+  $("secretDetachPartButton")?.addEventListener("click", detachSelectedTestPart);
+  $("secretRepairAllButton")?.addEventListener("click", repairTestParts);
   $("secretInfiniteGadgets")?.addEventListener("change", (event) =>
     toggleInfiniteGadgets(event.target.checked)
   );

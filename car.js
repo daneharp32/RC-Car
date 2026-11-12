@@ -806,6 +806,38 @@ function makeCarVisual(color, playerName = "") {
     return damageParts.get(id)?.detached === true;
   }
 
+  function getDamagePartOptions() {
+    return [...damageParts.values()].map((record) => ({
+      id: record.id,
+      label: record.label,
+      health: record.health,
+      maxHealth: record.maxHealth,
+      detached: record.detached,
+      visible: isPartVisible(record)
+    }));
+  }
+
+  function debugDamagePart(id, fraction = 0.45) {
+    const record = damageParts.get(String(id || ""));
+    if (!record || record.detached || !isPartAttached(record)) return false;
+    const normalizedFraction = THREE.MathUtils.clamp(Number(fraction) || 0.45, 0.05, 1);
+    const amount = record.maxHealth * normalizedFraction;
+    damageRecord(record, amount, { speed: 5.2 });
+    return {
+      id: record.id,
+      health: record.health,
+      maxHealth: record.maxHealth,
+      detached: record.detached
+    };
+  }
+
+  function debugDetachPart(id) {
+    const record = damageParts.get(String(id || ""));
+    if (!record || record.detached || !isPartAttached(record)) return false;
+    damageRecord(record, Math.max(0.01, record.health), { speed: 6.0 });
+    return record.detached;
+  }
+
   function detachPart(record, launch = {}) {
     if (record.detached || !record.group.parent) return false;
 
@@ -1190,7 +1222,10 @@ function makeCarVisual(color, playerName = "") {
     getDamageSnapshot,
     applyDamageSnapshot,
     getPartHealthRatio,
-    isPartDetached
+    isPartDetached,
+    getDamagePartOptions,
+    debugDamagePart,
+    debugDetachPart
   };
 }
   return makeCarVisual;
