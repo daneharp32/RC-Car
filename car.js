@@ -41,8 +41,12 @@ function makeCarVisual(color, playerName = "") {
   let totalled = false;
 
   function isActiveDamageRecord(record) {
-    if (record.id === "uploaded-scx30-ranger-shell") return shellStyle === "ranger";
-    if (record.id === "prerunner-shell-visual") return shellStyle === "prerunner";
+    if (record.id === "uploaded-scx30-ranger-shell") {
+      return shellStyle === "ranger" && shellGroup.visible && record.group.visible;
+    }
+    if (record.id === "prerunner-shell-visual") {
+      return shellStyle === "prerunner" && shellGroup.visible && record.group.visible;
+    }
     return true;
   }
 
@@ -1102,7 +1106,7 @@ function makeCarVisual(color, playerName = "") {
         continue;
       }
 
-      if (!isPartAttached(record) || !record.group.parent) continue;
+      if (!isPartAttached(record) || !isPartVisible(record) || !record.group.parent) continue;
       record.group.updateWorldMatrix(true, true);
       const partPosition = record.group.getWorldPosition(new THREE.Vector3());
       const direction = partPosition.sub(vehicleCenter);
