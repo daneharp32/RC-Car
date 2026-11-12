@@ -933,27 +933,51 @@ function makeCarVisual(color, playerName = "") {
       chassisGroup,
       id,
       side < 0 ? "Left rear limit strap" : "Right rear limit strap",
-      "A reinforced droop strap remains slack through normal compression, then becomes taut at maximum axle drop to limit suspension extension.",
+      "A reinforced droop strap stays loose during compression and tightens at maximum axle extension to protect the suspension links and shocks.",
       "live-axle"
     );
-    addMesh(group, new THREE.BoxGeometry(0.036, 1, 0.012), blackPlastic);
-    for (const x of [-0.011, 0.011]) {
-      addMesh(group, new THREE.BoxGeometry(0.0035, 0.94, 0.014), redBright, [x, 0, 0]);
+    const segments = [];
+    for (let i = 0; i < 6; i++) {
+      const piece = new THREE.Group();
+      const webbing = addMesh(piece, new THREE.BoxGeometry(0.032, 1, 0.010), blackPlastic);
+      const stitchLeft = addMesh(piece, new THREE.BoxGeometry(0.0028, 0.96, 0.012), redBright, [-0.0105, 0, 0]);
+      const stitchRight = addMesh(piece, new THREE.BoxGeometry(0.0028, 0.96, 0.012), redBright, [0.0105, 0, 0]);
+      group.add(piece);
+      segments.push(piece);
     }
-    for (const y of [-0.46, 0.46]) {
-      addMesh(group, new THREE.TorusGeometry(0.018, 0.004, 6, 14), alloy, [0, y, 0]);
-    }
-    return group;
+    const eyelets = [-1, 1].map(() => {
+      const eye = addMesh(group, new THREE.TorusGeometry(0.018, 0.0045, 8, 16), alloy);
+      eye.rotation.y = Math.PI / 2;
+      return eye;
+    });
+    return { group, segments, eyelets };
   }
-  function updateLimitStrap(group, start, end) {
-    const direction = end.clone().sub(start);
-    const length = Math.max(0.001, direction.length());
-    group.position.copy(start).add(end).multiplyScalar(0.5);
-    group.quaternion.setFromUnitVectors(
-      new THREE.Vector3(0, 1, 0),
-      direction.normalize()
-    );
-    group.scale.set(1, length, 1);
+  function updateLimitStrap(strap, start, end, maxLength) {
+    const delta = end.clone().sub(start);
+    const distance = Math.max(0.001, delta.length());
+    const direction = delta.clone().normalize();
+    const slack = Math.max(0, maxLength - distance);
+    const sag = Math.min(0.12, Math.sqrt(Math.max(0, maxLength * maxLength - distance * distance)) * 0.30);
+    const sagDirection = new THREE.Vector3(0, 0, 1);
+    sagDirection.addScaledVector(direction, -sagDirection.dot(direction));
+    if (sagDirection.lengthSq() < 1e-5) sagDirection.set(1, 0, 0);
+    sagDirection.normalize();
+    const curvePoint = (t) => start.clone()
+      .lerp(end, t)
+      .addScaledVector(sagDirection, 4 * t * (1 - t) * sag);
+    for (let i = 0; i < strap.segments.length; i++) {
+      const a = curvePoint(i / strap.segments.length);
+      const b = curvePoint((i + 1) / strap.segments.length);
+      const segmentDirection = b.clone().sub(a);
+      const length = Math.max(0.001, segmentDirection.length());
+      const piece = strap.segments[i];
+      piece.position.copy(a).add(b).multiplyScalar(0.5);
+      piece.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), segmentDirection.normalize());
+      piece.scale.set(1, length, 1);
+    }
+    strap.eyelets[0].position.copy(start);
+    strap.eyelets[1].position.copy(end);
+    strap.group.userData.isTaut = slack < 0.012;
   }
 
   const liveAxleLinks = [];
@@ -1003,10 +1027,21 @@ function makeCarVisual(color, playerName = "") {
     }
     liveAxleAssembly.visible = chassisStyle === "live-axle";
 
-    // Shift the heavy electrical modules forward for the desert axle layout.
-    const forwardOffset = chassisStyle === "live-axle" ? -0.19 : 0;
+    // Forward-mounted equipment is arranged across the front half of the
+    // frame, with the battery low and centered-right, motor left, and ESC /
+    // receiver on separate mounting pads to avoid stacking modules together.
+    const basePosition = (part) => part.userData.baseChassisPosition || new THREE.Vector3();
     for (const part of [battery, motor, gearing, esc, receiver, powerWiring, signalWiring]) {
-      part.position.z = (part.userData.baseChassisZ || 0) + forwardOffset;
+      part.position.copy(basePosition(part));
+    }
+    if (chassisStyle === "live-axle") {
+      battery.position.set(0.19, -0.045, -0.205);
+      motor.position.set(-0.24, -0.055, -0.30);
+      gearing.position.set(-0.23, 0, -0.30);
+      esc.position.set(-0.27, 0, -0.19);
+      receiver.position.set(0.25, 0, -0.46);
+      powerWiring.position.set(0.01, -0.045, -0.23);
+      signalWiring.position.set(0.15, -0.035, -0.32);
     }
     return chassisStyle;
   }
@@ -1050,13 +1085,18 @@ function makeCarVisual(color, playerName = "") {
         axlePoint(side * 0.215, 0.065, 0)
       );
     }
-    for (const strap of liveAxleStraps) {
+    for (let strapIndex = 0; strapIndex < liveAxleStraps.length; strapIndex++) {
+      const strap = liveAxleStraps[strapIndex];
       const side = strap.side;
       if (damageParts.get(strap.group.userData.damagePartId)?.detached) continue;
+      const strapMaxLength = Array.isArray(state.limitStrapLengths)
+        ? (state.limitStrapLengths[strapIndex] || 0) / rootScale
+        : 0.31 * visualScale;
       updateLimitStrap(
-        strap.group,
+        strap,
         new THREE.Vector3(side * 0.235 * visualScale, 0.205 * visualScale, (rearAxleZ - 0.085) * visualScale),
-        axlePoint(side * 0.235, 0.12, 0)
+        axlePoint(side * 0.235, 0.12, 0),
+        strapMaxLength
       );
     }
 
@@ -1150,10 +1190,10 @@ function makeCarVisual(color, playerName = "") {
     }
   });
   setShellStyle(shellModel ? "prerunner" : "ranger");
-  setChassisStyle("standard");
   for (const part of [battery, motor, gearing, esc, receiver, powerWiring, signalWiring]) {
-    part.userData.baseChassisZ = part.position.z;
+    part.userData.baseChassisPosition = part.position.clone();
   }
+  setChassisStyle("standard");
 
   // Store the original hierarchy and transforms so every damaged component
   // can be restored by the existing vehicle reset command.
