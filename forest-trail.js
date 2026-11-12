@@ -34,7 +34,9 @@ function makeForestTexture(THREE, random, trail = false) {
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(trail ? 72 : 38, trail ? 3 : 38);
+  // Geometry UVs already encode world-scale repetition, so keep the
+  // texture repeat at one to avoid multiplying the road/leaf detail too far.
+  texture.repeat.set(1, 1);
   texture.anisotropy = 4;
   return texture;
 }
