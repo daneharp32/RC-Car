@@ -277,7 +277,7 @@ export function createMultiplayerSystem(game) {
       if (currentLobby?.mode === "sandbox") {
         remote.visual.root.visible = data.inMap === true;
         const remoteCarScale = Number.isFinite(data.carScale)
-          ? Math.max(0.6, Math.min(1.8, data.carScale))
+          ? Math.max(0.6, Math.min(10, data.carScale))
           : 1;
         remote.visual.root.scale.setScalar(remoteCarScale);
         game.sandbox?.applyRemoteLoadout?.(remote.visual, data.loadout);

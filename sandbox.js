@@ -2411,7 +2411,7 @@ export function createSandboxSystem(game) {
   $("secretDamageMultiplier")?.addEventListener("input", e => setDamageMultiplier(e.target.value));
   $("secretFlingResistance")?.addEventListener("input", e => setFlingResistance(e.target.value));
   $("secretCarSize")?.addEventListener("input", (event) =>
-    updateSecretSetting("carSize", event.target, 0.6, 1.8)
+    updateSecretSetting("carSize", event.target, 0.6, 10)
   );
   $("secretGravityOrbRadius")?.addEventListener("input", (event) =>
     updateSecretSetting("gravityOrbRadius", event.target, 0.5, 5)
