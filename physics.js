@@ -257,7 +257,11 @@ for (let i = 0; i < 4; i++) {
     customSlidingRotationalSpeed: 18
   });
 }
+// The live-axle sensors must be repositioned before RaycastVehicle casts its
+// rays. The physical axle force solver runs immediately after that ray update.
+world.addEventListener("preStep", syncRearAxleSensors);
 vehicle.addToWorld(world);
+world.addEventListener("preStep", solveLiveRearAxle);
 
 // Sandbox-only size tuning. Keep base geometry and wheel data so changes are
 // reversible and never accumulate rounding error across slider adjustments.
@@ -275,9 +279,405 @@ const baseWheelSettings = vehicle.wheelInfos.map((wheel) => ({
   maxSuspensionForce: wheel.maxSuspensionForce,
   suspensionStiffness: wheel.suspensionStiffness,
   dampingCompression: wheel.dampingCompression,
-  dampingRelaxation: wheel.dampingRelaxation
+  dampingRelaxation: wheel.dampingRelaxation,
+  frictionSlip: wheel.frictionSlip
 }));
 let vehicleScale = 1;
+let chassisStyle = "standard";
+let liveAxleActive = false;
+let rearAxleBody = null;
+let liveAxleLinkBodies = [];
+let liveAxleConstraints = [];
+let rearDriveRequests = [0, 0];
+let rearBrakeRequests = [0, 0];
+const rearWheelRotations = [0, 0];
+const worldDown = new CANNON.Vec3(0, -1, 0);
+const localForward = new CANNON.Vec3(0, 0, -1);
+const localLateral = new CANNON.Vec3(1, 0, 0);
+
+function pointToWorld(body, localPoint) {
+  return body.pointToWorldFrame(localPoint, new CANNON.Vec3());
+}
+function pointToLocal(body, worldPoint) {
+  return body.pointToLocalFrame(worldPoint, new CANNON.Vec3());
+}
+function dot(a, b) {
+  return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+function difference(a, b) {
+  return new CANNON.Vec3(a.x - b.x, a.y - b.y, a.z - b.z);
+}
+function scaled(vector, amount) {
+  return new CANNON.Vec3(vector.x * amount, vector.y * amount, vector.z * amount);
+}
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function removeLiveAxleDynamics() {
+  for (const constraint of liveAxleConstraints) world.removeConstraint(constraint);
+  liveAxleConstraints = [];
+  for (const body of liveAxleLinkBodies) world.removeBody(body);
+  liveAxleLinkBodies = [];
+  if (rearAxleBody && world.bodies.includes(rearAxleBody)) world.removeBody(rearAxleBody);
+  rearAxleBody = null;
+  liveAxleActive = false;
+  rearDriveRequests = [0, 0];
+  rearBrakeRequests = [0, 0];
+  world.broadphase.dirty = true;
+}
+
+function makeAxleLink(chassisAnchor, axleAnchor, linkWidth, maxForce) {
+  const chassisWorld = pointToWorld(chassisBody, chassisAnchor);
+  const axleWorld = pointToWorld(rearAxleBody, axleAnchor);
+  const direction = difference(axleWorld, chassisWorld);
+  const length = Math.max(0.05, Math.hypot(direction.x, direction.y, direction.z));
+  direction.scale(1 / length);
+  const link = new CANNON.Body({
+    mass: 0.12 * Math.pow(vehicleScale, 3),
+    material: chassisMaterial,
+    linearDamping: 0.025,
+    angularDamping: 0.08,
+    collisionFilterGroup: 0,
+    collisionFilterMask: 0,
+    allowSleep: false
+  });
+  link.addShape(new CANNON.Box(new CANNON.Vec3(
+    linkWidth,
+    length * 0.5,
+    linkWidth
+  )));
+  link.position.set(
+    (chassisWorld.x + axleWorld.x) * 0.5,
+    (chassisWorld.y + axleWorld.y) * 0.5,
+    (chassisWorld.z + axleWorld.z) * 0.5
+  );
+  link.quaternion.setFromVectors(new CANNON.Vec3(0, 1, 0), direction);
+  world.addBody(link);
+  const chassisJoint = new CANNON.PointToPointConstraint(
+    chassisBody,
+    chassisAnchor,
+    link,
+    new CANNON.Vec3(0, -length * 0.5, 0),
+    maxForce
+  );
+  const axleJoint = new CANNON.PointToPointConstraint(
+    link,
+    new CANNON.Vec3(0, length * 0.5, 0),
+    rearAxleBody,
+    axleAnchor,
+    maxForce
+  );
+  world.addConstraint(chassisJoint);
+  world.addConstraint(axleJoint);
+  liveAxleLinkBodies.push(link);
+  liveAxleConstraints.push(chassisJoint, axleJoint);
+}
+
+let liveAxleSprings = [];
+let liveAxleStraps = [];
+function createLiveAxleDynamics() {
+  const scale = vehicleScale;
+  const rearZ = ACTIVE_WHEELBASE * 0.5 * scale;
+  const axlePosition = pointToWorld(chassisBody, new CANNON.Vec3(0, -0.085 * scale, rearZ));
+  rearAxleBody = new CANNON.Body({
+    mass: 1.55 * Math.pow(scale, 3),
+    material: chassisMaterial,
+    linearDamping: 0.025,
+    angularDamping: 0.10,
+    collisionFilterGroup: 0,
+    collisionFilterMask: 0,
+    allowSleep: false
+  });
+  rearAxleBody.addShape(new CANNON.Box(new CANNON.Vec3(0.405 * scale, 0.043 * scale, 0.046 * scale)));
+  rearAxleBody.addShape(new CANNON.Box(new CANNON.Vec3(0.125 * scale, 0.082 * scale, 0.12 * scale)),
+    new CANNON.Vec3(0, -0.015 * scale, 0));
+  rearAxleBody.position.copy(axlePosition);
+  rearAxleBody.quaternion.copy(chassisBody.quaternion);
+  rearAxleBody.velocity.copy(chassisBody.velocity);
+  rearAxleBody.angularVelocity.copy(chassisBody.angularVelocity);
+  rearAxleBody.updateMassProperties();
+  world.addBody(rearAxleBody);
+
+  // Two long lower trailing arms and two triangulated upper links locate the
+  // axle in pitch, roll, and lateral movement while allowing vertical travel.
+  for (const side of [-1, 1]) {
+    makeAxleLink(
+      new CANNON.Vec3(side * 0.22 * scale, -0.045 * scale, rearZ - 0.40 * scale),
+      new CANNON.Vec3(side * 0.24 * scale, 0, 0),
+      0.019 * scale,
+      5200 * Math.pow(scale, 3)
+    );
+    makeAxleLink(
+      new CANNON.Vec3(side * 0.18 * scale, 0.12 * scale, rearZ - 0.24 * scale),
+      new CANNON.Vec3(-side * 0.13 * scale, 0.055 * scale, 0),
+      0.015 * scale,
+      5200 * Math.pow(scale, 3)
+    );
+  }
+
+  liveAxleSprings = [];
+  liveAxleStraps = [];
+  for (const side of [-1, 1]) {
+    const chassisAnchor = new CANNON.Vec3(side * 0.205 * scale, 0.16 * scale, rearZ - 0.075 * scale);
+    const axleAnchor = new CANNON.Vec3(side * 0.215 * scale, 0.065 * scale, 0);
+    const top = pointToWorld(chassisBody, chassisAnchor);
+    const bottom = pointToWorld(rearAxleBody, axleAnchor);
+    const restLength = Math.hypot(bottom.x - top.x, bottom.y - top.y, bottom.z - top.z);
+    liveAxleSprings.push({ chassisAnchor, axleAnchor, restLength });
+
+    const strapChassisAnchor = new CANNON.Vec3(side * 0.235 * scale, 0.205 * scale, rearZ - 0.085 * scale);
+    const strapAxleAnchor = new CANNON.Vec3(side * 0.235 * scale, 0.12 * scale, 0);
+    const strapTop = pointToWorld(chassisBody, strapChassisAnchor);
+    const strapBottom = pointToWorld(rearAxleBody, strapAxleAnchor);
+    const strapRest = Math.hypot(
+      strapTop.x - strapBottom.x,
+      strapTop.y - strapBottom.y,
+      strapTop.z - strapBottom.z
+    );
+    liveAxleStraps.push({
+      chassisAnchor: strapChassisAnchor,
+      axleAnchor: strapAxleAnchor,
+      maxLength: strapRest + 0.13 * scale
+    });
+  }
+
+  // The rear RaycastVehicle wheels become ground-contact sensors only. They
+  // neither spring independently nor apply their own tire friction impulses.
+  for (const index of [2, 3]) {
+    const wheel = vehicle.wheelInfos[index];
+    wheel.radius = 0.158 * scale;
+    wheel.suspensionRestLength = 0;
+    wheel.suspensionLength = 0;
+    wheel.maxSuspensionTravel = 0.28 * scale;
+    wheel.suspensionStiffness = 0;
+    wheel.maxSuspensionForce = 0;
+    wheel.dampingCompression = 0;
+    wheel.dampingRelaxation = 0;
+    wheel.frictionSlip = 0;
+    wheel.engineForce = 0;
+    wheel.brake = 0;
+  }
+  liveAxleActive = true;
+  world.broadphase.dirty = true;
+}
+
+function rebuildLiveAxleDynamics() {
+  if (!chassisStyle || chassisStyle !== "live-axle") return;
+  removeLiveAxleDynamics();
+  createLiveAxleDynamics();
+}
+
+function syncRearAxleSensors() {
+  if (!liveAxleActive || !rearAxleBody) return;
+  const scale = vehicleScale;
+  const downLocal = chassisBody.vectorToLocalFrame(worldDown, new CANNON.Vec3());
+  for (let sideIndex = 0; sideIndex < 2; sideIndex++) {
+    const side = sideIndex === 0 ? -1 : 1;
+    const hubOffset = new CANNON.Vec3(side * 0.305 * scale, -0.005 * scale, 0);
+    const hubWorld = pointToWorld(rearAxleBody, hubOffset);
+    const wheel = vehicle.wheelInfos[sideIndex + 2];
+    wheel.chassisConnectionPointLocal.copy(pointToLocal(chassisBody, hubWorld));
+    wheel.directionLocal.copy(downLocal);
+  }
+}
+
+function solveLiveRearAxle() {
+  if (!liveAxleActive || !rearAxleBody) return;
+  const scale = vehicleScale;
+  const dt = Math.max(1 / 240, world.dt || 1 / 60);
+
+  // Coil-over spring/dampers support the sprung mass and resist axle velocity.
+  for (const mount of liveAxleSprings) {
+    const chassisPoint = pointToWorld(chassisBody, mount.chassisAnchor);
+    const axlePoint = pointToWorld(rearAxleBody, mount.axleAnchor);
+    const delta = difference(axlePoint, chassisPoint);
+    const length = Math.max(1e-4, Math.hypot(delta.x, delta.y, delta.z));
+    const axis = scaled(delta, 1 / length);
+    const chassisVelocity = chassisBody.getVelocityAtWorldPoint(chassisPoint, new CANNON.Vec3());
+    const axleVelocity = rearAxleBody.getVelocityAtWorldPoint(axlePoint, new CANNON.Vec3());
+    const relativeSpeed = dot(difference(axleVelocity, chassisVelocity), axis);
+    const springRate = 940 * scale * scale;
+    const damperRate = 78 * scale * scale;
+    const magnitude = clamp(
+      (mount.restLength - length) * springRate - relativeSpeed * damperRate,
+      -1500 * Math.pow(scale, 3),
+      1500 * Math.pow(scale, 3)
+    );
+    const force = scaled(axis, magnitude);
+    rearAxleBody.applyForce(force, difference(axlePoint, rearAxleBody.position));
+    chassisBody.applyForce(scaled(force, -1), difference(chassisPoint, chassisBody.position));
+  }
+
+  // Nylon droop straps are one-way tethers: slack is free, but once stretched
+  // beyond their set length they pull the axle back toward the chassis.
+  for (const strap of liveAxleStraps) {
+    const chassisPoint = pointToWorld(chassisBody, strap.chassisAnchor);
+    const axlePoint = pointToWorld(rearAxleBody, strap.axleAnchor);
+    const towardChassis = difference(chassisPoint, axlePoint);
+    const length = Math.hypot(towardChassis.x, towardChassis.y, towardChassis.z);
+    if (length <= strap.maxLength) continue;
+    const axis = scaled(towardChassis, 1 / Math.max(length, 1e-4));
+    const chassisVelocity = chassisBody.getVelocityAtWorldPoint(chassisPoint, new CANNON.Vec3());
+    const axleVelocity = rearAxleBody.getVelocityAtWorldPoint(axlePoint, new CANNON.Vec3());
+    const separationSpeed = dot(difference(chassisVelocity, axleVelocity), axis);
+    const tension = Math.min(
+      (length - strap.maxLength) * 7200 * scale * scale +
+        Math.max(0, separationSpeed) * 145 * scale * scale,
+      1750 * Math.pow(scale, 3)
+    );
+    const force = scaled(axis, tension);
+    rearAxleBody.applyForce(force, difference(axlePoint, rearAxleBody.position));
+    chassisBody.applyForce(scaled(force, -1), difference(chassisPoint, chassisBody.position));
+  }
+
+  // Each solid-axle tire applies its own contact-patch forces to the axle beam.
+  const forward = rearAxleBody.quaternion.vmult(localForward, new CANNON.Vec3());
+  const lateral = rearAxleBody.quaternion.vmult(localLateral, new CANNON.Vec3());
+  for (let sideIndex = 0; sideIndex < 2; sideIndex++) {
+    const wheelIndex = sideIndex + 2;
+    const wheel = vehicle.wheelInfos[wheelIndex];
+    const result = wheel.raycastResult;
+    if (!wheel.isInContact || !result?.hitPointWorld || !result?.hitNormalWorld) {
+      wheel.deltaRotation = 0;
+      continue;
+    }
+    const hitPoint = result.hitPointWorld;
+    const normal = result.hitNormalWorld;
+    const hubOffset = new CANNON.Vec3(
+      (sideIndex === 0 ? -1 : 1) * 0.305 * scale,
+      -0.005 * scale,
+      0
+    );
+    const hubWorld = pointToWorld(rearAxleBody, hubOffset);
+    const distance = Math.hypot(
+      hubWorld.x - hitPoint.x,
+      hubWorld.y - hitPoint.y,
+      hubWorld.z - hitPoint.z
+    );
+    const tireRadius = 0.158 * scale;
+    const penetration = Math.max(0, tireRadius - distance);
+    const groundVelocity = result.body?.getVelocityAtWorldPoint
+      ? result.body.getVelocityAtWorldPoint(hitPoint, new CANNON.Vec3())
+      : new CANNON.Vec3();
+    const axleVelocity = rearAxleBody.getVelocityAtWorldPoint(hitPoint, new CANNON.Vec3());
+    const relativeVelocity = difference(axleVelocity, groundVelocity);
+    const normalSpeed = dot(relativeVelocity, normal);
+    const normalForce = clamp(
+      penetration * 5200 * scale * scale - normalSpeed * 145 * scale * scale,
+      0,
+      1300 * Math.pow(scale, 3)
+    );
+    if (normalForce <= 0) {
+      wheel.deltaRotation = 0;
+      continue;
+    }
+
+    const forwardSpeed = dot(relativeVelocity, forward);
+    const lateralSpeed = dot(relativeVelocity, lateral);
+    const frictionLimit = normalForce * 1.12;
+    const brakeForce = rearBrakeRequests[sideIndex] * 48 * Math.pow(scale, 3);
+    const requestedLongitudinal = rearDriveRequests[sideIndex] -
+      Math.sign(forwardSpeed) * brakeForce;
+    const longitudinalForce = clamp(requestedLongitudinal, -frictionLimit, frictionLimit);
+    const lateralLimit = Math.sqrt(Math.max(
+      0,
+      frictionLimit * frictionLimit - longitudinalForce * longitudinalForce
+    ));
+    const lateralForce = clamp(
+      -lateralSpeed * 92 * scale * scale,
+      -lateralLimit,
+      lateralLimit
+    );
+    const totalForce = new CANNON.Vec3(
+      normal.x * normalForce + forward.x * longitudinalForce + lateral.x * lateralForce,
+      normal.y * normalForce + forward.y * longitudinalForce + lateral.y * lateralForce,
+      normal.z * normalForce + forward.z * longitudinalForce + lateral.z * lateralForce
+    );
+    rearAxleBody.applyForce(totalForce, difference(hitPoint, rearAxleBody.position));
+    wheel.deltaRotation = forwardSpeed / Math.max(0.001, tireRadius) * dt;
+    rearWheelRotations[sideIndex] += wheel.deltaRotation;
+    wheel.rotation = rearWheelRotations[sideIndex];
+  }
+}
+
+function restoreRearWheelSettings() {
+  for (const index of [2, 3]) {
+    const base = baseWheelSettings[index];
+    const wheel = vehicle.wheelInfos[index];
+    wheel.chassisConnectionPointLocal.set(
+      base.connection.x * vehicleScale,
+      base.connection.y * vehicleScale,
+      base.connection.z * vehicleScale
+    );
+    wheel.radius = base.radius * vehicleScale;
+    wheel.suspensionRestLength = base.suspensionRestLength * vehicleScale;
+    wheel.suspensionLength = base.suspensionRestLength * vehicleScale;
+    wheel.maxSuspensionTravel = base.maxSuspensionTravel * vehicleScale;
+    wheel.maxSuspensionForce = base.maxSuspensionForce * Math.pow(vehicleScale, 3);
+    wheel.suspensionStiffness = base.suspensionStiffness * vehicleScale * vehicleScale;
+    wheel.dampingCompression = base.dampingCompression * vehicleScale * vehicleScale;
+    wheel.dampingRelaxation = base.dampingRelaxation * vehicleScale * vehicleScale;
+    wheel.frictionSlip = base.frictionSlip;
+    wheel.engineForce = 0;
+    wheel.brake = 0;
+  }
+}
+
+function setChassisStyle(style) {
+  const requested = style === "live-axle" ? "live-axle" : "standard";
+  if (requested === chassisStyle) return chassisStyle;
+  if (requested === "live-axle") {
+    chassisStyle = requested;
+    createLiveAxleDynamics();
+  } else {
+    removeLiveAxleDynamics();
+    chassisStyle = requested;
+    restoreRearWheelSettings();
+  }
+  chassisBody.wakeUp();
+  world.broadphase.dirty = true;
+  return chassisStyle;
+}
+
+function setRearDriveForce(index, force, brake = 0) {
+  const wheel = Number(index);
+  if (!Number.isInteger(wheel) || wheel < 0 || wheel > 1) return;
+  rearDriveRequests[wheel] = Number.isFinite(force) ? force : 0;
+  rearBrakeRequests[wheel] = Number.isFinite(brake) ? clamp(brake, 0, 1) : 0;
+}
+
+function resetSuspension() {
+  if (chassisStyle === "live-axle") rebuildLiveAxleDynamics();
+}
+
+function getRearAxlePose() {
+  if (!liveAxleActive || !rearAxleBody) return null;
+  const position = pointToLocal(chassisBody, rearAxleBody.position);
+  const chassisQuaternion = chassisBody.quaternion;
+  const inverse = new CANNON.Quaternion(
+    -chassisQuaternion.x,
+    -chassisQuaternion.y,
+    -chassisQuaternion.z,
+    chassisQuaternion.w
+  );
+  const relativeQuaternion = inverse.mult(rearAxleBody.quaternion, new CANNON.Quaternion());
+  return {
+    position: [position.x, position.y, position.z],
+    quaternion: [
+      relativeQuaternion.x,
+      relativeQuaternion.y,
+      relativeQuaternion.z,
+      relativeQuaternion.w
+    ],
+    hubHalfTrack: 0.305 * vehicleScale,
+    wheelRotations: rearWheelRotations.slice()
+  };
+}
+
+function getChassisStyle() {
+  return chassisStyle;
+}
 
 function setVehicleScale(value) {
   const requested = Number(value);
@@ -334,6 +734,7 @@ function setVehicleScale(value) {
   chassisBody.aabbNeedsUpdate = true;
   chassisBody.wakeUp();
   world.broadphase.dirty = true;
+  if (chassisStyle === "live-axle") rebuildLiveAxleDynamics();
   return vehicleScale;
 }
 
@@ -429,6 +830,11 @@ for (const [mapId, layout] of alternateMapLayouts) {
     getSpawn,
     setActiveMap,
     setVehicleScale,
-    getVehicleScale() { return vehicleScale; }
+    getVehicleScale() { return vehicleScale; },
+    setChassisStyle,
+    getChassisStyle,
+    resetSuspension,
+    setRearDriveForce,
+    getRearAxlePose
   };
 }
