@@ -282,7 +282,7 @@ let vehicleScale = 1;
 function setVehicleScale(value) {
   const requested = Number(value);
   if (!Number.isFinite(requested)) return vehicleScale;
-  const nextScale = Math.max(0.6, Math.min(1.8, requested));
+  const nextScale = Math.max(0.6, Math.min(10, requested));
   if (Math.abs(nextScale - vehicleScale) < 0.0001) return vehicleScale;
 
   const previousScale = vehicleScale;
