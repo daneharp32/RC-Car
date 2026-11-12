@@ -170,7 +170,15 @@ function applyWheelDamageModifiers(index, requestedGrip) {
   const scale = game.physicsSystem?.getVehicleScale?.() ?? 1;
   if (index >= 2 && game.getChassisStyle?.() === "live-axle") {
     // Rear rays now only sense ground contact; the live axle solver applies
-    // the tire/suspension forces to the separate solid axle body.
+    // tire and suspension forces to the separate solid axle body. Component
+    // health also weakens or releases the matching physical arm/strap/shock.
+    const side = index === 2 ? "left" : "right";
+    game.physicsSystem?.setRearAxleCondition?.(index - 2, {
+      trailingArm: partHealth("rear-" + side + "-trailing-arm"),
+      upperLink: partHealth("rear-" + side + "-upper-link"),
+      shock: partHealth("rear-" + side + "-live-shock"),
+      strap: partHealth("rear-" + side + "-limit-strap")
+    });
     wheel.suspensionStiffness = 0;
     wheel.maxSuspensionForce = 0;
     wheel.frictionSlip = 0;
