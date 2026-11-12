@@ -75,6 +75,7 @@ function resetCar() {
   chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), spawn.yaw);
   chassisBody.velocity.set(0, 0, 0);
   chassisBody.angularVelocity.set(0, 0, 0);
+  game.resetLaunchStressBaseline?.();
   throttleState = 0;
   steerState = 0;
   steeringAngleState = 0;

@@ -948,6 +948,15 @@ const {
   spawnYaw
 } = physicsSystem;
 const impactDamageSystem = createImpactDamageSystem({ chassisBody });
+const previousLaunchVelocity = chassisBody.velocity.clone();
+const previousLaunchAngularVelocity = chassisBody.angularVelocity.clone();
+let lastLaunchStressAt = -Infinity;
+
+function resetLaunchStressBaseline() {
+  previousLaunchVelocity.copy(chassisBody.velocity);
+  previousLaunchAngularVelocity.copy(chassisBody.angularVelocity);
+  lastLaunchStressAt = typeof performance !== "undefined" ? performance.now() : Date.now();
+}
 
 const makeCarVisual = createCarVisualFactory({
   THREE, CANNON, world, chassisBody, scene,
@@ -1031,6 +1040,7 @@ const game = {
   VISUAL_CHASSIS_LENGTH_SCALE,
   physicsSystem,
   impactDamageSystem,
+  resetLaunchStressBaseline,
   trackLayout,
   activeMapId: "closed-course",
   mapLayouts,
@@ -1336,7 +1346,7 @@ function resize() {
 }
 window.addEventListener("resize", resize);
 
-const CATASTROPHIC_DAMAGE_THRESHOLD = 62;
+const CATASTROPHIC_DAMAGE_THRESHOLD = 25;
 let lastTime = performance.now();
 let drivingControlErrorReported = false;
 function animate(now) {
@@ -1380,6 +1390,43 @@ function animate(now) {
   // This keeps showroom, menus, and the Sandbox builder completely stationary.
   if (drivingActive && !isPaused) {
     world.step(FIXED_STEP, delta, 3);
+
+    const deltaVelocity = [
+      chassisBody.velocity.x - previousLaunchVelocity.x,
+      chassisBody.velocity.y - previousLaunchVelocity.y,
+      chassisBody.velocity.z - previousLaunchVelocity.z
+    ];
+    const deltaAngular = [
+      chassisBody.angularVelocity.x - previousLaunchAngularVelocity.x,
+      chassisBody.angularVelocity.y - previousLaunchAngularVelocity.y,
+      chassisBody.angularVelocity.z - previousLaunchAngularVelocity.z
+    ];
+    const linearChange = Math.hypot(...deltaVelocity);
+    const angularChange = Math.hypot(...deltaAngular);
+    previousLaunchVelocity.copy(chassisBody.velocity);
+    previousLaunchAngularVelocity.copy(chassisBody.angularVelocity);
+
+    const stressNow = typeof performance !== "undefined" ? performance.now() : Date.now();
+    if (
+      stressNow - lastLaunchStressAt >= 280 &&
+      (linearChange >= 4.1 || angularChange >= 7.0)
+    ) {
+      lastLaunchStressAt = stressNow;
+      const stressResult = localCar.applyLaunchStress?.({
+        deltaVelocity,
+        deltaAngular,
+        linearChange,
+        angularChange,
+        velocity: [chassisBody.velocity.x, chassisBody.velocity.y, chassisBody.velocity.z]
+      });
+      if (stressResult?.damaged?.length) {
+        const detached = stressResult.detached.length
+          ? " · " + stressResult.detached.join(", ").toUpperCase() + " DISCONNECTED"
+          : "";
+        showToast("SUDDEN-LAUNCH STRESS · " + stressResult.damaged[0].toUpperCase() + " DAMAGED" + detached);
+      }
+    }
+
     for (const impact of impactDamageSystem.drain()) {
       const damageResult = localCar.applyImpact?.(impact);
       if (damageResult) {
@@ -1389,6 +1436,9 @@ function animate(now) {
         showToast(damageResult.primary.toUpperCase() + " DAMAGED" + detachedText);
       }
     }
+  } else {
+    previousLaunchVelocity.copy(chassisBody.velocity);
+    previousLaunchAngularVelocity.copy(chassisBody.angularVelocity);
   }
   const damageBeforeFailure = localCar.getDamageSummary?.();
   if (
