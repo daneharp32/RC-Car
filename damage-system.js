@@ -70,6 +70,9 @@ export function createImpactDamageSystem({ CANNON, chassisBody }) {
   return {
     drain() {
       return pending.splice(0, pending.length);
+    },
+    clear() {
+      pending.length = 0;
     }
   };
 }
