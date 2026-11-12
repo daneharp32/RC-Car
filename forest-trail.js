@@ -194,7 +194,7 @@ export function createForestTrailSystem({ THREE, scene }) {
     if(distanceToTrail(tree.x,tree.z)<48 && random()<0.22) {
       trunkObstacles.push({
         x:tree.x,y:ground+trunkHeight*0.5,z:tree.z,yaw:tree.yaw,
-        halfWidth:0.30+tree.scale*0.045,halfHeight:trunkHeight*0.5,halfLength:0.30+tree.scale*0.045
+        halfWidth:0.25+tree.scale*0.14,halfHeight:trunkHeight*0.5,halfLength:0.25+tree.scale*0.14
       });
     }
   }
