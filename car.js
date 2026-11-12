@@ -1145,6 +1145,11 @@ function makeCarVisual(color, playerName = "") {
     }
     liveAxleAssembly.visible = chassisStyle === "live-axle";
 
+    // The live-axle layout uses a shorter forward-mounted chassis plate.
+    // Keep the original full-length plate unchanged for the standard setup.
+    chassis.position.z = chassisStyle === "live-axle" ? -0.20 : 0;
+    chassis.scale.z = chassisStyle === "live-axle" ? 0.66 : 1;
+
     // Move the complete electrical package forward together so the relative
     // battery / motor / ESC / receiver clearances remain unchanged. The new
     // electronics tray is centered under this relocated package.
