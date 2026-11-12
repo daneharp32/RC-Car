@@ -656,8 +656,18 @@ function solveLiveRearAxle() {
     const axleVelocity = rearAxleBody.getVelocityAtWorldPoint(hitPoint, new CANNON.Vec3());
     const relativeVelocity = difference(axleVelocity, groundVelocity);
     const normalSpeed = dot(relativeVelocity, normal);
+    // A tire exactly touching the ground has almost no geometric
+    // penetration, so penetration-only contact would provide no static load.
+    // Carry the axle weight plus a rear share of sprung chassis weight, then
+    // add compression and velocity response for bumps and landings.
+    const rearStaticLoad = (
+      rearAxleBody.mass * 9.82 +
+      chassisBody.mass * 9.82 * 0.42
+    ) * 0.5;
     const normalForce = clamp(
-      penetration * 5200 * scale * scale - normalSpeed * 145 * scale * scale,
+      rearStaticLoad +
+        penetration * 5200 * scale * scale -
+        normalSpeed * 145 * scale * scale,
       0,
       1300 * Math.pow(scale, 3)
     );
