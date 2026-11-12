@@ -417,6 +417,7 @@ function parkCarForShowroom() {
   chassisBody.force.set(0, 0, 0);
   chassisBody.torque.set(0, 0, 0);
   chassisBody.wakeUp();
+  game.physicsSystem?.resetSuspension?.();
   for (let i = 0; i < 4; i++) {
     vehicle.wheelInfos[i].engineForce = 0;
     vehicle.wheelInfos[i].rotation = 0;
