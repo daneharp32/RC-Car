@@ -57,6 +57,9 @@ function makeCarVisual(color, playerName = "") {
     if (id.includes("shell-visual") || id.includes("ranger-shell")) return { health: 92, mass: 0.62, sensitivity: 1.22 };
     if (id.includes("bumper")) return { health: 76, mass: 0.24, sensitivity: 0.72 };
     if (id.endsWith("-wheel")) return { health: 54, mass: 0.27, sensitivity: 1.18 };
+    if (id.includes("trailing-arm") || id === "rear-axle-housing") return { health: 58, mass: 0.18, sensitivity: 1.12 };
+    if (id.includes("upper-link") || id.includes("limit-strap")) return { health: 40, mass: 0.065, sensitivity: 1.26 };
+    if (id.includes("live-shock")) return { health: 48, mass: 0.11, sensitivity: 1.12 };
     if (id.includes("lower-arm") || id.includes("wheel-carrier")) return { health: 48, mass: 0.13, sensitivity: 1.18 };
     if (id.includes("camber-link")) return { health: 36, mass: 0.055, sensitivity: 1.38 };
     if (id.includes("oil-shock")) return { health: 44, mass: 0.10, sensitivity: 1.12 };
@@ -1266,14 +1269,18 @@ function makeCarVisual(color, playerName = "") {
     if (Math.abs(localKick.y) > Math.max(horizontalX, horizontalZ) * 1.15) {
       const side = localKick.x < 0 ? "left" : "right";
       const axle = localKick.z < 0 ? "front" : "rear";
-      targetIds = [`${axle}-${side}-oil-shock`];
+      targetIds = chassisStyle === "live-axle" && axle === "rear"
+        ? [`rear-${side}-live-shock`]
+        : [`${axle}-${side}-oil-shock`];
     } else if (horizontalX > horizontalZ * 1.12) {
       const side = localKick.x < 0 ? "left" : "right";
       const axle = localKick.z < 0 ? "front" : "rear";
-      targetIds = [
-        `${axle}-${side}-lower-arm`,
-        `${axle}-${side}-camber-link`
-      ];
+      targetIds = chassisStyle === "live-axle" && axle === "rear"
+        ? [`rear-${side}-trailing-arm`, `rear-${side}-upper-link`]
+        : [
+            `${axle}-${side}-lower-arm`,
+            `${axle}-${side}-camber-link`
+          ];
     } else {
       targetIds = [localKick.z < 0 ? "front-bumper" : "rear-bumper"];
     }
