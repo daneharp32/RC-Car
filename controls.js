@@ -75,6 +75,7 @@ function resetCar() {
   chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), spawn.yaw);
   chassisBody.velocity.set(0, 0, 0);
   chassisBody.angularVelocity.set(0, 0, 0);
+  game.physicsSystem?.resetSuspension?.();
   game.resetLaunchStressBaseline?.();
   throttleState = 0;
   steerState = 0;
@@ -84,6 +85,7 @@ function resetCar() {
   chassisBody.force.set(0, 0, 0);
   chassisBody.torque.set(0, 0, 0);
   chassisBody.wakeUp();
+  for (let i = 0; i < 2; i++) game.physicsSystem?.setRearDriveForce?.(i, 0, 0);
   for (let i = 0; i < 4; i++) {
     vehicle.wheelInfos[i].rotation = 0;
     vehicle.wheelInfos[i].deltaRotation = 0;
@@ -139,6 +141,16 @@ function partHealth(id) {
 
 function wheelStructureHealth(index) {
   const corner = wheelCornerNames[index];
+  if (index >= 2 && game.getChassisStyle?.() === "live-axle") {
+    const side = index === 2 ? "left" : "right";
+    return Math.min(
+      partHealth("rear-axle-housing"),
+      partHealth("rear-" + side + "-trailing-arm"),
+      partHealth("rear-" + side + "-upper-link"),
+      partHealth("rear-" + side + "-live-shock"),
+      partHealth("rear-" + side + "-limit-strap")
+    );
+  }
   const tower = index < 2 ? "front-shock-tower" : "rear-shock-tower";
   return Math.min(
     partHealth(corner + "-lower-arm"),
@@ -156,9 +168,17 @@ function applyWheelDamageModifiers(index, requestedGrip) {
   const gripHealth = Math.min(structure, tire);
   const base = baseWheelDynamics[index];
   const scale = game.physicsSystem?.getVehicleScale?.() ?? 1;
-  wheel.suspensionStiffness = base.suspensionStiffness * scale * scale * structure;
-  wheel.maxSuspensionForce = base.maxSuspensionForce * scale * scale * scale * structure;
-  wheel.frictionSlip = Math.max(0.01, requestedGrip * gripHealth);
+  if (index >= 2 && game.getChassisStyle?.() === "live-axle") {
+    // Rear rays now only sense ground contact; the live axle solver applies
+    // the tire/suspension forces to the separate solid axle body.
+    wheel.suspensionStiffness = 0;
+    wheel.maxSuspensionForce = 0;
+    wheel.frictionSlip = 0;
+  } else {
+    wheel.suspensionStiffness = base.suspensionStiffness * scale * scale * structure;
+    wheel.maxSuspensionForce = base.maxSuspensionForce * scale * scale * scale * structure;
+    wheel.frictionSlip = Math.max(0.01, requestedGrip * gripHealth);
+  }
   return { drive: gripHealth, structure, tire };
 }
 
@@ -168,6 +188,8 @@ function updateDrivingControls(delta) {
       vehicle.applyEngineForce(0, i);
       vehicle.setBrake(18, i);
     }
+    game.physicsSystem?.setRearDriveForce?.(0, 0, 0);
+    game.physicsSystem?.setRearDriveForce?.(1, 0, 0);
     vehicle.setSteeringValue(0, 0);
     vehicle.setSteeringValue(0, 1);
     throttleState = 0;
@@ -187,6 +209,8 @@ function updateDrivingControls(delta) {
       vehicle.applyEngineForce(0, i);
       vehicle.setBrake(game.multiplayer?.joined ? 12 : 0, i);
     }
+    game.physicsSystem?.setRearDriveForce?.(0, 0, 0);
+    game.physicsSystem?.setRearDriveForce?.(1, 0, 0);
     throttleState = 0;
     steerState = 0;
     steeringAngleState = 0;
@@ -266,15 +290,21 @@ function updateDrivingControls(delta) {
   );
   const radioHealth = Math.min(partHealth("radio-receiver"), partHealth("receiver-servo-wiring"));
   for (let i = 0; i < 4; i++) {
-    const axleHealth = partHealth(i < 2 ? "front-differential" : "rear-differential");
+    const liveAxle = game.getChassisStyle?.() === "live-axle" && i >= 2;
+    const axleHealth = partHealth(i < 2
+      ? "front-differential"
+      : liveAxle ? "rear-axle-housing" : "rear-differential");
     const wheelCondition = applyWheelDamageModifiers(
       i,
       i < 2 ? FRONT_TIRE_BASE_GRIP : REAR_TIRE_BASE_GRIP
     );
-    vehicle.applyEngineForce(
-      engineForce * powertrainHealth * radioHealth * axleHealth * wheelCondition.drive,
-      i
-    );
+    const requestedForce = engineForce * powertrainHealth * radioHealth * axleHealth * wheelCondition.drive;
+    if (liveAxle) {
+      game.physicsSystem?.setRearDriveForce?.(i - 2, requestedForce, keys[" "] ? 1 : 0);
+      vehicle.applyEngineForce(0, i);
+    } else {
+      vehicle.applyEngineForce(requestedForce, i);
+    }
     vehicle.setBrake(0, i);
   }
 
