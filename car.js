@@ -237,6 +237,35 @@ function makeCarVisual(color, playerName = "") {
     return group;
   }
 
+  function makeDynamicFrontShock(id, label, description) {
+    const group = makePart(chassisGroup, id, label, description);
+    addMesh(group, new THREE.CylinderGeometry(0.024, 0.027, 0.43, 16), blueDark);
+    addMesh(group, new THREE.CylinderGeometry(0.008, 0.008, 0.39, 12), alloy, [0, -0.13, 0]);
+    for (let i = 0; i < 8; i++) {
+      const spring = addMesh(group, new THREE.TorusGeometry(0.034, 0.0047, 8, 22), springSilver,
+        [0, -0.235 + i * 0.066, 0]);
+      spring.rotation.x = Math.PI / 2;
+    }
+    for (const y of [-0.20, 0.20]) {
+      const seat = addMesh(group, new THREE.TorusGeometry(0.039, 0.006, 8, 22), alloy, [0, y, 0]);
+      seat.rotation.x = Math.PI / 2;
+    }
+    addMesh(group, new THREE.CylinderGeometry(0.032, 0.032, 0.035, 16), red, [0, -0.12, 0]);
+    addMesh(group, new THREE.SphereGeometry(0.028, 12, 10), carbonEdge, [0, -0.30, 0]);
+    addMesh(group, new THREE.SphereGeometry(0.028, 12, 10), red, [0, 0.30, 0]);
+    return group;
+  }
+  function updateDynamicFrontShock(group, start, end) {
+    const direction = end.clone().sub(start);
+    const length = Math.max(0.001, direction.length());
+    group.position.copy(start).add(end).multiplyScalar(0.5);
+    group.quaternion.setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      direction.normalize()
+    );
+    group.scale.set(1, length / 0.62, 1);
+  }
+
   // Main molded tub / aluminum lower chassis plate. All other components are
   // mounted as individual named groups on top of this part.
   const chassis = makePart(
@@ -401,16 +430,17 @@ function makeCarVisual(color, playerName = "") {
     // lower eye stays in the same visual position; physics shocks are separate.
     const top = [s * 0.19, 0.195, z + (z < 0 ? 0.045 : -0.045)];
     const bottom = [s * 0.272, -0.012, z];
-    addShock(
-      chassisGroup,
-      `${corner.label.toLowerCase().replace(" ", "-")}-oil-shock`,
-      `${corner.label} oil-filled shock`,
-      "Aluminum-bodied coil-over damper. The silver spring supports the truck while the oil-filled shock body controls how quickly the suspension compresses and rebounds.",
-      top,
-      bottom,
-      springSilver,
-      corner.z > 0 ? "standard" : null
-    );
+    const shockId = `${corner.label.toLowerCase().replace(" ", "-")}-oil-shock`;
+    const shockDescription = "Aluminum-bodied coil-over damper. The spring supports the truck while the oil-filled shock controls compression and rebound.";
+    if (corner.z < 0) {
+      const visual = frontSuspensionVisuals.find((item) => item.side === s);
+      if (visual) {
+        visual.shock = makeDynamicFrontShock(shockId, `${corner.label} independent coil-over`, shockDescription);
+      }
+    } else {
+      addShock(chassisGroup, shockId, `${corner.label} oil-filled shock`,
+        shockDescription, top, bottom, springSilver, "standard");
+    }
   }
 
   // Steering servo, servo saver, rack and two front steering links.
@@ -1102,6 +1132,13 @@ function makeCarVisual(color, playerName = "") {
         wheel.z - visual.z
       );
       if (quaternion) visual.carrier.quaternion.copy(quaternion);
+    }
+    if (visual.shock) {
+      updateDynamicFrontShock(
+        visual.shock,
+        new THREE.Vector3(side * 0.19, 0.195, visual.z + 0.045),
+        new THREE.Vector3(side * 0.272, wheel.y + 0.03, wheel.z)
+      );
     }
   }
 
