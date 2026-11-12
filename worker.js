@@ -123,7 +123,7 @@ export class LobbyDirectory {
     const mode = ["race", "free-drive", "time-trial", "sandbox"].includes(message.mode)
       ? message.mode
       : "race";
-    const mapId = ["closed-course", "gravel-basin", "forest-trail"].includes(message.mapId)
+    const mapId = ["closed-course", "gravel-basin"].includes(message.mapId)
       ? message.mapId : "closed-course";
     if (mapId === "gravel-basin" && !["free-drive", "sandbox"].includes(mode)) {
       return jsonResponse({ error: "Gravel Basin supports Free Drive and Sandbox" }, 400);

@@ -9,7 +9,6 @@ import { createGarageSystem } from "./garage.js";
 import { createSandboxSystem } from "./sandbox.js";
 import { createTrackSystem } from "./track.js";
 import { createGravelBasinSystem } from "./gravel-map.js";
-import { createForestTrailSystem } from "./forest-trail.js";
 import { createRaceSystem } from "./race.js";
 
 import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/loaders/GLTFLoader.js";
@@ -93,9 +92,7 @@ let activeLighting = { sunOffset: [-8, 15, 8] };
 const DEFAULT_PIXEL_RATIO_CAP = 1.35;
 function applyMapRenderQuality(mapId) {
   const isGravelBasin = mapId === "gravel-basin";
-  const isForestTrail = mapId === "forest-trail";
-  const isLargeMap = isGravelBasin || isForestTrail;
-  const pixelRatioCap = isForestTrail ? 0.98 : isGravelBasin ? 1.05 : DEFAULT_PIXEL_RATIO_CAP;
+  const pixelRatioCap = isGravelBasin ? 1.05 : DEFAULT_PIXEL_RATIO_CAP;
   const pixelRatio = Math.min(window.devicePixelRatio || 1, pixelRatioCap);
   renderer.setPixelRatio(pixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight, false);
@@ -107,13 +104,13 @@ function applyMapRenderQuality(mapId) {
     sun.shadow.mapSize.set(shadowSize, shadowSize);
   }
 
-  const shadowExtent = isLargeMap ? 58 : 116;
+  const shadowExtent = isGravelBasin ? 58 : 116;
   sun.shadow.camera.left = -shadowExtent;
   sun.shadow.camera.right = shadowExtent;
   sun.shadow.camera.top = shadowExtent;
   sun.shadow.camera.bottom = -shadowExtent;
   sun.shadow.camera.near = 0.5;
-  sun.shadow.camera.far = isForestTrail ? 175 : isGravelBasin ? 145 : 250;
+  sun.shadow.camera.far = isGravelBasin ? 145 : 250;
   sun.shadow.camera.updateProjectionMatrix();
 
   if (!isGravelBasin) {
@@ -261,19 +258,16 @@ setTimeOfDay("day", false);
 // The track module owns the complete closed-course scenery and its shared layout.
 const trackSystem = createTrackSystem({ THREE, scene });
 const gravelBasinSystem = createGravelBasinSystem({ THREE, scene });
-const forestTrailSystem = createForestTrailSystem({ THREE, scene });
 const arenaVisuals = [
   ...trackSystem.arenaVisuals,
-  ...gravelBasinSystem.arenaVisuals,
-  ...forestTrailSystem.arenaVisuals
+  ...gravelBasinSystem.arenaVisuals
 ];
 let trackLayout = trackSystem.trackLayout;
 trackLayout.id = "closed-course";
 trackLayout.name = "Club Dirt Circuit";
 const mapLayouts = {
   "closed-course": trackLayout,
-  "gravel-basin": gravelBasinSystem.trackLayout,
-  "forest-trail": forestTrailSystem.trackLayout
+  "gravel-basin": gravelBasinSystem.trackLayout
 };
 
 // Load the painted prerunner shell before creating physics so its measured
@@ -943,8 +937,7 @@ const physicsSystem = createPhysicsSystem({
   CANNON,
   trackLayout,
   additionalLayouts: {
-    "gravel-basin": gravelBasinSystem.trackLayout,
-    "forest-trail": forestTrailSystem.trackLayout
+    "gravel-basin": gravelBasinSystem.trackLayout
   },
   shellFit: !!(shellGeometry || rangerShellGeometry),
   shellGeometry: shellPhysicsGeometry
@@ -1075,17 +1068,10 @@ game.setActiveMap = (mapId, options = {}) => {
 
   game.activeMapId = mapId;
   applyMapRenderQuality(mapId);
-  if (mapId === "forest-trail") {
-    scene.background.setHex(0x7f9b86);
-    scene.fog.color.setHex(0x7f9b86);
-    scene.fog.near = 92;
-    scene.fog.far = 235;
-  } else {
-    scene.background.setHex(0x83c5ef);
-    scene.fog.color.setHex(0x83c5ef);
-    scene.fog.near = 135;
-    scene.fog.far = 265;
-  }
+  scene.background.setHex(0x83c5ef);
+  scene.fog.color.setHex(0x83c5ef);
+  scene.fog.near = 135;
+  scene.fog.far = 265;
   trackLayout = mapLayouts[mapId];
   game.trackLayout = trackLayout;
   if (game.race?.setTrackLayout) game.race.setTrackLayout(trackLayout);
@@ -1202,11 +1188,11 @@ function prepareMapGraphics(mapId = game.activeMapId) {
     // A high overhead view fits either complete map in one inexpensive pass.
     // This deliberately covers distant scenery too, where new materials would
     // otherwise compile lazily as the player drives around the map.
-    camera.position.set(0, mapId === "forest-trail" ? 790 : 240, 0);
+    camera.position.set(0, 240, 0);
     camera.up.set(0, 0, -1);
     camera.fov = 58;
     camera.near = 0.1;
-    camera.far = mapId === "forest-trail" ? 1250 : 420;
+    camera.far = 420;
     camera.updateProjectionMatrix();
     camera.lookAt(0, 0, 0);
 
@@ -1219,7 +1205,7 @@ function prepareMapGraphics(mapId = game.activeMapId) {
     // Gravel Basin tracks the shadow frustum around the truck. Prewarm it at
     // its real spawn point so entering the map does not immediately invalidate
     // the shadow map and trigger another expensive first-frame update.
-    if (mapId === "gravel-basin" || mapId === "forest-trail") {
+    if (mapId === "gravel-basin") {
       const offset = activeLighting.sunOffset;
       sun.target.position.set(spawn.x, 0, spawn.z);
       sun.position.set(
@@ -1337,8 +1323,7 @@ const arenaSelect = $("arenaSelect");
 const arenaDescription = $("arenaDescription");
 const arenaDescriptions = {
   "closed-course": "A closed dirt circuit with marked corners, jumps and red/white curbs.",
-  "gravel-basin": "A huge open gravel area with rolling terrain, natural jumps, parked full-size vehicles and a tree-lined edge.",
-  "forest-trail": "A long, winding dirt trail through dense mixed forest, with rolling ground, thick bushes, ferns, grass and natural tree-lined corners."
+  "gravel-basin": "A huge open gravel area with rolling terrain, natural jumps, parked full-size vehicles and a tree-lined edge."
 };
 if (arenaSelect) {
   arenaSelect.value = game.activeMapId;
@@ -1618,7 +1603,7 @@ function animate(now) {
   multiplayer.sendSnapshotIfReady(delta);
 
   // Keep the large outdoor-map shadow frusta centered near the truck.
-  if ((game.activeMapId === "gravel-basin" || game.activeMapId === "forest-trail") && garage.viewMode === "drive") {
+  if (game.activeMapId === "gravel-basin" && garage.viewMode === "drive") {
     const focusX = Math.round(chassisBody.position.x / 3) * 3;
     const focusZ = Math.round(chassisBody.position.z / 3) * 3;
     sun.target.position.set(focusX, 0, focusZ);
