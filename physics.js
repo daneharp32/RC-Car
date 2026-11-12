@@ -448,10 +448,10 @@ function createLiveAxleDynamics() {
   const rearZ = ACTIVE_WHEELBASE * 0.5 * scale;
   const axlePosition = pointToWorld(chassisBody, new CANNON.Vec3(0, -0.085 * scale, rearZ));
   rearAxleBody = new CANNON.Body({
-    mass: 1.55 * Math.pow(scale, 3),
+    mass: 2.05 * Math.pow(scale, 3),
     material: chassisMaterial,
-    linearDamping: 0.025,
-    angularDamping: 0.10,
+    linearDamping: 0.10,
+    angularDamping: 0.92,
     collisionFilterGroup: 0,
     collisionFilterMask: 0,
     allowSleep: false
@@ -540,7 +540,7 @@ function createLiveAxleDynamics() {
   // links, and forward electronics are separate physical bodies rather than
   // being counted again inside the main chassis tub.
   const redistributedChassisMass = (
-    baseChassisMass - 1.55 - 0.48 - 0.85
+    baseChassisMass - 2.05 - 0.48 - 0.85
   ) * Math.pow(scale, 3);
   chassisBody.mass = Math.max(0.2 * Math.pow(scale, 3), redistributedChassisMass);
   chassisBody.updateMassProperties();
@@ -576,6 +576,31 @@ function solveLiveRearAxle() {
   const scale = vehicleScale;
   const dt = Math.max(1 / 240, world.dt || 1 / 60);
 
+  // A one-piece axle housing should articulate with the suspension, but it
+  // must not spin freely when one tire catches a bump. Dampen and bound its
+  // angular velocity relative to the chassis while preserving small axle
+  // roll and pinion movement.
+  const relativeAngularWorld = difference(
+    rearAxleBody.angularVelocity,
+    chassisBody.angularVelocity
+  );
+  const relativeAngularLocal = chassisBody.vectorToLocalFrame(
+    relativeAngularWorld,
+    new CANNON.Vec3()
+  );
+  relativeAngularLocal.x = clamp(relativeAngularLocal.x, -2.0, 2.0);
+  relativeAngularLocal.y = clamp(relativeAngularLocal.y, -2.8, 2.8);
+  relativeAngularLocal.z = clamp(relativeAngularLocal.z, -1.7, 1.7);
+  const boundedAngularWorld = chassisBody.vectorToWorldFrame(
+    relativeAngularLocal,
+    new CANNON.Vec3()
+  );
+  rearAxleBody.angularVelocity.set(
+    chassisBody.angularVelocity.x + boundedAngularWorld.x,
+    chassisBody.angularVelocity.y + boundedAngularWorld.y,
+    chassisBody.angularVelocity.z + boundedAngularWorld.z
+  );
+
   // Coil-over spring/dampers support the sprung mass and resist axle velocity.
   for (let sideIndex = 0; sideIndex < liveAxleSprings.length; sideIndex++) {
     const mount = liveAxleSprings[sideIndex];
@@ -588,12 +613,12 @@ function solveLiveRearAxle() {
     const chassisVelocity = chassisBody.getVelocityAtWorldPoint(chassisPoint, new CANNON.Vec3());
     const axleVelocity = rearAxleBody.getVelocityAtWorldPoint(axlePoint, new CANNON.Vec3());
     const relativeSpeed = dot(difference(axleVelocity, chassisVelocity), axis);
-    const springRate = 720 * scale * scale * shockHealth;
-    const damperRate = 92 * scale * scale * shockHealth;
+    const springRate = 430 * scale * scale * shockHealth;
+    const damperRate = 138 * scale * scale * shockHealth;
     const magnitude = clamp(
       (mount.restLength - length) * springRate - relativeSpeed * damperRate,
-      -650 * Math.pow(scale, 3),
-      650 * Math.pow(scale, 3)
+      -420 * Math.pow(scale, 3),
+      420 * Math.pow(scale, 3)
     );
     const force = scaled(axis, magnitude);
     rearAxleBody.applyForce(force, difference(axlePoint, rearAxleBody.position));
@@ -616,9 +641,9 @@ function solveLiveRearAxle() {
     const axleVelocity = rearAxleBody.getVelocityAtWorldPoint(axlePoint, new CANNON.Vec3());
     const separationSpeed = dot(difference(chassisVelocity, axleVelocity), axis);
     const tension = Math.min(
-      (length - strap.maxLength) * 2600 * scale * scale +
-        Math.max(0, separationSpeed) * 75 * scale * scale,
-      650 * Math.pow(scale, 3)
+      (length - strap.maxLength) * 1150 * scale * scale +
+        Math.max(0, separationSpeed) * 42 * scale * scale,
+      300 * Math.pow(scale, 3)
     ) * strapHealth;
     const force = scaled(axis, tension);
     rearAxleBody.applyForce(force, difference(axlePoint, rearAxleBody.position));
@@ -671,10 +696,10 @@ function solveLiveRearAxle() {
     ) / rearContactCount;
     const normalForce = clamp(
       rearStaticLoad +
-        penetration * 3600 * scale * scale -
-        normalSpeed * 100 * scale * scale,
+        penetration * 2100 * scale * scale -
+        normalSpeed * 62 * scale * scale,
       0,
-      800 * Math.pow(scale, 3)
+      470 * Math.pow(scale, 3)
     );
     if (normalForce <= 0) {
       wheel.deltaRotation = 0;
@@ -683,7 +708,7 @@ function solveLiveRearAxle() {
 
     const forwardSpeed = dot(relativeVelocity, forward);
     const lateralSpeed = dot(relativeVelocity, lateral);
-    const frictionLimit = normalForce * 1.02;
+    const frictionLimit = normalForce * 0.88;
     const brakeForce = rearBrakeRequests[sideIndex] * 48 * Math.pow(scale, 3);
     const requestedLongitudinal = rearDriveRequests[sideIndex] -
       Math.sign(forwardSpeed) * brakeForce;
@@ -693,7 +718,7 @@ function solveLiveRearAxle() {
       frictionLimit * frictionLimit - longitudinalForce * longitudinalForce
     ));
     const lateralForce = clamp(
-      -lateralSpeed * 62 * scale * scale,
+      -lateralSpeed * 30 * scale * scale,
       -lateralLimit,
       lateralLimit
     );
