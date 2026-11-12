@@ -593,7 +593,7 @@ function createLiveAxleDynamics() {
   // links, and forward electronics are separate physical bodies rather than
   // being counted again inside the main chassis tub.
   const redistributedChassisMass = (
-    baseChassisMass - 2.05 - 0.48 - 0.85
+    baseChassisMass - 2.05 - 0.18 - 0.85
   ) * Math.pow(scale, 3);
   chassisBody.mass = Math.max(0.2 * Math.pow(scale, 3), redistributedChassisMass);
   chassisBody.updateMassProperties();
