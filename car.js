@@ -797,8 +797,17 @@ function makeCarVisual(color, playerName = "") {
   roundedBox(rearAxleTray, [0.37, 0.025, 0.39], carbon, [0, 0.025, -0.245], null, 0.016);
   for (const side of [-1, 1]) {
     roundedBox(rearAxleTray, [0.018, 0.045, 0.39], alloy, [side * 0.18, 0.055, -0.245], null, 0.006);
+    for (const z of [-0.405, -0.085]) {
+      roundedBox(rearAxleTray, [0.045, 0.038, 0.045], darkMetal,
+        [side * 0.145, 0.060, z], null, 0.008);
+      addBolt(rearAxleTray, side * 0.145, 0.086, z, 0.0055);
+    }
   }
-
+  // Two transverse battery restraints align over the relocated LiPo pack.
+  for (const z of [-0.37, -0.12]) {
+    roundedBox(rearAxleTray, [0.31, 0.012, 0.026], blackPlastic, [0, 0.112, z], null, 0.006);
+    roundedBox(rearAxleTray, [0.31, 0.004, 0.006], red, [0, 0.120, z], null, 0.002);
+  }
 
   // A separate rear ladder-frame module makes the swing-arm pivots, upper
   // link mounts and shock crossmember visibly tied into the chassis rails.
