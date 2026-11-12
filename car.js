@@ -898,17 +898,22 @@ function makeCarVisual(color, playerName = "") {
       : 1;
     const position = new THREE.Vector3(...state.position);
     const quaternion = new THREE.Quaternion(...state.quaternion).normalize();
-    liveAxleAssembly.position.copy(position);
+    const rootScale = root.scale.x || 1;
+    const visualScale = scale / rootScale;
+    const visualPosition = position.clone().divideScalar(rootScale);
+    liveAxleAssembly.position.copy(visualPosition);
     liveAxleAssembly.quaternion.copy(quaternion);
 
     const axlePoint = (x, y, z) => new THREE.Vector3(
-      x * scale, y * scale, z * scale
-    ).applyQuaternion(quaternion).add(position);
+      x * visualScale, y * visualScale, z * visualScale
+    ).applyQuaternion(quaternion).add(visualPosition);
     for (const link of liveAxleLinks) {
       const side = link.side, isTrailing = link.kind === "trailing";
+      const record = damageParts.get(link.segment.group.userData.damagePartId);
+      if (record?.detached) continue;
       const chassisAnchor = isTrailing
-        ? new THREE.Vector3(side * 0.22 * scale, -0.045 * scale, (rearAxleZ - 0.40) * scale)
-        : new THREE.Vector3(side * 0.18 * scale, 0.12 * scale, (rearAxleZ - 0.24) * scale);
+        ? new THREE.Vector3(side * 0.22 * visualScale, -0.045 * visualScale, (rearAxleZ - 0.40) * visualScale)
+        : new THREE.Vector3(side * 0.18 * visualScale, 0.12 * visualScale, (rearAxleZ - 0.24) * visualScale);
       const axleAnchor = isTrailing
         ? axlePoint(side * 0.24, 0, 0)
         : axlePoint(-side * 0.13, 0.055, 0);
@@ -916,26 +921,28 @@ function makeCarVisual(color, playerName = "") {
     }
     for (const shock of liveAxleShocks) {
       const side = shock.side;
+      if (damageParts.get(shock.group.userData.damagePartId)?.detached) continue;
       updateLiveAxleShock(
         shock.group,
-        new THREE.Vector3(side * 0.205 * scale, 0.16 * scale, (rearAxleZ - 0.075) * scale),
+        new THREE.Vector3(side * 0.205 * visualScale, 0.16 * visualScale, (rearAxleZ - 0.075) * visualScale),
         axlePoint(side * 0.215, 0.065, 0)
       );
     }
     for (const strap of liveAxleStraps) {
       const side = strap.side;
+      if (damageParts.get(strap.group.userData.damagePartId)?.detached) continue;
       updateLimitStrap(
         strap.group,
-        new THREE.Vector3(side * 0.235 * scale, 0.205 * scale, (rearAxleZ - 0.085) * scale),
+        new THREE.Vector3(side * 0.235 * visualScale, 0.205 * visualScale, (rearAxleZ - 0.085) * visualScale),
         axlePoint(side * 0.235, 0.12, 0)
       );
     }
 
-    const rootScale = root.scale.x || 1;
     const hubHalfTrack = Number.isFinite(state.hubHalfTrack) ? state.hubHalfTrack : 0.305;
     for (let sideIndex = 0; sideIndex < 2; sideIndex++) {
       const side = sideIndex === 0 ? -1 : 1;
       const pivot = wheelPivots[sideIndex + 2];
+      if (damageParts.get(pivot.userData.damagePartId)?.detached) continue;
       const hub = new THREE.Vector3(side * hubHalfTrack, -0.005 * scale, 0)
         .applyQuaternion(quaternion)
         .add(position);
