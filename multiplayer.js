@@ -43,19 +43,9 @@ export function createMultiplayerSystem(game) {
   }
 
   function makeSnapshot() {
-    const frontWheelPoses = vehicle.wheelInfos.map((wheel, index) => {
-      vehicle.updateWheelTransform(index);
-      const local = chassisBody.pointToLocalFrame(
-        wheel.worldTransform.position,
-        new game.CANNON.Vec3()
-      );
-      return [local.x, local.y, local.z];
-    });
     return {
       name: driverName,
       shellStyle: game.getShellStyle?.() === "ranger" ? "ranger" : "prerunner",
-      chassisStyle: game.getChassisStyle?.() === "live-axle" ? "live-axle" : "standard",
-      rearAxlePose: game.physicsSystem?.getRearAxlePose?.() || null,
       x: chassisBody.position.x,
       y: chassisBody.position.y,
       z: chassisBody.position.z,
@@ -64,7 +54,6 @@ export function createMultiplayerSystem(game) {
       qz: chassisBody.quaternion.z,
       qw: chassisBody.quaternion.w,
       wheels: vehicle.wheelInfos.map((wheel) => wheel.rotation),
-      wheelPoses: frontWheelPoses,
       damage: game.localCar.getDamageSnapshot?.() || { parts: [] },
       steer: vehicle.wheelInfos[0].steering,
       mph: chassisBody.velocity.length() * 2.236936,
@@ -251,16 +240,12 @@ export function createMultiplayerSystem(game) {
       const name = cleanPlayerName(data.name) || "Driver";
       const visual = makeCarVisual(colorForPeer(peerId), name);
       visual.setShellStyle?.(data.shellStyle === "ranger" ? "ranger" : "prerunner");
-      visual.setChassisStyle?.(data.chassisStyle === "live-axle" ? "live-axle" : "standard");
       remote = {
         visual,
         target: null,
         lastSeen: performance.now(),
         wheelRotations: [0, 0, 0, 0],
         steering: 0,
-        chassisStyle: data.chassisStyle === "live-axle" ? "live-axle" : "standard",
-        rearAxlePose: null,
-        frontWheelPoses: null,
         name
       };
       remotePlayers.set(peerId, remote);
@@ -280,30 +265,10 @@ export function createMultiplayerSystem(game) {
       remote.wheelRotations = Array.isArray(data.wheels)
         ? data.wheels.slice(0, 4).map((value) => Number.isFinite(value) ? value : 0)
         : remote.wheelRotations;
-      if (Array.isArray(data.wheelPoses) && data.wheelPoses.length >= 2 &&
-          data.wheelPoses.slice(0, 4).every((pose) =>
-            Array.isArray(pose) && pose.length === 3 && pose.every(Number.isFinite))) {
-        remote.frontWheelPoses = data.wheelPoses.slice(0, 4);
-      }
       remote.steering = Number.isFinite(data.steer) ? data.steer : 0;
       const remoteShellStyle = data.shellStyle === "ranger" ? "ranger" : "prerunner";
       if (remote.visual.shellStyle !== remoteShellStyle) {
         remote.visual.setShellStyle?.(remoteShellStyle);
-      }
-      const remoteChassisStyle = data.chassisStyle === "live-axle" ? "live-axle" : "standard";
-      if (remote.chassisStyle !== remoteChassisStyle) {
-        remote.chassisStyle = remoteChassisStyle;
-        remote.visual.setChassisStyle?.(remoteChassisStyle);
-      }
-      if (remoteChassisStyle === "live-axle" &&
-          Array.isArray(data.rearAxlePose?.position) &&
-          Array.isArray(data.rearAxlePose?.quaternion) &&
-          data.rearAxlePose.position.length === 3 &&
-          data.rearAxlePose.quaternion.length === 4 &&
-          [...data.rearAxlePose.position, ...data.rearAxlePose.quaternion].every(Number.isFinite)) {
-        remote.rearAxlePose = data.rearAxlePose;
-      } else if (remoteChassisStyle !== "live-axle") {
-        remote.rearAxlePose = null;
       }
       if (Array.isArray(data.damage?.parts)) {
         remote.visual.applyDamageSnapshot?.(data.damage);
@@ -1040,37 +1005,17 @@ export function createMultiplayerSystem(game) {
       remote.visual.root.position.lerp(remote.target.position, alpha);
       remote.visual.root.quaternion.slerp(remote.target.quaternion, alpha);
       const wheelPartIds = ["front-left-wheel", "front-right-wheel", "rear-left-wheel", "rear-right-wheel"];
-      if (remote.chassisStyle === "live-axle" && remote.rearAxlePose) {
-        remote.visual.setRearAxlePose?.(remote.rearAxlePose);
-      }
       for (let i = 0; i < 4; i++) {
-        if (i >= 2 && remote.chassisStyle === "live-axle") continue;
         if (remote.visual.isPartDetached?.(wheelPartIds[i])) continue;
-        const pose = remote.frontWheelPoses?.[i];
-        const [fallbackX, fallbackY, fallbackZ] = wheelPositions[i];
-        const x = pose ? pose[0] : fallbackX;
-        const y = pose ? pose[1] : fallbackY;
-        const z = pose ? pose[2] : fallbackZ;
-        const rootScale = remote.visual.root.scale.x || 1;
+        const [x, , z] = wheelPositions[i];
         const pivot = remote.visual.wheelPivots[i];
-        pivot.position.set(
-          x / rootScale,
-          y / rootScale,
-          z * VISUAL_CHASSIS_LENGTH_SCALE / rootScale
-        );
+        pivot.position.set(x, -0.095, z * VISUAL_CHASSIS_LENGTH_SCALE);
         const steerQ = new THREE.Quaternion().setFromAxisAngle(
           new THREE.Vector3(0, 1, 0), i < 2 ? remote.steering : 0
         );
         const spinQ = new THREE.Quaternion().setFromAxisAngle(
           new THREE.Vector3(1, 0, 0), remote.wheelRotations[i]
         );
-        if (i < 2 && pose) {
-          remote.visual.setFrontSuspensionPose?.(i, {
-            x: x / rootScale,
-            y: y / rootScale,
-            z: z / rootScale
-          }, steerQ);
-        }
         pivot.quaternion.copy(steerQ).multiply(spinQ);
       }
       remote.visual.updateDebris?.(delta);

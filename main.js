@@ -968,23 +968,11 @@ const makeCarVisual = createCarVisualFactory({
   VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellModel, rangerShellGeometry
 });
 const localCar = makeCarVisual(0xffa33d);
-let selectedChassisStyle = "standard";
-localCar.setChassisStyle(selectedChassisStyle);
 let selectedShellStyle = shellModel ? "prerunner" : "ranger";
 function setSelectedShellStyle(style) {
   selectedShellStyle = style === "ranger" ? "ranger" : "prerunner";
   selectedShellStyle = localCar.setShellStyle(selectedShellStyle);
   return selectedShellStyle;
-}
-function setSelectedChassisStyle(style) {
-  const requested = style === "live-axle" ? "live-axle" : "standard";
-  selectedChassisStyle = physicsSystem.setChassisStyle(requested);
-  localCar.setChassisStyle(selectedChassisStyle);
-  chassisBody.velocity.set(0, 0, 0);
-  chassisBody.angularVelocity.set(0, 0, 0);
-  resetLaunchStressBaseline();
-  updateLocalVisual();
-  return selectedChassisStyle;
 }
 localCar.setShellStyle(selectedShellStyle);
 
@@ -1001,10 +989,8 @@ function updateLocalVisual() {
   const inverseRoot = localCar.root.quaternion.clone().invert();
   const localPosition = new THREE.Vector3();
   const worldWheelQuaternion = new THREE.Quaternion();
-  localCar.setRearAxlePose?.(physicsSystem.getRearAxlePose?.());
   const wheelPartIds = ["front-left-wheel", "front-right-wheel", "rear-left-wheel", "rear-right-wheel"];
   for (let i = 0; i < 4; i++) {
-    if (i >= 2 && selectedChassisStyle === "live-axle") continue;
     if (localCar.isPartDetached?.(wheelPartIds[i])) continue;
     vehicle.updateWheelTransform(i);
     const transform = vehicle.wheelInfos[i].worldTransform;
@@ -1014,20 +1000,16 @@ function updateLocalVisual() {
       transform.position.z - chassisBody.position.z
     );
     localPosition.applyQuaternion(inverseRoot);
-    const rootScale = localCar.root.scale.x || 1;
-    const suspensionPosition = localPosition.clone().divideScalar(rootScale);
+    localPosition.z *= VISUAL_CHASSIS_LENGTH_SCALE;
+    localPosition.divideScalar(localCar.root.scale.x || 1);
     worldWheelQuaternion.set(
       transform.quaternion.x,
       transform.quaternion.y,
       transform.quaternion.z,
       transform.quaternion.w
     );
-    const localWheelQuaternion = inverseRoot.clone().multiply(worldWheelQuaternion);
-    if (i < 2) localCar.setFrontSuspensionPose?.(i, suspensionPosition, localWheelQuaternion);
-    localPosition.z *= VISUAL_CHASSIS_LENGTH_SCALE;
-    localPosition.divideScalar(rootScale);
     localCar.wheelPivots[i].position.copy(localPosition);
-    localCar.wheelPivots[i].quaternion.copy(localWheelQuaternion);
+    localCar.wheelPivots[i].quaternion.copy(inverseRoot).multiply(worldWheelQuaternion);
   }
 }
 
@@ -1075,8 +1057,6 @@ const game = {
   makeCarVisual,
   getShellStyle: () => selectedShellStyle,
   setShellStyle: setSelectedShellStyle,
-  getChassisStyle: () => selectedChassisStyle,
-  setChassisStyle: setSelectedChassisStyle,
   updateLocalVisual,
   showToast
 };
