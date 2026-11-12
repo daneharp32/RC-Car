@@ -1336,6 +1336,7 @@ function resize() {
 }
 window.addEventListener("resize", resize);
 
+const CATASTROPHIC_DAMAGE_THRESHOLD = 62;
 let lastTime = performance.now();
 let drivingControlErrorReported = false;
 function animate(now) {
@@ -1389,6 +1390,15 @@ function animate(now) {
       }
     }
   }
+  const damageBeforeFailure = localCar.getDamageSummary?.();
+  if (
+    damageBeforeFailure &&
+    !damageBeforeFailure.totalled &&
+    damageBeforeFailure.damagePercent >= CATASTROPHIC_DAMAGE_THRESHOLD
+  ) {
+    localCar.triggerCatastrophicFailure?.();
+    showToast("VEHICLE TOTALLED · ALL COMPONENTS RELEASED · PRESS R TO RESET");
+  }
   localCar.updateDebris?.(delta);
   // Stabilize the Sandbox chassis after physics so contact forces cannot build into a flip.
   sandbox.postPhysicsUpdate(delta);
@@ -1402,16 +1412,23 @@ function animate(now) {
   $("speedValue").textContent = String(Math.round(speedMph));
   const touching = vehicle.wheelInfos.filter((wheel) => wheel.isInContact).length;
   $("wheelStatus").textContent = touching + " / 4 TIRES IN CONTACT";
-  const damageSummary = localCar.getDamageSummary?.() || { damaged: 0, detached: 0, damagedNames: [] };
-  $("damageValue").textContent = damageSummary.detached
-    ? damageSummary.detached + " PART" + (damageSummary.detached === 1 ? "" : "S") + " DETACHED"
-    : damageSummary.damaged
-      ? damageSummary.damaged + " PART" + (damageSummary.damaged === 1 ? "" : "S") + " DAMAGED"
-      : "ALL SYSTEMS NOMINAL";
-  $("damageDetails").textContent = damageSummary.damaged
-    ? damageSummary.damagedNames.slice(0, 2).join(" · ").toUpperCase() + (damageSummary.damaged > 2 ? " · +" + (damageSummary.damaged - 2) : "")
-    : "0 COMPONENTS DAMAGED";
+  const damageSummary = localCar.getDamageSummary?.() || {
+    damaged: 0, detached: 0, damagePercent: 0, totalled: false, damagedNames: []
+  };
+  $("damageValue").textContent = damageSummary.totalled
+    ? "VEHICLE TOTALLED · PRESS R"
+    : damageSummary.detached
+      ? damageSummary.detached + " PART" + (damageSummary.detached === 1 ? "" : "S") + " DETACHED"
+      : damageSummary.damaged
+        ? damageSummary.damaged + " PART" + (damageSummary.damaged === 1 ? "" : "S") + " DAMAGED"
+        : "ALL SYSTEMS NOMINAL";
+  $("damageDetails").textContent = damageSummary.totalled
+    ? "ALL COMPONENTS RELEASED · RESET REQUIRED"
+    : damageSummary.damagePercent
+      ? damageSummary.damagePercent + "% OVERALL DAMAGE · TOTAL-OUT AT " + CATASTROPHIC_DAMAGE_THRESHOLD + "%"
+      : "0 COMPONENTS DAMAGED";
   $("damageCard").classList.toggle("damaged", damageSummary.damaged > 0);
+  $("damageCard").classList.toggle("totalled", damageSummary.totalled);
 
   // The showroom camera presents the parked truck in menu and garage views.
   if (garage.viewMode === "menu" || garage.viewMode === "mode-select" || garage.viewMode === "create-lobby" || garage.viewMode === "garage" || garage.viewMode === "sandbox-builder") {
