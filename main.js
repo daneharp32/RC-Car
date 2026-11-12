@@ -1030,6 +1030,7 @@ const game = {
   wheelPositions,
   VISUAL_CHASSIS_LENGTH_SCALE,
   physicsSystem,
+  impactDamageSystem,
   trackLayout,
   activeMapId: "closed-course",
   mapLayouts,
