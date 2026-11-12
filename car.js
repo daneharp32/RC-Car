@@ -1072,7 +1072,8 @@ function makeCarVisual(color, playerName = "") {
         ? THREE.MathUtils.clamp(data.h, 0, record.maxHealth)
         : record.maxHealth;
       if (data.d === true) {
-        if (!record.detached) {
+        if (!record.detached || (!record.debrisBody && Array.isArray(data.p) && record.debrisExpired)) {
+          if (record.detached) restoreRecord(record);
           detachPart(record, {
             position: data.p,
             quaternion: data.q,
