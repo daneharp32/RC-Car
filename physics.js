@@ -626,6 +626,14 @@ function rebuildLiveAxleDynamics() {
 
 function syncRearAxleSensors() {
   if (!liveAxleActive || !rearAxleBody) return;
+
+  // RaycastVehicle casts rear-wheel rays from the hub position. That point
+  // sits inside the live axle beam. Cannon's rayTest respects collisionResponse,
+  // but not the body's collision groups in RaycastVehicle.castRay(). Temporarily
+  // hide only the axle body from the raycast; solveLiveRearAxle restores its
+  // normal collision response immediately after the vehicle's preStep callback.
+  rearAxleBody.collisionResponse = false;
+
   const scale = vehicleScale;
   const downLocal = chassisBody.vectorToLocalFrame(worldDown, new CANNON.Vec3());
   for (let sideIndex = 0; sideIndex < 2; sideIndex++) {
@@ -640,6 +648,11 @@ function syncRearAxleSensors() {
 
 function solveLiveRearAxle() {
   if (!liveAxleActive || !rearAxleBody) return;
+
+  // RaycastVehicle's preStep callback has now completed. Restore real axle /
+  // ground collision response before Cannon builds the contact equations.
+  rearAxleBody.collisionResponse = true;
+
   const scale = vehicleScale;
   const dt = Math.max(1 / 240, world.dt || 1 / 60);
 
@@ -724,6 +737,13 @@ function solveLiveRearAxle() {
     const wheelIndex = sideIndex + 2;
     const wheel = vehicle.wheelInfos[wheelIndex];
     const result = wheel.raycastResult;
+    // Defensive fallback: if a library update or callback-order change ever
+    // lets the axle appear as its own sensor hit, discard that contact instead
+    // of applying tire forces to the axle's own collision surface.
+    if (result?.body === rearAxleBody) {
+      result.reset();
+      wheel.isInContact = false;
+    }
     if (!wheel.isInContact || !result?.hitPointWorld || !result?.hitNormalWorld) {
       wheel.deltaRotation = 0;
       continue;
