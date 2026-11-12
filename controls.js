@@ -249,7 +249,12 @@ function updateDrivingControls(delta) {
   const boosterForce = sandboxThrusterState?.forward
     ? forwardThrusterPower * boosterSpeedScale
     : 0;
-  const engineForce = (throttleState * 30 + boosterForce) * speedLimitScale;
+  // Vehicle mass grows with volume (scale^3). RaycastVehicle engineForce
+  // is a force applied at the tire contact patch, so keep acceleration
+  // consistent by scaling both the motor and E-key booster with mass.
+  const vehicleScale = game.physicsSystem?.getVehicleScale?.() ?? 1;
+  const driveForceScale = Math.pow(THREE.MathUtils.clamp(vehicleScale, 0.6, 10), 3);
+  const engineForce = (throttleState * 30 + boosterForce) * speedLimitScale * driveForceScale;
   const powertrainHealth = Math.min(
     partHealth("lipo-battery"),
     partHealth("electronic-speed-controller"),
