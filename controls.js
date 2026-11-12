@@ -71,6 +71,7 @@ function resetCar() {
   };
   game.localCar?.repairAll?.();
   game.impactDamageSystem?.clear?.();
+  game.resetLaunchStressBaseline?.();
   chassisBody.position.set(spawn.x, spawn.y, spawn.z);
   chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), spawn.yaw);
   chassisBody.velocity.set(0, 0, 0);
