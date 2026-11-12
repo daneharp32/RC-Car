@@ -947,7 +947,7 @@ const {
   spawnZ,
   spawnYaw
 } = physicsSystem;
-const impactDamageSystem = createImpactDamageSystem({ CANNON, chassisBody });
+const impactDamageSystem = createImpactDamageSystem({ chassisBody });
 
 const makeCarVisual = createCarVisualFactory({
   THREE, CANNON, world, chassisBody, scene,
