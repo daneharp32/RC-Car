@@ -162,6 +162,21 @@ function applyWheelDamageModifiers(index, requestedGrip) {
 }
 
 function updateDrivingControls(delta) {
+  if (game.localCar?.isTotalled?.()) {
+    for (let i = 0; i < 4; i++) {
+      vehicle.applyEngineForce(0, i);
+      vehicle.setBrake(18, i);
+    }
+    vehicle.setSteeringValue(0, 0);
+    vehicle.setSteeringValue(0, 1);
+    throttleState = 0;
+    steerState = 0;
+    steeringAngleState = 0;
+    previousGroundedForwardSpeed = null;
+    smoothedLongitudinalAcceleration = 0;
+    return;
+  }
+
   const sandboxAllowsDriving = game.sandbox?.active === true && game.sandbox.inMap === true;
   const raceAllowsDriving = sandboxAllowsDriving || !game.race || game.race.phase === "racing" || game.race.phase === "free-drive";
   if (!game.multiplayer?.joined || !raceAllowsDriving) {
