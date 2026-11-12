@@ -321,6 +321,10 @@ function removeLiveAxleDynamics() {
   liveAxleLinkBodies = [];
   if (rearAxleBody && world.bodies.includes(rearAxleBody)) world.removeBody(rearAxleBody);
   rearAxleBody = null;
+  chassisBody.mass = baseChassisMass * Math.pow(vehicleScale, 3);
+  chassisBody.updateMassProperties();
+  chassisBody.updateInertiaWorld(true);
+  chassisBody.updateBoundingRadius();
   liveAxleActive = false;
   rearDriveRequests = [0, 0];
   rearBrakeRequests = [0, 0];
@@ -376,6 +380,61 @@ function makeAxleLink(chassisAnchor, axleAnchor, linkWidth, maxForce) {
 
 let liveAxleSprings = [];
 let liveAxleStraps = [];
+function createForwardElectronicsMass(scale) {
+  const mass = 0.85 * Math.pow(scale, 3);
+  const electronicsBody = new CANNON.Body({
+    mass,
+    material: chassisMaterial,
+    linearDamping: 0.03,
+    angularDamping: 0.12,
+    collisionFilterGroup: 0,
+    collisionFilterMask: 0,
+    allowSleep: false
+  });
+  electronicsBody.addShape(new CANNON.Box(new CANNON.Vec3(
+    0.135 * scale, 0.040 * scale, 0.18 * scale
+  )));
+  electronicsBody.addShape(new CANNON.Box(new CANNON.Vec3(
+    0.085 * scale, 0.035 * scale, 0.07 * scale
+  )), new CANNON.Vec3(0.065 * scale, 0.005 * scale, 0.13 * scale));
+  electronicsBody.position.copy(pointToWorld(
+    chassisBody,
+    new CANNON.Vec3(0, 0.07 * scale, -0.27 * scale)
+  ));
+  electronicsBody.quaternion.copy(chassisBody.quaternion);
+  electronicsBody.updateMassProperties();
+  world.addBody(electronicsBody);
+  liveAxleLinkBodies.push(electronicsBody);
+
+  // Two longitudinal pivots and one lateral pivot keep this ballast rigidly
+  // attached while preserving the chassis-mounted forward mass location.
+  const mounts = [
+    {
+      chassis: new CANNON.Vec3(0, 0.07 * scale, -0.42 * scale),
+      electronics: new CANNON.Vec3(0, 0, -0.15 * scale)
+    },
+    {
+      chassis: new CANNON.Vec3(0, 0.07 * scale, -0.12 * scale),
+      electronics: new CANNON.Vec3(0, 0, 0.15 * scale)
+    },
+    {
+      chassis: new CANNON.Vec3(0.12 * scale, 0.07 * scale, -0.27 * scale),
+      electronics: new CANNON.Vec3(0.12 * scale, 0, 0)
+    }
+  ];
+  for (const mount of mounts) {
+    const constraint = new CANNON.PointToPointConstraint(
+      chassisBody,
+      mount.chassis,
+      electronicsBody,
+      mount.electronics,
+      9000 * Math.pow(scale, 3)
+    );
+    world.addConstraint(constraint);
+    liveAxleConstraints.push(constraint);
+  }
+}
+
 function createLiveAxleDynamics() {
   const scale = vehicleScale;
   const rearZ = ACTIVE_WHEELBASE * 0.5 * scale;
@@ -458,6 +517,19 @@ function createLiveAxleDynamics() {
     wheel.engineForce = 0;
     wheel.brake = 0;
   }
+  createForwardElectronicsMass(scale);
+
+  // Keep the base vehicle mass near the existing layout: the live axle, four
+  // links, and forward electronics are separate physical bodies rather than
+  // being counted again inside the main chassis tub.
+  const redistributedChassisMass = (
+    baseChassisMass - 1.55 - 0.48 - 0.85
+  ) * Math.pow(scale, 3);
+  chassisBody.mass = Math.max(0.2 * Math.pow(scale, 3), redistributedChassisMass);
+  chassisBody.updateMassProperties();
+  chassisBody.updateInertiaWorld(true);
+  chassisBody.updateBoundingRadius();
+
   liveAxleActive = true;
   world.broadphase.dirty = true;
 }
