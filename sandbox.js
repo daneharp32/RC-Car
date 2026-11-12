@@ -25,8 +25,10 @@ export function createSandboxSystem(game) {
     gravityOrbRadius: 1,
     gravityOrbPower: 1,
     jumpThrusterPower: 26,
-    forwardThrusterPower: 48
+    forwardThrusterPower: 48,
+    invincible: false, damageMultiplier: 1, flingResistance: 0, lobbyAllowsCheats: false
   };
+  let lobbyDamageEnabled = true;
   const secretChordKeys = new Set();
   const orbitalLaserSequences = [];
   let secretChordLatched = false;
@@ -777,6 +779,11 @@ export function createSandboxSystem(game) {
     if (infinite) infinite.checked = secretSettings.infiniteGadgets;
     const noCooldown = $("secretNoCooldown");
     if (noCooldown) noCooldown.checked = secretSettings.noCooldown;
+    $("secretInvincible").checked = secretSettings.invincible;
+    $("secretDamageMultiplier").value = String(secretSettings.damageMultiplier);
+    $("secretDamageMultiplierValue").textContent = secretSettings.damageMultiplier.toFixed(2) + "×";
+    $("secretFlingResistance").value = String(secretSettings.flingResistance);
+    $("secretFlingResistanceValue").textContent = secretSettings.flingResistance + "%";
     for (const [id, value] of [
       ["secretCarSize", secretSettings.carSize],
       ["secretGravityOrbRadius", secretSettings.gravityOrbRadius],
@@ -811,7 +818,8 @@ export function createSandboxSystem(game) {
   }
 
   function setSecretMenuOpen(open) {
-    secretMenuOpen = Boolean(open) && active && !game.isPaused?.();
+    secretMenuOpen = Boolean(open) && active && !game.isPaused?.() &&
+      (game.multiplayer?.currentLobby?.allowCheats === true || game.multiplayer?.joined !== true);
     if (secretMenuPanel) {
       secretMenuPanel.style.display = secretMenuOpen ? "block" : "none";
       secretMenuPanel.classList.toggle("sandbox-secret-menu-in-game", inMap);
@@ -852,6 +860,23 @@ export function createSandboxSystem(game) {
       : "Sandbox gadget cooldowns restored");
   }
 
+  function setInvincible(value) { secretSettings.invincible = value === true; renderSecretMenu(); }
+  function setDamageMultiplier(value) { secretSettings.damageMultiplier = THREE.MathUtils.clamp(Number(value) || 1, 0.5, 4); renderSecretMenu(); }
+  function setFlingResistance(value) { secretSettings.flingResistance = THREE.MathUtils.clamp(Number(value) || 0, 0, 100); renderSecretMenu(); }
+  function setLobbyRules(rules = {}) {
+    lobbyDamageEnabled = rules.damageEnabled !== false;
+    secretSettings.lobbyAllowsCheats = rules.allowCheats === true;
+    if (!secretSettings.lobbyAllowsCheats) {
+      secretSettings.invincible = false; secretSettings.damageMultiplier = 1; secretSettings.flingResistance = 0;
+      secretSettings.noCooldown = false; secretSettings.infiniteGadgets = false; setSecretMenuOpen(false);
+    }
+    renderSecretMenu();
+  }
+  function getCheatModifiers() {
+    const allowed = secretSettings.lobbyAllowsCheats;
+    return { invincible: allowed && secretSettings.invincible, damageMultiplier: allowed ? secretSettings.damageMultiplier : 1,
+      flingResistance: allowed ? secretSettings.flingResistance / 100 : 0, damageEnabled: lobbyDamageEnabled };
+  }
   function toggleInfiniteGadgets(enabled) {
     secretSettings.infiniteGadgets = enabled === true;
     if (!secretSettings.infiniteGadgets && loadout.size > MAX_EQUIPPED_GADGETS) {
@@ -2382,6 +2407,9 @@ export function createSandboxSystem(game) {
   $("secretNoCooldown")?.addEventListener("change", (event) =>
     toggleNoCooldown(event.target.checked)
   );
+  $("secretInvincible")?.addEventListener("change", e => setInvincible(e.target.checked));
+  $("secretDamageMultiplier")?.addEventListener("input", e => setDamageMultiplier(e.target.value));
+  $("secretFlingResistance")?.addEventListener("input", e => setFlingResistance(e.target.value));
   $("secretCarSize")?.addEventListener("input", (event) =>
     updateSecretSetting("carSize", event.target, 0.6, 1.8)
   );
@@ -2421,6 +2449,8 @@ export function createSandboxSystem(game) {
       return createImpulseBeacon(event);
     },
     getLoadout,
+    setLobbyRules,
+    getCheatModifiers,
     getVehicleScale() { return secretSettings.carSize; },
     getThrusterState,
     getThrusterTuning() {

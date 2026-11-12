@@ -955,6 +955,8 @@ function makeCarVisual(color, playerName = "") {
     return false;
   }
 
+  let damageMultiplier = 1;
+  function setDamageMultiplier(value) { damageMultiplier = Number.isFinite(value) ? THREE.MathUtils.clamp(value, 0.1, 8) : 1; }
   function applyLaunchStress(stress = {}) {
     if (totalled) return null;
 
@@ -1000,9 +1002,9 @@ function makeCarVisual(color, playerName = "") {
     );
 
     if (activeShell) {
-      const shellDamage = severity >= 2.65
+      const shellDamage = (severity >= 2.65
         ? activeShell.health
-        : 12 + Math.max(0, severity - 0.85) * 44;
+        : 12 + Math.max(0, severity - 0.85) * 44) * damageMultiplier;
       const detached = damageRecord(activeShell, shellDamage, launch);
       affected.push({ id: activeShell.id, detached });
     }
@@ -1038,9 +1040,9 @@ function makeCarVisual(color, playerName = "") {
     }
 
     if (severity >= 1.4) {
-      const componentDamage = severity >= 2.7
+      const componentDamage = (severity >= 2.7
         ? Infinity
-        : 8 + (severity - 1.4) * 28;
+        : 8 + (severity - 1.4) * 28) * damageMultiplier;
       for (const id of targetIds) {
         const record = damageParts.get(id);
         if (!record || record.detached || !isPartVisible(record)) continue;
@@ -1101,7 +1103,7 @@ function makeCarVisual(color, playerName = "") {
     if (!primary) return null;
 
     const applyTo = [];
-    const damageAmount = (Math.max(0, speed - 3.0) * 13.0) * primary.sensitivity;
+    const damageAmount = (Math.max(0, speed - 3.0) * 13.0) * primary.sensitivity * damageMultiplier;
     const launch = {
       speed,
       velocity: impact.velocity ? [impact.velocity.x, impact.velocity.y, impact.velocity.z] : null
@@ -1424,6 +1426,7 @@ function makeCarVisual(color, playerName = "") {
     setPlayerName,
     applyImpact,
     applyLaunchStress,
+    setDamageMultiplier,
     updateDebris,
     repairAll,
     getDamageSummary,

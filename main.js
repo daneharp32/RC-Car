@@ -1401,6 +1401,13 @@ function animate(now) {
       chassisBody.angularVelocity.y - previousLaunchAngularVelocity.y,
       chassisBody.angularVelocity.z - previousLaunchAngularVelocity.z
     ];
+    const cheatModifiers = sandbox.getCheatModifiers?.() || { flingResistance: 0, damageEnabled: true, invincible: false, damageMultiplier: 1 };
+    if (cheatModifiers.flingResistance > 0) {
+      const factor = 1 - THREE.MathUtils.clamp(cheatModifiers.flingResistance, 0, 1);
+      chassisBody.velocity.set(previousLaunchVelocity.x + deltaVelocity[0] * factor, previousLaunchVelocity.y + deltaVelocity[1] * factor, previousLaunchVelocity.z + deltaVelocity[2] * factor);
+      chassisBody.angularVelocity.set(previousLaunchAngularVelocity.x + deltaAngular[0] * factor, previousLaunchAngularVelocity.y + deltaAngular[1] * factor, previousLaunchAngularVelocity.z + deltaAngular[2] * factor);
+      for (let i = 0; i < 3; i++) { deltaVelocity[i] *= factor; deltaAngular[i] *= factor; }
+    }
     const linearChange = Math.hypot(...deltaVelocity);
     const angularChange = Math.hypot(...deltaAngular);
     previousLaunchVelocity.copy(chassisBody.velocity);
@@ -1412,13 +1419,14 @@ function animate(now) {
       (linearChange >= 4.1 || angularChange >= 7.0)
     ) {
       lastLaunchStressAt = stressNow;
-      const stressResult = localCar.applyLaunchStress?.({
+      localCar.setDamageMultiplier?.(cheatModifiers.damageMultiplier);
+      const stressResult = (!cheatModifiers.invincible && cheatModifiers.damageEnabled) ? localCar.applyLaunchStress?.({
         deltaVelocity,
         deltaAngular,
         linearChange,
         angularChange,
         velocity: [chassisBody.velocity.x, chassisBody.velocity.y, chassisBody.velocity.z]
-      });
+      }) : null;
       if (stressResult?.damaged?.length) {
         const detached = stressResult.detached.length
           ? " · " + stressResult.detached.join(", ").toUpperCase() + " DISCONNECTED"
@@ -1428,7 +1436,8 @@ function animate(now) {
     }
 
     for (const impact of impactDamageSystem.drain()) {
-      const damageResult = localCar.applyImpact?.(impact);
+      localCar.setDamageMultiplier?.(cheatModifiers.damageMultiplier);
+      const damageResult = (!cheatModifiers.invincible && cheatModifiers.damageEnabled) ? localCar.applyImpact?.(impact) : null;
       if (damageResult) {
         const detachedText = damageResult.detached.length
           ? " · " + damageResult.detached.join(", ").toUpperCase() + " DISCONNECTED"
@@ -1440,7 +1449,8 @@ function animate(now) {
     previousLaunchVelocity.copy(chassisBody.velocity);
     previousLaunchAngularVelocity.copy(chassisBody.angularVelocity);
   }
-  const damageBeforeFailure = localCar.getDamageSummary?.();
+  const damageRules = sandbox.getCheatModifiers?.() || { damageEnabled: true };
+  const damageBeforeFailure = damageRules.damageEnabled ? localCar.getDamageSummary?.() : null;
   if (
     damageBeforeFailure &&
     !damageBeforeFailure.totalled &&

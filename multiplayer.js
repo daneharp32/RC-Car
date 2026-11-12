@@ -316,12 +316,13 @@ export function createMultiplayerSystem(game) {
       const mode = document.createElement("div");
       mode.className = "lobby-row-mode";
       const mapLabel = lobby.mapId === "gravel-basin" ? "GRAVEL BASIN" : "CLUB DIRT CIRCUIT";
+      const rules = [lobby.allowCheats ? "CHEATS ON" : "CHEATS OFF", lobby.damageEnabled === false ? "DAMAGE OFF" : "DAMAGE ON"];
       mode.textContent = (lobby.mode === "sandbox"
         ? "SANDBOX · BUILD & DRIVE ANYTIME"
         : lobby.mode === "free-drive"
           ? "FREE DRIVE · OPEN SESSION"
           : (lobby.mode === "time-trial" ? "TIME TRIAL · " : "RACE · ") +
-            lobby.laps + (lobby.laps === 1 ? " LAP" : " LAPS")) + " · " + mapLabel;
+            lobby.laps + (lobby.laps === 1 ? " LAP" : " LAPS")) + " · " + mapLabel + " · " + rules.join(" · ");
       main.append(name, mode);
 
       const count = document.createElement("div");
@@ -373,7 +374,9 @@ export function createMultiplayerSystem(game) {
       laps: currentLobby.laps,
       phase: currentLobby.mode === "sandbox" ? "sandbox" : game.race?.phase || "waiting",
       playerCount: currentPlayerCount(),
-      maxPlayers: MAX_PLAYERS
+      maxPlayers: MAX_PLAYERS,
+      allowCheats: currentLobby.allowCheats === true,
+      damageEnabled: currentLobby.damageEnabled !== false
     };
 
     discoveredLobbies.set(currentLobby.id, {
@@ -469,6 +472,8 @@ export function createMultiplayerSystem(game) {
           mode,
           mapId,
           laps: Number.isFinite(item.laps) ? Math.max(1, Math.min(20, Math.floor(item.laps))) : 3,
+          allowCheats: item.allowCheats === true,
+          damageEnabled: item.damageEnabled !== false,
           phase: item.phase === "free-drive" ? "free-drive" : item.phase === "sandbox" ? "sandbox" : "waiting",
           playerCount: Number.isFinite(item.playerCount)
             ? Math.max(1, Math.min(MAX_PLAYERS, Math.floor(item.playerCount)))
@@ -582,6 +587,8 @@ export function createMultiplayerSystem(game) {
           mode,
           mapId: message.mapId === "gravel-basin" ? "gravel-basin" : "closed-course",
           laps: Number.isFinite(message.laps) ? Math.max(1, Math.min(20, Math.floor(message.laps))) : 3,
+          allowCheats: message.allowCheats === true,
+          damageEnabled: message.damageEnabled !== false,
           phase: ["waiting", "countdown", "racing", "finished", "free-drive", "sandbox"].includes(message.phase) ? message.phase : "waiting",
           playerCount,
           maxPlayers: MAX_PLAYERS,
@@ -747,8 +754,11 @@ export function createMultiplayerSystem(game) {
         : 3,
       hostPeerId: "",
       localPeerId: "",
-      directoryToken: isHost ? createDirectoryToken() : ""
+      directoryToken: isHost ? createDirectoryToken() : "",
+      allowCheats: lobby.allowCheats === true,
+      damageEnabled: lobby.damageEnabled !== false
     };
+    game.sandbox?.setLobbyRules?.(currentLobby);
     hostingLobby = !!isHost;
     roomPeerIds.clear();
     pendingRoomPeers.clear();
@@ -883,6 +893,8 @@ export function createMultiplayerSystem(game) {
           ? "Free Drive Lobby"
           : mode === "time-trial" ? "Time Trial Lobby" : "Race Lobby");
     const laps = Math.max(1, Math.min(20, Number($("raceLapCount").value) || 3));
+    const allowCheats = $("lobbyAllowCheats").checked;
+    const damageEnabled = $("lobbyDamageEnabled").checked;
     if (!["race", "free-drive", "time-trial", "sandbox"].includes(mode)) {
       joinError.textContent = "That lobby mode isn't available yet.";
       joinError.style.display = "block";
@@ -896,7 +908,7 @@ export function createMultiplayerSystem(game) {
       laps,
       phase: "waiting",
       playerCount: 1,
-      mapId: game.activeMapId || "closed-course"
+      mapId: game.activeMapId || "closed-course", allowCheats, damageEnabled
     }, true);
   }
 
