@@ -341,10 +341,10 @@ function makeTrailingArm(chassisAnchor, axleAnchor, linkWidth, maxForce, side) {
   const length = Math.max(0.05, Math.hypot(rawDirection.x, rawDirection.y, rawDirection.z));
   const direction = scaled(rawDirection, 1 / length);
   const link = new CANNON.Body({
-    mass: 0.12 * Math.pow(vehicleScale, 3),
+    mass: 0.045 * Math.pow(vehicleScale, 3),
     material: chassisMaterial,
-    linearDamping: 0.06,
-    angularDamping: 0.16,
+    linearDamping: 0.14,
+    angularDamping: 0.24,
     collisionFilterGroup: 0,
     collisionFilterMask: 0,
     allowSleep: false
@@ -358,30 +358,16 @@ function makeTrailingArm(chassisAnchor, axleAnchor, linkWidth, maxForce, side) {
   link.quaternion.setFromVectors(new CANNON.Vec3(0, 1, 0), direction);
   world.addBody(link);
 
-  // The chassis-side joint is a true transverse hinge. This makes each
-  // trailing arm swing through suspension travel instead of letting its
-  // chassis pivot wander in every direction like a loose ball joint.
-  const hingeAxisWorld = chassisBody.quaternion.vmult(
-    new CANNON.Vec3(1, 0, 0),
-    new CANNON.Vec3()
-  );
-  const inverseLinkQuaternion = new CANNON.Quaternion(
-    -link.quaternion.x,
-    -link.quaternion.y,
-    -link.quaternion.z,
-    link.quaternion.w
-  );
-  const hingeAxisLink = inverseLinkQuaternion.vmult(
-    hingeAxisWorld,
-    new CANNON.Vec3()
-  );
-  const chassisPivot = new CANNON.HingeConstraint(chassisBody, link, {
-    pivotA: chassisAnchor,
-    pivotB: new CANNON.Vec3(0, -length * 0.5, 0),
-    axisA: new CANNON.Vec3(1, 0, 0),
-    axisB: hingeAxisLink,
+  // Lower links are simple fixed-length four-link bars with ball joints at
+  // both ends. Their paired geometry controls fore/aft axle travel without
+  // imposing a second, competing hinge axis on the axle housing.
+  const chassisJoint = new CANNON.PointToPointConstraint(
+    chassisBody,
+    chassisAnchor,
+    link,
+    new CANNON.Vec3(0, -length * 0.5, 0),
     maxForce
-  });
+  );
   const axleJoint = new CANNON.PointToPointConstraint(
     link,
     new CANNON.Vec3(0, length * 0.5, 0),
@@ -389,14 +375,14 @@ function makeTrailingArm(chassisAnchor, axleAnchor, linkWidth, maxForce, side) {
     axleAnchor,
     maxForce
   );
-  world.addConstraint(chassisPivot);
+  world.addConstraint(chassisJoint);
   world.addConstraint(axleJoint);
   liveAxleLinkBodies.push(link);
-  liveAxleConstraints.push(chassisPivot, axleJoint);
+  liveAxleConstraints.push(chassisJoint, axleJoint);
   return {
     side,
     kind: "trailingArm",
-    constraints: [chassisPivot, axleJoint],
+    constraints: [chassisJoint, axleJoint],
     maxForce
   };
 }
@@ -408,10 +394,10 @@ function makeAxleLink(chassisAnchor, axleAnchor, linkWidth, maxForce, side, kind
   const length = Math.max(0.05, Math.hypot(rawDirection.x, rawDirection.y, rawDirection.z));
   const direction = scaled(rawDirection, 1 / length);
   const link = new CANNON.Body({
-    mass: 0.12 * Math.pow(vehicleScale, 3),
+    mass: 0.045 * Math.pow(vehicleScale, 3),
     material: chassisMaterial,
-    linearDamping: 0.025,
-    angularDamping: 0.08,
+    linearDamping: 0.14,
+    angularDamping: 0.24,
     collisionFilterGroup: 0,
     collisionFilterMask: 0,
     allowSleep: false
@@ -519,7 +505,7 @@ function createLiveAxleDynamics() {
     mass: 2.05 * Math.pow(scale, 3),
     material: chassisMaterial,
     linearDamping: 0.10,
-    angularDamping: 0.92,
+    angularDamping: 0.38,
     collisionFilterGroup: LIVE_AXLE_COLLISION_GROUP,
     collisionFilterMask: -1,
     allowSleep: false
@@ -546,14 +532,14 @@ function createLiveAxleDynamics() {
       new CANNON.Vec3(side * 0.22 * scale, -0.045 * scale, rearZ - 0.40 * scale),
       new CANNON.Vec3(side * 0.24 * scale, 0, 0),
       0.019 * scale,
-      2600 * Math.pow(scale, 3),
+      1500 * Math.pow(scale, 3),
       side
     ));
     liveAxleLinkComponents.push(makeAxleLink(
       new CANNON.Vec3(side * 0.18 * scale, 0.12 * scale, rearZ - 0.24 * scale),
       new CANNON.Vec3(-side * 0.13 * scale, 0.055 * scale, 0),
       0.015 * scale,
-      2600 * Math.pow(scale, 3),
+      1500 * Math.pow(scale, 3),
       side,
       "upperLink"
     ));
@@ -656,31 +642,6 @@ function solveLiveRearAxle() {
   const scale = vehicleScale;
   const dt = Math.max(1 / 240, world.dt || 1 / 60);
 
-  // A one-piece axle housing should articulate with the suspension, but it
-  // must not spin freely when one tire catches a bump. Dampen and bound its
-  // angular velocity relative to the chassis while preserving small axle
-  // roll and pinion movement.
-  const relativeAngularWorld = difference(
-    rearAxleBody.angularVelocity,
-    chassisBody.angularVelocity
-  );
-  const relativeAngularLocal = chassisBody.vectorToLocalFrame(
-    relativeAngularWorld,
-    new CANNON.Vec3()
-  );
-  relativeAngularLocal.x = clamp(relativeAngularLocal.x, -2.0, 2.0);
-  relativeAngularLocal.y = clamp(relativeAngularLocal.y, -2.8, 2.8);
-  relativeAngularLocal.z = clamp(relativeAngularLocal.z, -1.7, 1.7);
-  const boundedAngularWorld = chassisBody.vectorToWorldFrame(
-    relativeAngularLocal,
-    new CANNON.Vec3()
-  );
-  rearAxleBody.angularVelocity.set(
-    chassisBody.angularVelocity.x + boundedAngularWorld.x,
-    chassisBody.angularVelocity.y + boundedAngularWorld.y,
-    chassisBody.angularVelocity.z + boundedAngularWorld.z
-  );
-
   // Coil-over spring/dampers support the sprung mass and resist axle velocity.
   for (let sideIndex = 0; sideIndex < liveAxleSprings.length; sideIndex++) {
     const mount = liveAxleSprings[sideIndex];
@@ -693,12 +654,12 @@ function solveLiveRearAxle() {
     const chassisVelocity = chassisBody.getVelocityAtWorldPoint(chassisPoint, new CANNON.Vec3());
     const axleVelocity = rearAxleBody.getVelocityAtWorldPoint(axlePoint, new CANNON.Vec3());
     const relativeSpeed = dot(difference(axleVelocity, chassisVelocity), axis);
-    const springRate = 430 * scale * scale * shockHealth;
-    const damperRate = 138 * scale * scale * shockHealth;
+    const springRate = 560 * scale * scale * shockHealth;
+    const damperRate = 112 * scale * scale * shockHealth;
     const magnitude = clamp(
       (mount.restLength - length) * springRate - relativeSpeed * damperRate,
-      -420 * Math.pow(scale, 3),
-      420 * Math.pow(scale, 3)
+      -520 * Math.pow(scale, 3),
+      520 * Math.pow(scale, 3)
     );
     const force = scaled(axis, magnitude);
     rearAxleBody.applyForce(force, difference(axlePoint, rearAxleBody.position));
