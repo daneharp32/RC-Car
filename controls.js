@@ -69,6 +69,7 @@ function resetCar() {
   const spawn = game.physicsSystem?.getSpawn?.() || {
     x: spawnX, y: 0.24, z: spawnZ, yaw: spawnYaw
   };
+  game.localCar?.repairAll?.();
   chassisBody.position.set(spawn.x, spawn.y, spawn.z);
   chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), spawn.yaw);
   chassisBody.velocity.set(0, 0, 0);
@@ -85,9 +86,11 @@ function resetCar() {
     vehicle.wheelInfos[i].rotation = 0;
     vehicle.wheelInfos[i].deltaRotation = 0;
     vehicle.wheelInfos[i].engineForce = 0;
-    vehicle.wheelInfos[i].frictionSlip = i < 2 ? FRONT_TIRE_BASE_GRIP : REAR_TIRE_BASE_GRIP;
+    vehicle.wheelInfos[i].suspensionStiffness = baseWheelDynamics[i].suspensionStiffness;
+    vehicle.wheelInfos[i].maxSuspensionForce = baseWheelDynamics[i].maxSuspensionForce;
+    applyWheelDamageModifiers(i, i < 2 ? FRONT_TIRE_BASE_GRIP : REAR_TIRE_BASE_GRIP);
   }
-  showToast("Car reset");
+  showToast("Car reset and repaired");
 }
 
 let steerState = 0;
@@ -120,6 +123,41 @@ const activeWheelbase = Math.max(
 let previousGroundedForwardSpeed = null;
 let smoothedLongitudinalAcceleration = 0;
 
+const wheelPartIds = ["front-left-wheel", "front-right-wheel", "rear-left-wheel", "rear-right-wheel"];
+const wheelCornerNames = ["front-left", "front-right", "rear-left", "rear-right"];
+const baseWheelDynamics = vehicle.wheelInfos.map((wheel) => ({
+  suspensionStiffness: wheel.suspensionStiffness,
+  maxSuspensionForce: wheel.maxSuspensionForce
+}));
+
+function partHealth(id) {
+  return game.localCar?.getPartHealthRatio?.(id) ?? 1;
+}
+
+function wheelStructureHealth(index) {
+  const corner = wheelCornerNames[index];
+  const tower = index < 2 ? "front-shock-tower" : "rear-shock-tower";
+  return Math.min(
+    partHealth(corner + "-lower-arm"),
+    partHealth(corner + "-camber-link"),
+    partHealth(corner + "-wheel-carrier"),
+    partHealth(corner + "-oil-shock"),
+    partHealth(tower)
+  );
+}
+
+function applyWheelDamageModifiers(index, requestedGrip) {
+  const wheel = vehicle.wheelInfos[index];
+  const structure = wheelStructureHealth(index);
+  const tire = partHealth(wheelPartIds[index]);
+  const gripHealth = Math.min(structure, tire);
+  const base = baseWheelDynamics[index];
+  wheel.suspensionStiffness = base.suspensionStiffness * structure;
+  wheel.maxSuspensionForce = base.maxSuspensionForce * structure;
+  wheel.frictionSlip = Math.max(0.01, requestedGrip * gripHealth);
+  return { drive: gripHealth, structure, tire };
+}
+
 function updateDrivingControls(delta) {
   const sandboxAllowsDriving = game.sandbox?.active === true && game.sandbox.inMap === true;
   const raceAllowsDriving = sandboxAllowsDriving || !game.race || game.race.phase === "racing" || game.race.phase === "free-drive";
@@ -136,7 +174,7 @@ function updateDrivingControls(delta) {
     previousGroundedForwardSpeed = null;
     smoothedLongitudinalAcceleration = 0;
     for (let i = 0; i < 4; i++) {
-      vehicle.wheelInfos[i].frictionSlip = i < 2 ? FRONT_TIRE_BASE_GRIP : REAR_TIRE_BASE_GRIP;
+      applyWheelDamageModifiers(i, i < 2 ? FRONT_TIRE_BASE_GRIP : REAR_TIRE_BASE_GRIP);
     }
     return;
   }
@@ -165,7 +203,12 @@ function updateDrivingControls(delta) {
       chassisBody.velocity.z * worldForwardAxis.z) / headingLength
   );
   const speedSteerScale = THREE.MathUtils.clamp(1 - forwardTravelSpeed / 26, 0.58, 1);
-  const targetSteeringAngle = steerState * 0.34 * speedSteerScale;
+  const steeringHealth = Math.min(
+    partHealth("steering-servo"),
+    partHealth("radio-receiver"),
+    partHealth("receiver-servo-wiring")
+  );
+  const targetSteeringAngle = steerState * 0.34 * speedSteerScale * steeringHealth;
   // Respond slightly quicker so counter-steer is available as soon as the
   // driver changes direction during an existing slide.
   const steeringResponse = 1 - Math.exp(-8.5 * delta);
@@ -188,8 +231,25 @@ function updateDrivingControls(delta) {
     ? forwardThrusterPower * boosterSpeedScale
     : 0;
   const engineForce = (throttleState * 30 + boosterForce) * speedLimitScale;
+  const powertrainHealth = Math.min(
+    partHealth("lipo-battery"),
+    partHealth("electronic-speed-controller"),
+    partHealth("brushless-motor"),
+    partHealth("power-wiring"),
+    partHealth("center-driveshaft"),
+    partHealth("spur-pinion-gears")
+  );
+  const radioHealth = Math.min(partHealth("radio-receiver"), partHealth("receiver-servo-wiring"));
   for (let i = 0; i < 4; i++) {
-    vehicle.applyEngineForce(engineForce, i);
+    const axleHealth = partHealth(i < 2 ? "front-differential" : "rear-differential");
+    const wheelCondition = applyWheelDamageModifiers(
+      i,
+      i < 2 ? FRONT_TIRE_BASE_GRIP : REAR_TIRE_BASE_GRIP
+    );
+    vehicle.applyEngineForce(
+      engineForce * powertrainHealth * radioHealth * axleHealth * wheelCondition.drive,
+      i
+    );
     vehicle.setBrake(0, i);
   }
 
@@ -301,10 +361,11 @@ function updateDrivingControls(delta) {
       : REAR_TIRE_BASE_GRIP;
     const gripReduction = wheel.isFrontWheel ? 0.12 : 0.32;
     const minimumGrip = wheel.isFrontWheel ? 2.38 : 2.02;
-    wheel.frictionSlip = Math.max(
+    const requestedGrip = Math.max(
       minimumGrip,
       baseGrip - totalGripLoad * gripReduction
     );
+    applyWheelDamageModifiers(i, requestedGrip);
   }
 
   // Do not apply flight controls while the truck is merely settling at spawn.
