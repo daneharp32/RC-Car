@@ -765,8 +765,7 @@ function makeCarVisual(color, playerName = "") {
   addMesh(axleHousing, new THREE.SphereGeometry(0.122, 24, 18), darkMetal, [0, -0.004, 0])
     .scale.set(1.0, 0.90, 1.13);
   roundedBox(axleHousing, [0.215, 0.155, 0.035], carbonEdge, [0, -0.005, 0.112], null, 0.027);
-  addMesh(axleHousing, new THREE.TorusGeometry(0.083, 0.007, 8, 32), alloy, [0, 0.005, 0.135])
-    .rotation.x = Math.PI / 2;
+  addMesh(axleHousing, new THREE.TorusGeometry(0.083, 0.007, 8, 32), alloy, [0, 0.005, 0.135]);
   addMesh(axleHousing, new THREE.CylinderGeometry(0.074, 0.074, 0.012, 32), darkMetal,
     [0, 0.005, 0.136], [Math.PI / 2, 0, 0]);
   for (let bolt = 0; bolt < 10; bolt++) {
@@ -780,7 +779,7 @@ function makeCarVisual(color, playerName = "") {
     );
   }
   const pinionNeck = addMesh(axleHousing, new THREE.CylinderGeometry(0.034, 0.045, 0.11, 16), alloy,
-    [0, -0.005, -0.118]);
+    [0, -0.005, -0.118], [Math.PI / 2, 0, 0]);
   pinionNeck.rotation.x = Math.PI / 2;
   addMesh(axleHousing, new THREE.TorusGeometry(0.035, 0.006, 8, 24), red, [0, -0.005, -0.17])
     .rotation.x = Math.PI / 2;
@@ -1053,21 +1052,13 @@ function makeCarVisual(color, playerName = "") {
     }
     liveAxleAssembly.visible = chassisStyle === "live-axle";
 
-    // Forward-mounted equipment is arranged across the front half of the
-    // frame, with the battery low and centered-right, motor left, and ESC /
-    // receiver on separate mounting pads to avoid stacking modules together.
+    // Move the complete electrical package forward together so the relative
+    // battery / motor / ESC / receiver clearances remain unchanged. The new
+    // electronics tray is centered under this relocated package.
     const basePosition = (part) => part.userData.baseChassisPosition || new THREE.Vector3();
     for (const part of [battery, motor, gearing, esc, receiver, powerWiring, signalWiring]) {
       part.position.copy(basePosition(part));
-    }
-    if (chassisStyle === "live-axle") {
-      battery.position.set(0.19, -0.045, -0.205);
-      motor.position.set(-0.24, -0.055, -0.30);
-      gearing.position.set(-0.23, 0, -0.30);
-      esc.position.set(-0.27, 0, -0.19);
-      receiver.position.set(0.25, 0, -0.46);
-      powerWiring.position.set(0.01, -0.045, -0.23);
-      signalWiring.position.set(0.15, -0.035, -0.32);
+      if (chassisStyle === "live-axle") part.position.z -= 0.24;
     }
     return chassisStyle;
   }
