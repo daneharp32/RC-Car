@@ -317,6 +317,7 @@ function clamp(value, min, max) {
 function removeLiveAxleDynamics() {
   for (const constraint of liveAxleConstraints) world.removeConstraint(constraint);
   liveAxleConstraints = [];
+  liveAxleLinkComponents = [];
   for (const body of liveAxleLinkBodies) world.removeBody(body);
   liveAxleLinkBodies = [];
   if (rearAxleBody && world.bodies.includes(rearAxleBody)) world.removeBody(rearAxleBody);
@@ -331,7 +332,7 @@ function removeLiveAxleDynamics() {
   world.broadphase.dirty = true;
 }
 
-function makeAxleLink(chassisAnchor, axleAnchor, linkWidth, maxForce) {
+function makeAxleLink(chassisAnchor, axleAnchor, linkWidth, maxForce, side, kind) {
   const chassisWorld = pointToWorld(chassisBody, chassisAnchor);
   const axleWorld = pointToWorld(rearAxleBody, axleAnchor);
   const rawDirection = difference(axleWorld, chassisWorld);
@@ -376,10 +377,16 @@ function makeAxleLink(chassisAnchor, axleAnchor, linkWidth, maxForce) {
   world.addConstraint(axleJoint);
   liveAxleLinkBodies.push(link);
   liveAxleConstraints.push(chassisJoint, axleJoint);
+  return { side, kind, constraints: [chassisJoint, axleJoint], maxForce };
 }
 
 let liveAxleSprings = [];
 let liveAxleStraps = [];
+let liveAxleLinkComponents = [];
+let rearAxleCondition = [
+  { trailingArm: 1, upperLink: 1, shock: 1, strap: 1 },
+  { trailingArm: 1, upperLink: 1, shock: 1, strap: 1 }
+];
 function createForwardElectronicsMass(scale) {
   const mass = 0.85 * Math.pow(scale, 3);
   const electronicsBody = new CANNON.Body({
@@ -460,19 +467,28 @@ function createLiveAxleDynamics() {
 
   // Two long lower trailing arms and two triangulated upper links locate the
   // axle in pitch, roll, and lateral movement while allowing vertical travel.
+  liveAxleLinkComponents = [];
+  rearAxleCondition = [
+    { trailingArm: 1, upperLink: 1, shock: 1, strap: 1 },
+    { trailingArm: 1, upperLink: 1, shock: 1, strap: 1 }
+  ];
   for (const side of [-1, 1]) {
-    makeAxleLink(
+    liveAxleLinkComponents.push(makeAxleLink(
       new CANNON.Vec3(side * 0.22 * scale, -0.045 * scale, rearZ - 0.40 * scale),
       new CANNON.Vec3(side * 0.24 * scale, 0, 0),
       0.019 * scale,
-      5200 * Math.pow(scale, 3)
-    );
-    makeAxleLink(
+      5200 * Math.pow(scale, 3),
+      side,
+      "trailingArm"
+    ));
+    liveAxleLinkComponents.push(makeAxleLink(
       new CANNON.Vec3(side * 0.18 * scale, 0.12 * scale, rearZ - 0.24 * scale),
       new CANNON.Vec3(-side * 0.13 * scale, 0.055 * scale, 0),
       0.015 * scale,
-      5200 * Math.pow(scale, 3)
-    );
+      5200 * Math.pow(scale, 3),
+      side,
+      "upperLink"
+    ));
   }
 
   liveAxleSprings = [];
@@ -560,7 +576,9 @@ function solveLiveRearAxle() {
   const dt = Math.max(1 / 240, world.dt || 1 / 60);
 
   // Coil-over spring/dampers support the sprung mass and resist axle velocity.
-  for (const mount of liveAxleSprings) {
+  for (let sideIndex = 0; sideIndex < liveAxleSprings.length; sideIndex++) {
+    const mount = liveAxleSprings[sideIndex];
+    const shockHealth = rearAxleCondition[sideIndex].shock;
     const chassisPoint = pointToWorld(chassisBody, mount.chassisAnchor);
     const axlePoint = pointToWorld(rearAxleBody, mount.axleAnchor);
     const delta = difference(axlePoint, chassisPoint);
@@ -569,8 +587,8 @@ function solveLiveRearAxle() {
     const chassisVelocity = chassisBody.getVelocityAtWorldPoint(chassisPoint, new CANNON.Vec3());
     const axleVelocity = rearAxleBody.getVelocityAtWorldPoint(axlePoint, new CANNON.Vec3());
     const relativeSpeed = dot(difference(axleVelocity, chassisVelocity), axis);
-    const springRate = 940 * scale * scale;
-    const damperRate = 78 * scale * scale;
+    const springRate = 940 * scale * scale * shockHealth;
+    const damperRate = 78 * scale * scale * shockHealth;
     const magnitude = clamp(
       (mount.restLength - length) * springRate - relativeSpeed * damperRate,
       -1500 * Math.pow(scale, 3),
@@ -583,7 +601,10 @@ function solveLiveRearAxle() {
 
   // Nylon droop straps are one-way tethers: slack is free, but once stretched
   // beyond their set length they pull the axle back toward the chassis.
-  for (const strap of liveAxleStraps) {
+  for (let sideIndex = 0; sideIndex < liveAxleStraps.length; sideIndex++) {
+    const strap = liveAxleStraps[sideIndex];
+    const strapHealth = rearAxleCondition[sideIndex].strap;
+    if (strapHealth <= 0) continue;
     const chassisPoint = pointToWorld(chassisBody, strap.chassisAnchor);
     const axlePoint = pointToWorld(rearAxleBody, strap.axleAnchor);
     const towardChassis = difference(chassisPoint, axlePoint);
@@ -597,7 +618,7 @@ function solveLiveRearAxle() {
       (length - strap.maxLength) * 7200 * scale * scale +
         Math.max(0, separationSpeed) * 145 * scale * scale,
       1750 * Math.pow(scale, 3)
-    );
+    ) * strapHealth;
     const force = scaled(axis, tension);
     rearAxleBody.applyForce(force, difference(axlePoint, rearAxleBody.position));
     chassisBody.applyForce(scaled(force, -1), difference(chassisPoint, chassisBody.position));
@@ -717,6 +738,28 @@ function setRearDriveForce(index, force, brake = 0) {
   if (!Number.isInteger(wheel) || wheel < 0 || wheel > 1) return;
   rearDriveRequests[wheel] = Number.isFinite(force) ? force : 0;
   rearBrakeRequests[wheel] = Number.isFinite(brake) ? clamp(brake, 0, 1) : 0;
+}
+
+function setRearAxleCondition(index, condition = {}) {
+  const sideIndex = Number(index);
+  if (!Number.isInteger(sideIndex) || sideIndex < 0 || sideIndex > 1) return;
+  const keys = ["trailingArm", "upperLink", "shock", "strap"];
+  const state = rearAxleCondition[sideIndex];
+  for (const key of keys) {
+    const value = condition[key];
+    if (Number.isFinite(value)) state[key] = clamp(value, 0, 1);
+  }
+  for (const component of liveAxleLinkComponents) {
+    if (component.side !== (sideIndex === 0 ? -1 : 1)) continue;
+    const health = state[component.kind];
+    for (const constraint of component.constraints) {
+      for (const equation of constraint.equations) {
+        equation.maxForce = component.maxForce * health;
+        equation.minForce = -component.maxForce * health;
+        equation.enabled = health > 0.001;
+      }
+    }
+  }
 }
 
 function resetSuspension() {
@@ -911,6 +954,7 @@ for (const [mapId, layout] of alternateMapLayouts) {
     getChassisStyle,
     resetSuspension,
     setRearDriveForce,
+    setRearAxleCondition,
     getRearAxlePose
   };
 }
