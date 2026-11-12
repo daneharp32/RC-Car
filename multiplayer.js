@@ -46,6 +46,8 @@ export function createMultiplayerSystem(game) {
     return {
       name: driverName,
       shellStyle: game.getShellStyle?.() === "ranger" ? "ranger" : "prerunner",
+      chassisStyle: game.getChassisStyle?.() === "live-axle" ? "live-axle" : "standard",
+      rearAxlePose: game.physicsSystem?.getRearAxlePose?.() || null,
       x: chassisBody.position.x,
       y: chassisBody.position.y,
       z: chassisBody.position.z,
@@ -240,12 +242,15 @@ export function createMultiplayerSystem(game) {
       const name = cleanPlayerName(data.name) || "Driver";
       const visual = makeCarVisual(colorForPeer(peerId), name);
       visual.setShellStyle?.(data.shellStyle === "ranger" ? "ranger" : "prerunner");
+      visual.setChassisStyle?.(data.chassisStyle === "live-axle" ? "live-axle" : "standard");
       remote = {
         visual,
         target: null,
         lastSeen: performance.now(),
         wheelRotations: [0, 0, 0, 0],
         steering: 0,
+        chassisStyle: data.chassisStyle === "live-axle" ? "live-axle" : "standard",
+        rearAxlePose: null,
         name
       };
       remotePlayers.set(peerId, remote);
@@ -269,6 +274,21 @@ export function createMultiplayerSystem(game) {
       const remoteShellStyle = data.shellStyle === "ranger" ? "ranger" : "prerunner";
       if (remote.visual.shellStyle !== remoteShellStyle) {
         remote.visual.setShellStyle?.(remoteShellStyle);
+      }
+      const remoteChassisStyle = data.chassisStyle === "live-axle" ? "live-axle" : "standard";
+      if (remote.chassisStyle !== remoteChassisStyle) {
+        remote.chassisStyle = remoteChassisStyle;
+        remote.visual.setChassisStyle?.(remoteChassisStyle);
+      }
+      if (remoteChassisStyle === "live-axle" &&
+          Array.isArray(data.rearAxlePose?.position) &&
+          Array.isArray(data.rearAxlePose?.quaternion) &&
+          data.rearAxlePose.position.length === 3 &&
+          data.rearAxlePose.quaternion.length === 4 &&
+          [...data.rearAxlePose.position, ...data.rearAxlePose.quaternion].every(Number.isFinite)) {
+        remote.rearAxlePose = data.rearAxlePose;
+      } else if (remoteChassisStyle !== "live-axle") {
+        remote.rearAxlePose = null;
       }
       if (Array.isArray(data.damage?.parts)) {
         remote.visual.applyDamageSnapshot?.(data.damage);
@@ -1005,7 +1025,11 @@ export function createMultiplayerSystem(game) {
       remote.visual.root.position.lerp(remote.target.position, alpha);
       remote.visual.root.quaternion.slerp(remote.target.quaternion, alpha);
       const wheelPartIds = ["front-left-wheel", "front-right-wheel", "rear-left-wheel", "rear-right-wheel"];
+      if (remote.chassisStyle === "live-axle" && remote.rearAxlePose) {
+        remote.visual.setRearAxlePose?.(remote.rearAxlePose);
+      }
       for (let i = 0; i < 4; i++) {
+        if (i >= 2 && remote.chassisStyle === "live-axle") continue;
         if (remote.visual.isPartDetached?.(wheelPartIds[i])) continue;
         const [x, , z] = wheelPositions[i];
         const pivot = remote.visual.wheelPivots[i];

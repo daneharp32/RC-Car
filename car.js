@@ -40,7 +40,9 @@ function makeCarVisual(color, playerName = "") {
   const damageParts = new Map();
   let totalled = false;
 
+  let chassisStyle = "standard";
   function isActiveDamageRecord(record) {
+    if (record.chassisVariant && record.chassisVariant !== chassisStyle) return false;
     if (record.id === "uploaded-scx30-ranger-shell") {
       return shellStyle === "ranger" && shellGroup.visible && record.group.visible;
     }
@@ -55,6 +57,9 @@ function makeCarVisual(color, playerName = "") {
     if (id.includes("shell-visual") || id.includes("ranger-shell")) return { health: 92, mass: 0.62, sensitivity: 1.22 };
     if (id.includes("bumper")) return { health: 76, mass: 0.24, sensitivity: 0.72 };
     if (id.endsWith("-wheel")) return { health: 54, mass: 0.27, sensitivity: 1.18 };
+    if (id.includes("trailing-arm") || id === "rear-axle-housing") return { health: 58, mass: 0.18, sensitivity: 1.12 };
+    if (id.includes("upper-link") || id.includes("limit-strap")) return { health: 40, mass: 0.065, sensitivity: 1.26 };
+    if (id.includes("live-shock")) return { health: 48, mass: 0.11, sensitivity: 1.12 };
     if (id.includes("lower-arm") || id.includes("wheel-carrier")) return { health: 48, mass: 0.13, sensitivity: 1.18 };
     if (id.includes("camber-link")) return { health: 36, mass: 0.055, sensitivity: 1.38 };
     if (id.includes("oil-shock")) return { health: 44, mass: 0.10, sensitivity: 1.12 };
@@ -67,17 +72,20 @@ function makeCarVisual(color, playerName = "") {
     return { health: 60, mass: 0.09, sensitivity: 1.0 };
   }
 
-  function makePart(parent, id, label, description) {
+  function makePart(parent, id, label, description, chassisVariant = null) {
     const group = new THREE.Group();
     group.name = id;
     group.userData.partInfo = { id, label, description };
     group.userData.damagePartId = id;
+    if (chassisVariant) group.userData.chassisVariant = chassisVariant;
+    if (chassisVariant === "live-axle") group.visible = false;
     parent.add(group);
     const profile = getDamageProfile(id);
     damageParts.set(id, {
       id,
       label,
       description,
+      chassisVariant,
       group,
       maxHealth: profile.health,
       health: profile.health,
@@ -179,8 +187,8 @@ function makeCarVisual(color, playerName = "") {
     return addMesh(parent, new THREE.TubeGeometry(curve, steps, 0.0055, 7, false), material);
   }
 
-  function addShock(parent, id, label, description, top, bottom, springMaterial) {
-    const group = makePart(parent, id, label, description);
+  function addShock(parent, id, label, description, top, bottom, springMaterial, chassisVariant = null) {
+    const group = makePart(parent, id, label, description, chassisVariant);
     const a = new THREE.Vector3(...top);
     const b = new THREE.Vector3(...bottom);
     const axis = b.clone().sub(a).normalize();
@@ -242,7 +250,13 @@ function makeCarVisual(color, playerName = "") {
     { z: frontAxleZ, id: "front-differential", label: "Front differential housing", desc: "Sealed front gearcase transfers drive to the left and right front half-shafts." },
     { z: rearAxleZ, id: "rear-differential", label: "Rear differential housing", desc: "Rear gearcase distributes motor power to the rear half-shafts." }
   ]) {
-    const diff = makePart(chassisGroup, end.id, end.label, end.desc);
+    const diff = makePart(
+      chassisGroup,
+      end.id,
+      end.label,
+      end.desc,
+      end.id === "rear-differential" ? "standard" : null
+    );
     roundedBox(diff, [0.31, 0.115, 0.16], darkMetal, [0, 0.018, end.z], null, 0.035);
     roundedBox(diff, [0.19, 0.035, 0.17], carbonEdge, [0, 0.079, end.z], null, 0.018);
     addMesh(diff, new THREE.SphereGeometry(0.074, 20, 14), alloy, [0, 0.04, end.z]).scale.set(1.0, 0.62, 1.0);
@@ -278,7 +292,8 @@ function makeCarVisual(color, playerName = "") {
       chassisGroup,
       `${corner.name.toLowerCase().replace(" ", "-")}-lower-arm`,
       `${corner.name} lower suspension arm`,
-      "Molded reinforced A-arm connects the chassis hinge pins to the wheel carrier and lets the wheel move vertically with the suspension."
+      "Molded reinforced A-arm connects the chassis hinge pins to the wheel carrier and lets the wheel move vertically with the suspension.",
+      isFront ? null : "standard"
     );
     const s = corner.side;
     const z = corner.z;
@@ -294,7 +309,8 @@ function makeCarVisual(color, playerName = "") {
       chassisGroup,
       `${corner.name.toLowerCase().replace(" ", "-")}-camber-link`,
       `${corner.name} upper camber link`,
-      "Adjustable upper link controls wheel camber and keeps the upright aligned as the suspension travels."
+      "Adjustable upper link controls wheel camber and keeps the upright aligned as the suspension travels.",
+      isFront ? null : "standard"
     );
     cylinderBetween(upper, [s * 0.10, 0.17, z + (isFront ? 0.025 : -0.025)],
       [s * 0.29, 0.13, z], 0.011, alloy, 10, 0.009);
@@ -305,7 +321,8 @@ function makeCarVisual(color, playerName = "") {
       chassisGroup,
       `${corner.name.toLowerCase().replace(" ", "-")}-wheel-carrier`,
       `${corner.name} wheel carrier / hub`,
-      "The upright holds the axle bearings and connects the steering or rear toe links to the suspension arms."
+      "The upright holds the axle bearings and connects the steering or rear toe links to the suspension arms.",
+      isFront ? null : "standard"
     );
     roundedBox(carrier, [0.075, 0.13, 0.085], blackPlastic, [s * 0.295, 0.005, z], null, 0.018);
     cylinderBetween(carrier, [s * 0.25, 0.005, z], [s * 0.35, 0.005, z], 0.031, alloy, 16);
@@ -323,7 +340,8 @@ function makeCarVisual(color, playerName = "") {
       chassisGroup,
       end.id,
       end.label,
-      "Reinforced vertical plate that anchors the upper shock eyes and suspension bracing."
+      "Reinforced vertical plate that anchors the upper shock eyes and suspension bracing.",
+      end.id === "rear-shock-tower" ? "standard" : null
     );
     // Shorter tower plates keep the top mounts lower without changing any
     // wheel, arm, or physics attachment coordinates.
@@ -360,7 +378,8 @@ function makeCarVisual(color, playerName = "") {
       "Aluminum-bodied coil-over damper. The silver spring supports the truck while the oil-filled shock body controls how quickly the suspension compresses and rebounds.",
       top,
       bottom,
-      springSilver
+      springSilver,
+      corner.z > 0 ? "standard" : null
     );
   }
 
@@ -711,6 +730,236 @@ function makeCarVisual(color, playerName = "") {
   }
 
 
+  // Alternate desert live-axle hardware. The axle beam and wheels follow a
+  // separate physics body; link bars, coil-overs and droop straps are updated
+  // from that body's pose every frame instead of being static decoration.
+  const liveAxleAssembly = new THREE.Group();
+  liveAxleAssembly.name = "articulated-solid-rear-axle";
+  liveAxleAssembly.visible = false;
+  chassisGroup.add(liveAxleAssembly);
+  const axleHousing = makePart(
+    liveAxleAssembly,
+    "rear-axle-housing",
+    "Solid rear axle housing",
+    "One continuous live axle connects both rear hubs. The differential pumpkin, axle tubes and hub ends move together as a single unsprung assembly.",
+    "live-axle"
+  );
+  cylinderBetween(axleHousing, [-0.395, 0, 0], [0.395, 0, 0], 0.043, darkMetal, 24);
+  roundedBox(axleHousing, [0.245, 0.15, 0.205], carbonEdge, [0, -0.012, 0], null, 0.045);
+  addMesh(axleHousing, new THREE.SphereGeometry(0.112, 22, 16), alloy, [0, 0.018, 0])
+    .scale.set(1.0, 0.82, 1.10);
+  for (const side of [-1, 1]) {
+    cylinderBetween(axleHousing, [side * 0.30, 0, 0], [side * 0.43, 0, 0], 0.060, blackPlastic, 18);
+    cylinderBetween(axleHousing, [side * 0.40, 0, 0], [side * 0.455, 0, 0], 0.035, alloy, 16);
+  }
+  const rearAxleTray = makePart(
+    chassisGroup,
+    "front-electronics-tray",
+    "Forward electronics deck",
+    "Repositioned low-mounted battery, ESC and receiver tray shifts electrical mass toward the front half of the chassis.",
+    "live-axle"
+  );
+  roundedBox(rearAxleTray, [0.37, 0.025, 0.39], carbon, [0, 0.025, -0.245], null, 0.016);
+  for (const side of [-1, 1]) {
+    roundedBox(rearAxleTray, [0.018, 0.045, 0.39], alloy, [side * 0.18, 0.055, -0.245], null, 0.006);
+  }
+
+  function makeLiveAxleSegment(id, label, description, radius, material) {
+    const group = makePart(chassisGroup, id, label, description, "live-axle");
+    const mesh = addMesh(group, new THREE.CylinderGeometry(radius, radius, 1, 12), material);
+    return { group, mesh };
+  }
+  function updateLiveAxleSegment(segment, start, end) {
+    const direction = end.clone().sub(start);
+    const length = Math.max(0.001, direction.length());
+    segment.mesh.position.copy(start).add(end).multiplyScalar(0.5);
+    segment.mesh.quaternion.setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      direction.normalize()
+    );
+    segment.mesh.scale.set(1, length, 1);
+  }
+  function makeLiveAxleShock(id, label, side) {
+    const group = makePart(
+      chassisGroup,
+      id,
+      label,
+      "Long-travel oil-filled coil-over supports the live axle. Its body, shaft and spring visibly follow axle articulation.",
+      "live-axle"
+    );
+    addMesh(group, new THREE.CylinderGeometry(0.023, 0.026, 0.62, 14), blueDark);
+    addMesh(group, new THREE.CylinderGeometry(0.008, 0.008, 0.53, 10), alloy)
+      .position.x = side * 0.003;
+    for (let i = 0; i < 7; i++) {
+      const spring = addMesh(group, new THREE.TorusGeometry(0.033, 0.0045, 7, 20), springSilver);
+      spring.rotation.x = Math.PI / 2;
+      spring.position.y = -0.23 + i * 0.075;
+    }
+    addMesh(group, new THREE.SphereGeometry(0.029, 12, 10), carbonEdge, [0, -0.30, 0]);
+    addMesh(group, new THREE.SphereGeometry(0.029, 12, 10), red, [0, 0.30, 0]);
+    return group;
+  }
+  function updateLiveAxleShock(group, start, end) {
+    const direction = end.clone().sub(start);
+    const length = Math.max(0.001, direction.length());
+    group.position.copy(start).add(end).multiplyScalar(0.5);
+    group.quaternion.setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      direction.normalize()
+    );
+    group.scale.set(1, length / 0.62, 1);
+  }
+  function makeLimitStrap(id, side) {
+    const group = makePart(
+      chassisGroup,
+      id,
+      side < 0 ? "Left rear limit strap" : "Right rear limit strap",
+      "A reinforced droop strap remains slack through normal compression, then becomes taut at maximum axle drop to limit suspension extension.",
+      "live-axle"
+    );
+    addMesh(group, new THREE.BoxGeometry(0.036, 1, 0.012), blackPlastic);
+    for (const x of [-0.011, 0.011]) {
+      addMesh(group, new THREE.BoxGeometry(0.0035, 0.94, 0.014), redBright, [x, 0, 0]);
+    }
+    for (const y of [-0.46, 0.46]) {
+      addMesh(group, new THREE.TorusGeometry(0.018, 0.004, 6, 14), alloy, [0, y, 0]);
+    }
+    return group;
+  }
+  function updateLimitStrap(group, start, end) {
+    const direction = end.clone().sub(start);
+    const length = Math.max(0.001, direction.length());
+    group.position.copy(start).add(end).multiplyScalar(0.5);
+    group.quaternion.setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      direction.normalize()
+    );
+    group.scale.set(1, length, 1);
+  }
+
+  const liveAxleLinks = [];
+  const liveAxleShocks = [];
+  const liveAxleStraps = [];
+  for (const side of [-1, 1]) {
+    const sideName = side < 0 ? "left" : "right";
+    liveAxleLinks.push({
+      side,
+      kind: "trailing",
+      segment: makeLiveAxleSegment(
+        `rear-${sideName}-trailing-arm`,
+        `${sideName === "left" ? "Left" : "Right"} rear trailing / swing arm`,
+        "Long lower trailing arm pivots at the chassis and sweeps with the solid axle through suspension travel.",
+        0.026,
+        red
+      )
+    });
+    liveAxleLinks.push({
+      side,
+      kind: "upper",
+      segment: makeLiveAxleSegment(
+        `rear-${sideName}-upper-link`,
+        `${sideName === "left" ? "Left" : "Right"} triangulated upper link`,
+        "Triangulated upper four-link locates the axle laterally and controls axle rotation under acceleration and braking.",
+        0.014,
+        alloy
+      )
+    });
+    liveAxleShocks.push({
+      side,
+      group: makeLiveAxleShock(`rear-${sideName}-live-shock`, `${sideName} live-axle coil-over`, side)
+    });
+    liveAxleStraps.push({
+      side,
+      group: makeLimitStrap(`rear-${sideName}-limit-strap`, side)
+    });
+  }
+
+  function setChassisStyle(style) {
+    chassisStyle = style === "live-axle" ? "live-axle" : "standard";
+    for (const record of damageParts.values()) {
+      if (!record.chassisVariant) continue;
+      const active = record.chassisVariant === chassisStyle;
+      if (!record.detached) record.group.visible = active;
+      record.originalVisible = active;
+    }
+    liveAxleAssembly.visible = chassisStyle === "live-axle";
+
+    // Shift the heavy electrical modules forward for the desert axle layout.
+    const forwardOffset = chassisStyle === "live-axle" ? -0.19 : 0;
+    for (const part of [battery, motor, gearing, esc, receiver, powerWiring, signalWiring]) {
+      part.position.z = (part.userData.baseChassisZ || 0) + forwardOffset;
+    }
+    return chassisStyle;
+  }
+
+  function setRearAxlePose(state) {
+    if (!state || chassisStyle !== "live-axle" ||
+        !Array.isArray(state.position) || state.position.length < 3 ||
+        !Array.isArray(state.quaternion) || state.quaternion.length < 4) return;
+    const scale = Number.isFinite(state.hubHalfTrack)
+      ? state.hubHalfTrack / 0.305
+      : 1;
+    const position = new THREE.Vector3(...state.position);
+    const quaternion = new THREE.Quaternion(...state.quaternion).normalize();
+    const rootScale = root.scale.x || 1;
+    const visualScale = scale / rootScale;
+    const visualPosition = position.clone().divideScalar(rootScale);
+    liveAxleAssembly.position.copy(visualPosition);
+    liveAxleAssembly.quaternion.copy(quaternion);
+
+    const axlePoint = (x, y, z) => new THREE.Vector3(
+      x * visualScale, y * visualScale, z * visualScale
+    ).applyQuaternion(quaternion).add(visualPosition);
+    for (const link of liveAxleLinks) {
+      const side = link.side, isTrailing = link.kind === "trailing";
+      const record = damageParts.get(link.segment.group.userData.damagePartId);
+      if (record?.detached) continue;
+      const chassisAnchor = isTrailing
+        ? new THREE.Vector3(side * 0.22 * visualScale, -0.045 * visualScale, (rearAxleZ - 0.40) * visualScale)
+        : new THREE.Vector3(side * 0.18 * visualScale, 0.12 * visualScale, (rearAxleZ - 0.24) * visualScale);
+      const axleAnchor = isTrailing
+        ? axlePoint(side * 0.24, 0, 0)
+        : axlePoint(-side * 0.13, 0.055, 0);
+      updateLiveAxleSegment(link.segment, chassisAnchor, axleAnchor);
+    }
+    for (const shock of liveAxleShocks) {
+      const side = shock.side;
+      if (damageParts.get(shock.group.userData.damagePartId)?.detached) continue;
+      updateLiveAxleShock(
+        shock.group,
+        new THREE.Vector3(side * 0.205 * visualScale, 0.16 * visualScale, (rearAxleZ - 0.075) * visualScale),
+        axlePoint(side * 0.215, 0.065, 0)
+      );
+    }
+    for (const strap of liveAxleStraps) {
+      const side = strap.side;
+      if (damageParts.get(strap.group.userData.damagePartId)?.detached) continue;
+      updateLimitStrap(
+        strap.group,
+        new THREE.Vector3(side * 0.235 * visualScale, 0.205 * visualScale, (rearAxleZ - 0.085) * visualScale),
+        axlePoint(side * 0.235, 0.12, 0)
+      );
+    }
+
+    const hubHalfTrack = Number.isFinite(state.hubHalfTrack) ? state.hubHalfTrack : 0.305;
+    for (let sideIndex = 0; sideIndex < 2; sideIndex++) {
+      const side = sideIndex === 0 ? -1 : 1;
+      const pivot = wheelPivots[sideIndex + 2];
+      if (damageParts.get(pivot.userData.damagePartId)?.detached) continue;
+      const hub = new THREE.Vector3(side * hubHalfTrack, -0.005 * scale, 0)
+        .applyQuaternion(quaternion)
+        .add(position);
+      pivot.position.set(
+        hub.x / rootScale,
+        hub.y / rootScale,
+        hub.z * chassisLengthScale / rootScale
+      );
+      const spin = Array.isArray(state.wheelRotations) ? state.wheelRotations[sideIndex] || 0 : 0;
+      const spinQuaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), spin);
+      pivot.quaternion.copy(quaternion).multiply(spinQuaternion);
+    }
+  }
+
   const rangerShellMaterial = new THREE.MeshStandardMaterial({
     color: 0xff581a,
     roughness: 0.58,
@@ -782,6 +1031,10 @@ function makeCarVisual(color, playerName = "") {
     }
   });
   setShellStyle(shellModel ? "prerunner" : "ranger");
+  setChassisStyle("standard");
+  for (const part of [battery, motor, gearing, esc, receiver, powerWiring, signalWiring]) {
+    part.userData.baseChassisZ = part.position.z;
+  }
 
   // Store the original hierarchy and transforms so every damaged component
   // can be restored by the existing vehicle reset command.
@@ -1016,14 +1269,18 @@ function makeCarVisual(color, playerName = "") {
     if (Math.abs(localKick.y) > Math.max(horizontalX, horizontalZ) * 1.15) {
       const side = localKick.x < 0 ? "left" : "right";
       const axle = localKick.z < 0 ? "front" : "rear";
-      targetIds = [`${axle}-${side}-oil-shock`];
+      targetIds = chassisStyle === "live-axle" && axle === "rear"
+        ? [`rear-${side}-live-shock`]
+        : [`${axle}-${side}-oil-shock`];
     } else if (horizontalX > horizontalZ * 1.12) {
       const side = localKick.x < 0 ? "left" : "right";
       const axle = localKick.z < 0 ? "front" : "rear";
-      targetIds = [
-        `${axle}-${side}-lower-arm`,
-        `${axle}-${side}-camber-link`
-      ];
+      targetIds = chassisStyle === "live-axle" && axle === "rear"
+        ? [`rear-${side}-trailing-arm`, `rear-${side}-upper-link`]
+        : [
+            `${axle}-${side}-lower-arm`,
+            `${axle}-${side}-camber-link`
+          ];
     } else {
       targetIds = [localKick.z < 0 ? "front-bumper" : "rear-bumper"];
     }
@@ -1420,8 +1677,12 @@ function makeCarVisual(color, playerName = "") {
     wheelPivots,
     shellGroup,
     chassisGroup,
+    liveAxleAssembly,
     setShellVisible(visible) { shellGroup.visible = !!visible; },
     setShellStyle,
+    setChassisStyle,
+    get chassisStyle() { return chassisStyle; },
+    setRearAxlePose,
     get shellStyle() { return shellStyle; },
     setPlayerName,
     applyImpact,
