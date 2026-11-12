@@ -800,7 +800,8 @@ function getRearAxlePose() {
       relativeQuaternion.w
     ],
     hubHalfTrack: 0.305 * vehicleScale,
-    wheelRotations: rearWheelRotations.slice()
+    wheelRotations: rearWheelRotations.slice(),
+    limitStrapLengths: liveAxleStraps.map((strap) => strap.maxLength)
   };
 }
 
