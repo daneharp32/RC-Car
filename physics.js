@@ -16,7 +16,7 @@ const world = new CANNON.World({
   gravity: new CANNON.Vec3(0, -9.82, 0)
 });
 world.broadphase = new CANNON.SAPBroadphase(world);
-world.solver.iterations = 14;
+world.solver.iterations = 20;
 world.allowSleep = false;
 world.defaultContactMaterial.friction = 0.35;
 world.defaultContactMaterial.restitution = 0.02;
@@ -266,6 +266,7 @@ world.addEventListener("preStep", solveLiveRearAxle);
 // Sandbox-only size tuning. Keep base geometry and wheel data so changes are
 // reversible and never accumulate rounding error across slider adjustments.
 const baseChassisMass = chassisBody.mass;
+const baseChassisAngularDamping = chassisBody.angularDamping;
 const baseChassisShapes = chassisBody.shapes.map((shape, index) => ({
   shape,
   halfExtents: shape.halfExtents?.clone?.() || null,
@@ -406,7 +407,7 @@ function createForwardElectronicsMass(scale) {
   )), new CANNON.Vec3(0.065 * scale, 0.005 * scale, 0.13 * scale));
   electronicsBody.position.copy(pointToWorld(
     chassisBody,
-    new CANNON.Vec3(0, 0.07 * scale, -0.27 * scale)
+    new CANNON.Vec3(0, 0.025 * scale, -0.31 * scale)
   ));
   electronicsBody.quaternion.copy(chassisBody.quaternion);
   electronicsBody.updateMassProperties();
@@ -417,15 +418,15 @@ function createForwardElectronicsMass(scale) {
   // attached while preserving the chassis-mounted forward mass location.
   const mounts = [
     {
-      chassis: new CANNON.Vec3(0, 0.07 * scale, -0.42 * scale),
+      chassis: new CANNON.Vec3(0, 0.025 * scale, -0.46 * scale),
       electronics: new CANNON.Vec3(0, 0, -0.15 * scale)
     },
     {
-      chassis: new CANNON.Vec3(0, 0.07 * scale, -0.12 * scale),
+      chassis: new CANNON.Vec3(0, 0.025 * scale, -0.16 * scale),
       electronics: new CANNON.Vec3(0, 0, 0.15 * scale)
     },
     {
-      chassis: new CANNON.Vec3(0.12 * scale, 0.07 * scale, -0.27 * scale),
+      chassis: new CANNON.Vec3(0.12 * scale, 0.025 * scale, -0.31 * scale),
       electronics: new CANNON.Vec3(0.12 * scale, 0, 0)
     }
   ];
@@ -477,7 +478,7 @@ function createLiveAxleDynamics() {
       new CANNON.Vec3(side * 0.22 * scale, -0.045 * scale, rearZ - 0.40 * scale),
       new CANNON.Vec3(side * 0.24 * scale, 0, 0),
       0.019 * scale,
-      5200 * Math.pow(scale, 3),
+      2600 * Math.pow(scale, 3),
       side,
       "trailingArm"
     ));
@@ -485,7 +486,7 @@ function createLiveAxleDynamics() {
       new CANNON.Vec3(side * 0.18 * scale, 0.12 * scale, rearZ - 0.24 * scale),
       new CANNON.Vec3(-side * 0.13 * scale, 0.055 * scale, 0),
       0.015 * scale,
-      5200 * Math.pow(scale, 3),
+      2600 * Math.pow(scale, 3),
       side,
       "upperLink"
     ));
@@ -587,12 +588,12 @@ function solveLiveRearAxle() {
     const chassisVelocity = chassisBody.getVelocityAtWorldPoint(chassisPoint, new CANNON.Vec3());
     const axleVelocity = rearAxleBody.getVelocityAtWorldPoint(axlePoint, new CANNON.Vec3());
     const relativeSpeed = dot(difference(axleVelocity, chassisVelocity), axis);
-    const springRate = 940 * scale * scale * shockHealth;
-    const damperRate = 78 * scale * scale * shockHealth;
+    const springRate = 720 * scale * scale * shockHealth;
+    const damperRate = 92 * scale * scale * shockHealth;
     const magnitude = clamp(
       (mount.restLength - length) * springRate - relativeSpeed * damperRate,
-      -1500 * Math.pow(scale, 3),
-      1500 * Math.pow(scale, 3)
+      -650 * Math.pow(scale, 3),
+      650 * Math.pow(scale, 3)
     );
     const force = scaled(axis, magnitude);
     rearAxleBody.applyForce(force, difference(axlePoint, rearAxleBody.position));
@@ -615,9 +616,9 @@ function solveLiveRearAxle() {
     const axleVelocity = rearAxleBody.getVelocityAtWorldPoint(axlePoint, new CANNON.Vec3());
     const separationSpeed = dot(difference(chassisVelocity, axleVelocity), axis);
     const tension = Math.min(
-      (length - strap.maxLength) * 7200 * scale * scale +
-        Math.max(0, separationSpeed) * 145 * scale * scale,
-      1750 * Math.pow(scale, 3)
+      (length - strap.maxLength) * 2600 * scale * scale +
+        Math.max(0, separationSpeed) * 75 * scale * scale,
+      650 * Math.pow(scale, 3)
     ) * strapHealth;
     const force = scaled(axis, tension);
     rearAxleBody.applyForce(force, difference(axlePoint, rearAxleBody.position));
@@ -670,10 +671,10 @@ function solveLiveRearAxle() {
     ) / rearContactCount;
     const normalForce = clamp(
       rearStaticLoad +
-        penetration * 5200 * scale * scale -
-        normalSpeed * 145 * scale * scale,
+        penetration * 3600 * scale * scale -
+        normalSpeed * 100 * scale * scale,
       0,
-      1300 * Math.pow(scale, 3)
+      800 * Math.pow(scale, 3)
     );
     if (normalForce <= 0) {
       wheel.deltaRotation = 0;
@@ -682,7 +683,7 @@ function solveLiveRearAxle() {
 
     const forwardSpeed = dot(relativeVelocity, forward);
     const lateralSpeed = dot(relativeVelocity, lateral);
-    const frictionLimit = normalForce * 1.12;
+    const frictionLimit = normalForce * 1.02;
     const brakeForce = rearBrakeRequests[sideIndex] * 48 * Math.pow(scale, 3);
     const requestedLongitudinal = rearDriveRequests[sideIndex] -
       Math.sign(forwardSpeed) * brakeForce;
@@ -692,7 +693,7 @@ function solveLiveRearAxle() {
       frictionLimit * frictionLimit - longitudinalForce * longitudinalForce
     ));
     const lateralForce = clamp(
-      -lateralSpeed * 92 * scale * scale,
+      -lateralSpeed * 62 * scale * scale,
       -lateralLimit,
       lateralLimit
     );
@@ -742,6 +743,9 @@ function setChassisStyle(style) {
     chassisStyle = requested;
     restoreRearWheelSettings();
   }
+  chassisBody.angularDamping = requested === "live-axle"
+    ? Math.max(baseChassisAngularDamping, 1.15)
+    : baseChassisAngularDamping;
   chassisBody.wakeUp();
   world.broadphase.dirty = true;
   return chassisStyle;
