@@ -660,10 +660,14 @@ function solveLiveRearAxle() {
     // penetration, so penetration-only contact would provide no static load.
     // Carry the axle weight plus a rear share of sprung chassis weight, then
     // add compression and velocity response for bumps and landings.
+    const rearContactCount = Math.max(
+      1,
+      vehicle.wheelInfos.slice(2, 4).filter((rearWheel) => rearWheel.isInContact).length
+    );
     const rearStaticLoad = (
       rearAxleBody.mass * 9.82 +
       chassisBody.mass * 9.82 * 0.42
-    ) * 0.5;
+    ) / rearContactCount;
     const normalForce = clamp(
       rearStaticLoad +
         penetration * 5200 * scale * scale -
@@ -800,7 +804,8 @@ function getRearAxlePose() {
       relativeQuaternion.w
     ],
     hubHalfTrack: 0.305 * vehicleScale,
-    wheelRotations: rearWheelRotations.slice()
+    wheelRotations: rearWheelRotations.slice(),
+    limitStrapLengths: liveAxleStraps.map((strap) => strap.maxLength)
   };
 }
 

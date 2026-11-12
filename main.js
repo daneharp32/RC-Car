@@ -1014,16 +1014,20 @@ function updateLocalVisual() {
       transform.position.z - chassisBody.position.z
     );
     localPosition.applyQuaternion(inverseRoot);
-    localPosition.z *= VISUAL_CHASSIS_LENGTH_SCALE;
-    localPosition.divideScalar(localCar.root.scale.x || 1);
+    const rootScale = localCar.root.scale.x || 1;
+    const suspensionPosition = localPosition.clone().divideScalar(rootScale);
     worldWheelQuaternion.set(
       transform.quaternion.x,
       transform.quaternion.y,
       transform.quaternion.z,
       transform.quaternion.w
     );
+    const localWheelQuaternion = inverseRoot.clone().multiply(worldWheelQuaternion);
+    if (i < 2) localCar.setFrontSuspensionPose?.(i, suspensionPosition, localWheelQuaternion);
+    localPosition.z *= VISUAL_CHASSIS_LENGTH_SCALE;
+    localPosition.divideScalar(rootScale);
     localCar.wheelPivots[i].position.copy(localPosition);
-    localCar.wheelPivots[i].quaternion.copy(inverseRoot).multiply(worldWheelQuaternion);
+    localCar.wheelPivots[i].quaternion.copy(localWheelQuaternion);
   }
 }
 

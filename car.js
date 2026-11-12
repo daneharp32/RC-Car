@@ -38,6 +38,7 @@ function makeCarVisual(color, playerName = "") {
   const amber = new THREE.MeshStandardMaterial({ color: 0xffbd58, emissive: 0x7d3100, emissiveIntensity: 0.18 });
 
   const damageParts = new Map();
+  const frontSuspensionVisuals = [];
   let totalled = false;
 
   let chassisStyle = "standard";
@@ -138,7 +139,21 @@ function makeCarVisual(color, playerName = "") {
       a.clone().add(b).multiplyScalar(0.5).toArray()
     );
     object.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+    object.userData.segmentRestLength = length;
     return object;
+  }
+
+  function updateCylinderBetween(object, start, end) {
+    const a = new THREE.Vector3(...start);
+    const b = new THREE.Vector3(...end);
+    const direction = b.clone().sub(a);
+    const length = Math.max(0.001, direction.length());
+    object.position.copy(a).add(b).multiplyScalar(0.5);
+    object.quaternion.setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      direction.normalize()
+    );
+    object.scale.y = length / Math.max(0.001, object.userData.segmentRestLength || length);
   }
 
   function addBolt(parent, x, y, z, radius = 0.008, material = alloy) {
@@ -222,6 +237,35 @@ function makeCarVisual(color, playerName = "") {
     return group;
   }
 
+  function makeDynamicFrontShock(id, label, description) {
+    const group = makePart(chassisGroup, id, label, description);
+    addMesh(group, new THREE.CylinderGeometry(0.024, 0.027, 0.43, 16), blueDark);
+    addMesh(group, new THREE.CylinderGeometry(0.008, 0.008, 0.39, 12), alloy, [0, -0.13, 0]);
+    for (let i = 0; i < 8; i++) {
+      const spring = addMesh(group, new THREE.TorusGeometry(0.034, 0.0047, 8, 22), springSilver,
+        [0, -0.235 + i * 0.066, 0]);
+      spring.rotation.x = Math.PI / 2;
+    }
+    for (const y of [-0.20, 0.20]) {
+      const seat = addMesh(group, new THREE.TorusGeometry(0.039, 0.006, 8, 22), alloy, [0, y, 0]);
+      seat.rotation.x = Math.PI / 2;
+    }
+    addMesh(group, new THREE.CylinderGeometry(0.032, 0.032, 0.035, 16), red, [0, -0.12, 0]);
+    addMesh(group, new THREE.SphereGeometry(0.028, 12, 10), carbonEdge, [0, -0.30, 0]);
+    addMesh(group, new THREE.SphereGeometry(0.028, 12, 10), red, [0, 0.30, 0]);
+    return group;
+  }
+  function updateDynamicFrontShock(group, start, end) {
+    const direction = end.clone().sub(start);
+    const length = Math.max(0.001, direction.length());
+    group.position.copy(start).add(end).multiplyScalar(0.5);
+    group.quaternion.setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      direction.normalize()
+    );
+    group.scale.set(1, length / 0.62, 1);
+  }
+
   // Main molded tub / aluminum lower chassis plate. All other components are
   // mounted as individual named groups on top of this part.
   const chassis = makePart(
@@ -300,10 +344,17 @@ function makeCarVisual(color, playerName = "") {
     const innerFront = [s * 0.075, -0.055, z - (isFront ? -0.075 : 0.075)];
     const innerRear = [s * 0.075, -0.055, z + (isFront ? -0.075 : 0.075)];
     const outer = [s * 0.292, -0.038, z];
-    cylinderBetween(arm, innerFront, outer, 0.023, carbonEdge, 12, 0.018);
-    cylinderBetween(arm, innerRear, outer, 0.023, carbonEdge, 12, 0.018);
+    const lowerFrontRod = cylinderBetween(arm, innerFront, outer, 0.023, carbonEdge, 12, 0.018);
+    const lowerRearRod = cylinderBetween(arm, innerRear, outer, 0.023, carbonEdge, 12, 0.018);
     cylinderBetween(arm, innerFront, innerRear, 0.018, blackPlastic, 10);
-    addMesh(arm, new THREE.SphereGeometry(0.025, 12, 10), alloy, outer);
+    const outerJoint = addMesh(arm, new THREE.SphereGeometry(0.025, 12, 10), alloy, outer);
+    if (isFront) {
+      frontSuspensionVisuals.push({
+        side: s, z, innerFront, innerRear,
+        lowerFrontRod, lowerRearRod, outerJoint,
+        carrier: null, upperRod: null
+      });
+    }
 
     const upper = makePart(
       chassisGroup,
@@ -312,10 +363,14 @@ function makeCarVisual(color, playerName = "") {
       "Adjustable upper link controls wheel camber and keeps the upright aligned as the suspension travels.",
       isFront ? null : "standard"
     );
-    cylinderBetween(upper, [s * 0.10, 0.17, z + (isFront ? 0.025 : -0.025)],
+    const upperRodStart = [s * 0.10, 0.17, z + (isFront ? 0.025 : -0.025)];
+    const upperRod = cylinderBetween(upper, upperRodStart,
       [s * 0.29, 0.13, z], 0.011, alloy, 10, 0.009);
-    addMesh(upper, new THREE.SphereGeometry(0.015, 12, 10), red,
-      [s * 0.12, 0.17, z + (isFront ? 0.025 : -0.025)]);
+    addMesh(upper, new THREE.SphereGeometry(0.015, 12, 10), red, upperRodStart);
+    if (isFront) {
+      const visual = frontSuspensionVisuals.find((item) => item.side === s);
+      if (visual) { visual.upperRod = upperRod; visual.upperRodStart = upperRodStart; }
+    }
 
     const carrier = makePart(
       chassisGroup,
@@ -328,6 +383,10 @@ function makeCarVisual(color, playerName = "") {
     cylinderBetween(carrier, [s * 0.25, 0.005, z], [s * 0.35, 0.005, z], 0.031, alloy, 16);
     cylinderBetween(carrier, [s * 0.335, 0.005, z], [s * 0.355, 0.005, z], 0.022, red, 12);
     addBolt(carrier, s * 0.30, 0.075, z, 0.007);
+    if (isFront) {
+      const visual = frontSuspensionVisuals.find((item) => item.side === s);
+      if (visual) visual.carrier = carrier;
+    }
   }
 
   // Front and rear shock towers. Holes and braces make the plates read as
@@ -371,16 +430,17 @@ function makeCarVisual(color, playerName = "") {
     // lower eye stays in the same visual position; physics shocks are separate.
     const top = [s * 0.19, 0.195, z + (z < 0 ? 0.045 : -0.045)];
     const bottom = [s * 0.272, -0.012, z];
-    addShock(
-      chassisGroup,
-      `${corner.label.toLowerCase().replace(" ", "-")}-oil-shock`,
-      `${corner.label} oil-filled shock`,
-      "Aluminum-bodied coil-over damper. The silver spring supports the truck while the oil-filled shock body controls how quickly the suspension compresses and rebounds.",
-      top,
-      bottom,
-      springSilver,
-      corner.z > 0 ? "standard" : null
-    );
+    const shockId = `${corner.label.toLowerCase().replace(" ", "-")}-oil-shock`;
+    const shockDescription = "Aluminum-bodied coil-over damper. The spring supports the truck while the oil-filled shock controls compression and rebound.";
+    if (corner.z < 0) {
+      const visual = frontSuspensionVisuals.find((item) => item.side === s);
+      if (visual) {
+        visual.shock = makeDynamicFrontShock(shockId, `${corner.label} independent coil-over`, shockDescription);
+      }
+    } else {
+      addShock(chassisGroup, shockId, `${corner.label} oil-filled shock`,
+        shockDescription, top, bottom, springSilver, "standard");
+    }
   }
 
   // Steering servo, servo saver, rack and two front steering links.
@@ -744,13 +804,48 @@ function makeCarVisual(color, playerName = "") {
     "One continuous live axle connects both rear hubs. The differential pumpkin, axle tubes and hub ends move together as a single unsprung assembly.",
     "live-axle"
   );
-  cylinderBetween(axleHousing, [-0.395, 0, 0], [0.395, 0, 0], 0.043, darkMetal, 24);
-  roundedBox(axleHousing, [0.245, 0.15, 0.205], carbonEdge, [0, -0.012, 0], null, 0.045);
-  addMesh(axleHousing, new THREE.SphereGeometry(0.112, 22, 16), alloy, [0, 0.018, 0])
-    .scale.set(1.0, 0.82, 1.10);
+  // One continuous axle tube with stepped ends, bearing carriers and a
+  // clearly visible differential pumpkin / rear-facing inspection cover.
+  cylinderBetween(axleHousing, [-0.39, 0, 0], [0.39, 0, 0], 0.034, darkMetal, 24);
   for (const side of [-1, 1]) {
-    cylinderBetween(axleHousing, [side * 0.30, 0, 0], [side * 0.43, 0, 0], 0.060, blackPlastic, 18);
-    cylinderBetween(axleHousing, [side * 0.40, 0, 0], [side * 0.455, 0, 0], 0.035, alloy, 16);
+    cylinderBetween(axleHousing, [side * 0.22, 0, 0], [side * 0.405, 0, 0], 0.050, blackPlastic, 20);
+    cylinderBetween(axleHousing, [side * 0.365, 0, 0], [side * 0.435, 0, 0], 0.061, alloy, 20);
+    cylinderBetween(axleHousing, [side * 0.405, 0, 0], [side * 0.455, 0, 0], 0.042, darkMetal, 18);
+    const hubFlange = addMesh(
+      axleHousing,
+      new THREE.CylinderGeometry(0.073, 0.073, 0.026, 24),
+      alloy,
+      [side * 0.445, 0, 0],
+      [0, 0, Math.PI / 2]
+    );
+    hubFlange.rotation.z = Math.PI / 2;
+    addMesh(axleHousing, new THREE.TorusGeometry(0.060, 0.006, 8, 24), red, [side * 0.462, 0, 0])
+      .rotation.y = Math.PI / 2;
+  }
+  addMesh(axleHousing, new THREE.SphereGeometry(0.122, 24, 18), darkMetal, [0, -0.004, 0])
+    .scale.set(1.0, 0.90, 1.13);
+  roundedBox(axleHousing, [0.215, 0.155, 0.035], carbonEdge, [0, -0.005, 0.112], null, 0.027);
+  addMesh(axleHousing, new THREE.TorusGeometry(0.083, 0.007, 8, 32), alloy, [0, 0.005, 0.135]);
+  addMesh(axleHousing, new THREE.CylinderGeometry(0.074, 0.074, 0.012, 32), darkMetal,
+    [0, 0.005, 0.136], [Math.PI / 2, 0, 0]);
+  for (let bolt = 0; bolt < 10; bolt++) {
+    const angle = bolt * Math.PI * 2 / 10;
+    addMesh(
+      axleHousing,
+      new THREE.CylinderGeometry(0.006, 0.006, 0.012, 8),
+      alloy,
+      [Math.cos(angle) * 0.091, 0.018, 0.137 + Math.sin(angle) * 0.091],
+      [Math.PI / 2, 0, 0]
+    );
+  }
+  const pinionNeck = addMesh(axleHousing, new THREE.CylinderGeometry(0.034, 0.045, 0.11, 16), alloy,
+    [0, -0.005, -0.118], [Math.PI / 2, 0, 0]);
+  pinionNeck.rotation.x = Math.PI / 2;
+  addMesh(axleHousing, new THREE.TorusGeometry(0.035, 0.006, 8, 24), red, [0, -0.005, -0.17])
+    .rotation.x = Math.PI / 2;
+  for (const x of [-0.035, 0.035]) {
+    addMesh(axleHousing, new THREE.CylinderGeometry(0.007, 0.007, 0.018, 8), alloy,
+      [x, -0.005, -0.174], [Math.PI / 2, 0, 0]);
   }
   const rearAxleTray = makePart(
     chassisGroup,
@@ -762,41 +857,133 @@ function makeCarVisual(color, playerName = "") {
   roundedBox(rearAxleTray, [0.37, 0.025, 0.39], carbon, [0, 0.025, -0.245], null, 0.016);
   for (const side of [-1, 1]) {
     roundedBox(rearAxleTray, [0.018, 0.045, 0.39], alloy, [side * 0.18, 0.055, -0.245], null, 0.006);
+    for (const z of [-0.405, -0.085]) {
+      roundedBox(rearAxleTray, [0.045, 0.038, 0.045], darkMetal,
+        [side * 0.145, 0.060, z], null, 0.008);
+      addBolt(rearAxleTray, side * 0.145, 0.086, z, 0.0055);
+    }
+  }
+  // A separate rear ladder-frame module makes the swing-arm pivots, upper
+  // link mounts and shock crossmember visibly tied into the chassis rails.
+  const liveAxleFrame = makePart(
+    chassisGroup,
+    "live-axle-rear-frame",
+    "Rear ladder frame and suspension crossmembers",
+    "Twin reinforced side rails and boxed crossmembers carry the live-axle trailing-arm pivots, upper links and coil-over shock mounts.",
+    "live-axle"
+  );
+  for (const side of [-1, 1]) {
+    roundedBox(liveAxleFrame, [0.052, 0.068, 0.57], carbonEdge,
+      [side * 0.205, 0.010, rearAxleZ - 0.18], null, 0.012);
+    roundedBox(liveAxleFrame, [0.075, 0.038, 0.17], blackPlastic,
+      [side * 0.205, -0.036, rearAxleZ - 0.30], null, 0.010);
+    // Double-shear swing-arm pivot ears.
+    for (const earSide of [-1, 1]) {
+      roundedBox(liveAxleFrame, [0.014, 0.105, 0.095], alloy,
+        [side * 0.22 + earSide * 0.032, -0.005, rearAxleZ - 0.40], null, 0.006);
+      cylinderBetween(liveAxleFrame,
+        [side * 0.22 + earSide * 0.032, -0.005, rearAxleZ - 0.40],
+        [side * 0.22 + earSide * 0.032, -0.005, rearAxleZ - 0.40 + 0.01],
+        0.023, red, 12);
+      addBolt(liveAxleFrame, side * 0.22 + earSide * 0.032, 0.025, rearAxleZ - 0.40, 0.007);
+    }
+    // Upper link brackets and shock tower gussets.
+    roundedBox(liveAxleFrame, [0.065, 0.13, 0.055], darkMetal,
+      [side * 0.18, 0.10, rearAxleZ - 0.24], null, 0.009);
+    cylinderBetween(liveAxleFrame,
+      [side * 0.18, 0.12, rearAxleZ - 0.24],
+      [side * 0.205, 0.16, rearAxleZ - 0.075],
+      0.012, alloy, 10);
+    for (const y of [0.135, 0.175]) {
+      addBolt(liveAxleFrame, side * 0.205, y, rearAxleZ - 0.075, 0.006);
+    }
+  }
+  roundedBox(liveAxleFrame, [0.46, 0.055, 0.065], carbon,
+    [0, 0.015, rearAxleZ - 0.39], null, 0.012);
+  roundedBox(liveAxleFrame, [0.44, 0.048, 0.070], darkMetal,
+    [0, 0.11, rearAxleZ - 0.24], null, 0.012);
+  roundedBox(liveAxleFrame, [0.49, 0.045, 0.060], carbonEdge,
+    [0, 0.19, rearAxleZ - 0.075], null, 0.010);
+  for (const side of [-1, 1]) {
+    cylinderBetween(liveAxleFrame,
+      [side * 0.12, 0.19, rearAxleZ - 0.075],
+      [side * 0.205, 0.25, rearAxleZ - 0.075],
+      0.012, alloy, 10);
   }
 
   function makeLiveAxleSegment(id, label, description, radius, material) {
     const group = makePart(chassisGroup, id, label, description, "live-axle");
-    const mesh = addMesh(group, new THREE.CylinderGeometry(radius, radius, 1, 12), material);
-    return { group, mesh };
+    const mesh = addMesh(group, new THREE.CylinderGeometry(radius, radius, 1, 16), material);
+    const outerRails = [];
+    const crossBraces = [];
+    if (radius > 0.02) {
+      for (const offset of [-0.028, 0.028]) {
+        const rail = addMesh(
+          group,
+          new THREE.CylinderGeometry(0.010, 0.010, 1, 10),
+          carbonEdge,
+          [offset, 0, 0]
+        );
+        outerRails.push(rail);
+      }
+      for (const t of [-0.34, 0.34]) {
+        const brace = addMesh(
+          group,
+          new THREE.CylinderGeometry(0.009, 0.009, 0.065, 10),
+          alloy,
+          [0, t, 0]
+        );
+        brace.rotation.z = Math.PI / 2;
+        brace.scale.y = 1;
+        crossBraces.push(brace);
+      }
+      for (const end of [-0.48, 0.48]) {
+        addMesh(group, new THREE.TorusGeometry(0.025, 0.006, 7, 18), alloy, [0, end, 0])
+          .rotation.x = Math.PI / 2;
+      }
+    } else {
+      addMesh(group, new THREE.SphereGeometry(0.021, 12, 10), red, [0, -0.48, 0]);
+      addMesh(group, new THREE.SphereGeometry(0.021, 12, 10), red, [0, 0.48, 0]);
+    }
+    return { group, mesh, outerRails, crossBraces };
   }
   function updateLiveAxleSegment(segment, start, end) {
     const direction = end.clone().sub(start);
     const length = Math.max(0.001, direction.length());
-    segment.mesh.position.copy(start).add(end).multiplyScalar(0.5);
-    segment.mesh.quaternion.setFromUnitVectors(
+    segment.group.position.copy(start).add(end).multiplyScalar(0.5);
+    segment.group.quaternion.setFromUnitVectors(
       new THREE.Vector3(0, 1, 0),
       direction.normalize()
     );
-    segment.mesh.scale.set(1, length, 1);
+    segment.group.scale.set(1, length, 1);
+    // Cross braces span the arm width; only the longitudinal rails use
+    // the animated length scale.
   }
   function makeLiveAxleShock(id, label, side) {
     const group = makePart(
       chassisGroup,
       id,
       label,
-      "Long-travel oil-filled coil-over supports the live axle. Its body, shaft and spring visibly follow axle articulation.",
+      "Long-travel oil-filled coil-over supports the live axle. Its body, shaft, spring seats and preload collar visibly follow axle articulation.",
       "live-axle"
     );
-    addMesh(group, new THREE.CylinderGeometry(0.023, 0.026, 0.62, 14), blueDark);
-    addMesh(group, new THREE.CylinderGeometry(0.008, 0.008, 0.53, 10), alloy)
+    addMesh(group, new THREE.CylinderGeometry(0.023, 0.026, 0.62, 16), blueDark);
+    addMesh(group, new THREE.CylinderGeometry(0.008, 0.008, 0.53, 12), alloy)
       .position.x = side * 0.003;
-    for (let i = 0; i < 7; i++) {
-      const spring = addMesh(group, new THREE.TorusGeometry(0.033, 0.0045, 7, 20), springSilver);
+    for (let i = 0; i < 8; i++) {
+      const spring = addMesh(group, new THREE.TorusGeometry(0.034, 0.0048, 8, 24), springSilver);
       spring.rotation.x = Math.PI / 2;
-      spring.position.y = -0.23 + i * 0.075;
+      spring.position.y = -0.245 + i * 0.070;
     }
-    addMesh(group, new THREE.SphereGeometry(0.029, 12, 10), carbonEdge, [0, -0.30, 0]);
-    addMesh(group, new THREE.SphereGeometry(0.029, 12, 10), red, [0, 0.30, 0]);
+    for (const y of [-0.205, 0.205]) {
+      const seat = addMesh(group, new THREE.TorusGeometry(0.039, 0.006, 8, 24), alloy, [0, y, 0]);
+      seat.rotation.x = Math.PI / 2;
+    }
+    const adjuster = addMesh(group, new THREE.CylinderGeometry(0.032, 0.032, 0.035, 16), red, [0, -0.15, 0]);
+    adjuster.rotation.x = Math.PI / 2;
+    addMesh(group, new THREE.SphereGeometry(0.030, 14, 12), carbonEdge, [0, -0.31, 0]);
+    addMesh(group, new THREE.SphereGeometry(0.030, 14, 12), red, [0, 0.31, 0]);
+    addMesh(group, new THREE.CylinderGeometry(0.013, 0.013, 0.045, 12), alloy, [0, 0.31, 0]);
     return group;
   }
   function updateLiveAxleShock(group, start, end) {
@@ -814,29 +1001,72 @@ function makeCarVisual(color, playerName = "") {
       chassisGroup,
       id,
       side < 0 ? "Left rear limit strap" : "Right rear limit strap",
-      "A reinforced droop strap remains slack through normal compression, then becomes taut at maximum axle drop to limit suspension extension.",
+      "A reinforced droop strap stays loose during compression and tightens at maximum axle extension to protect the suspension links and shocks.",
       "live-axle"
     );
-    addMesh(group, new THREE.BoxGeometry(0.036, 1, 0.012), blackPlastic);
-    for (const x of [-0.011, 0.011]) {
-      addMesh(group, new THREE.BoxGeometry(0.0035, 0.94, 0.014), redBright, [x, 0, 0]);
+    const segments = [];
+    for (let i = 0; i < 6; i++) {
+      const piece = new THREE.Group();
+      const webbing = addMesh(piece, new THREE.BoxGeometry(0.032, 1, 0.010), blackPlastic);
+      const stitchLeft = addMesh(piece, new THREE.BoxGeometry(0.0028, 0.96, 0.012), redBright, [-0.0105, 0, 0]);
+      const stitchRight = addMesh(piece, new THREE.BoxGeometry(0.0028, 0.96, 0.012), redBright, [0.0105, 0, 0]);
+      group.add(piece);
+      segments.push(piece);
     }
-    for (const y of [-0.46, 0.46]) {
-      addMesh(group, new THREE.TorusGeometry(0.018, 0.004, 6, 14), alloy, [0, y, 0]);
-    }
-    return group;
+    const eyelets = [-1, 1].map(() => {
+      const eye = addMesh(group, new THREE.TorusGeometry(0.018, 0.0045, 8, 16), alloy);
+      eye.rotation.y = Math.PI / 2;
+      return eye;
+    });
+    return { group, segments, eyelets };
   }
-  function updateLimitStrap(group, start, end) {
-    const direction = end.clone().sub(start);
-    const length = Math.max(0.001, direction.length());
-    group.position.copy(start).add(end).multiplyScalar(0.5);
-    group.quaternion.setFromUnitVectors(
-      new THREE.Vector3(0, 1, 0),
-      direction.normalize()
-    );
-    group.scale.set(1, length, 1);
+  function updateLimitStrap(strap, start, end, maxLength) {
+    const delta = end.clone().sub(start);
+    const distance = Math.max(0.001, delta.length());
+    const direction = delta.clone().normalize();
+    const slack = Math.max(0, maxLength - distance);
+    const sag = Math.min(0.12, Math.sqrt(Math.max(0, maxLength * maxLength - distance * distance)) * 0.30);
+    const sagDirection = new THREE.Vector3(0, 0, 1);
+    sagDirection.addScaledVector(direction, -sagDirection.dot(direction));
+    if (sagDirection.lengthSq() < 1e-5) sagDirection.set(1, 0, 0);
+    sagDirection.normalize();
+    const curvePoint = (t) => start.clone()
+      .lerp(end, t)
+      .addScaledVector(sagDirection, 4 * t * (1 - t) * sag);
+    for (let i = 0; i < strap.segments.length; i++) {
+      const a = curvePoint(i / strap.segments.length);
+      const b = curvePoint((i + 1) / strap.segments.length);
+      const segmentDirection = b.clone().sub(a);
+      const length = Math.max(0.001, segmentDirection.length());
+      const piece = strap.segments[i];
+      piece.position.copy(a).add(b).multiplyScalar(0.5);
+      piece.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), segmentDirection.normalize());
+      piece.scale.set(1, length, 1);
+    }
+    strap.eyelets[0].position.copy(start);
+    strap.eyelets[1].position.copy(end);
+    strap.group.userData.isTaut = slack < 0.012;
   }
 
+  const liveAxleDriveshaft = makeLiveAxleSegment(
+    "live-axle-driveshaft",
+    "Rear differential driveshaft",
+    "The longitudinal prop shaft drives the live axle through a sliding coupling and articulated rear universal joint.",
+    0.014,
+    alloy
+  );
+  const driveshaftCoupler = addMesh(
+    liveAxleDriveshaft.group,
+    new THREE.CylinderGeometry(0.022, 0.022, 0.075, 16),
+    darkMetal,
+    [0, 0.12, 0]
+  );
+  const driveshaftJoint = addMesh(
+    liveAxleDriveshaft.group,
+    new THREE.SphereGeometry(0.028, 14, 12),
+    red,
+    [0, 0.48, 0]
+  );
   const liveAxleLinks = [];
   const liveAxleShocks = [];
   const liveAxleStraps = [];
@@ -870,8 +1100,39 @@ function makeCarVisual(color, playerName = "") {
     });
     liveAxleStraps.push({
       side,
-      group: makeLimitStrap(`rear-${sideName}-limit-strap`, side)
+      ...makeLimitStrap(`rear-${sideName}-limit-strap`, side)
     });
+  }
+
+  function setFrontSuspensionPose(index, position, quaternion = null) {
+    const side = index === 0 ? -1 : index === 1 ? 1 : 0;
+    if (!side || !position) return;
+    const visual = frontSuspensionVisuals.find((item) => item.side === side);
+    if (!visual) return;
+    const wheel = new THREE.Vector3(position.x, position.y, position.z);
+    const lowerOuter = wheel.clone();
+    lowerOuter.x = side * 0.292;
+    updateCylinderBetween(visual.lowerFrontRod, visual.innerFront, lowerOuter.toArray());
+    updateCylinderBetween(visual.lowerRearRod, visual.innerRear, lowerOuter.toArray());
+    visual.outerJoint.position.copy(lowerOuter);
+    const upperOuter = lowerOuter.clone();
+    upperOuter.y += 0.105;
+    updateCylinderBetween(visual.upperRod, visual.upperRodStart, upperOuter.toArray());
+    if (visual.carrier) {
+      visual.carrier.position.set(
+        wheel.x - side * 0.295,
+        wheel.y - 0.005,
+        wheel.z - visual.z
+      );
+      if (quaternion) visual.carrier.quaternion.copy(quaternion);
+    }
+    if (visual.shock) {
+      updateDynamicFrontShock(
+        visual.shock,
+        new THREE.Vector3(side * 0.19, 0.195, visual.z + 0.045),
+        new THREE.Vector3(side * 0.272, wheel.y + 0.03, wheel.z)
+      );
+    }
   }
 
   function setChassisStyle(style) {
@@ -884,10 +1145,13 @@ function makeCarVisual(color, playerName = "") {
     }
     liveAxleAssembly.visible = chassisStyle === "live-axle";
 
-    // Shift the heavy electrical modules forward for the desert axle layout.
-    const forwardOffset = chassisStyle === "live-axle" ? -0.19 : 0;
+    // Move the complete electrical package forward together so the relative
+    // battery / motor / ESC / receiver clearances remain unchanged. The new
+    // electronics tray is centered under this relocated package.
+    const basePosition = (part) => part.userData.baseChassisPosition || new THREE.Vector3();
     for (const part of [battery, motor, gearing, esc, receiver, powerWiring, signalWiring]) {
-      part.position.z = (part.userData.baseChassisZ || 0) + forwardOffset;
+      part.position.copy(basePosition(part));
+      if (chassisStyle === "live-axle") part.position.z -= 0.24;
     }
     return chassisStyle;
   }
@@ -903,20 +1167,22 @@ function makeCarVisual(color, playerName = "") {
     const quaternion = new THREE.Quaternion(...state.quaternion).normalize();
     const rootScale = root.scale.x || 1;
     const visualScale = scale / rootScale;
+    const visualScaleZ = visualScale / chassisLengthScale;
     const visualPosition = position.clone().divideScalar(rootScale);
+    visualPosition.z /= chassisLengthScale;
     liveAxleAssembly.position.copy(visualPosition);
     liveAxleAssembly.quaternion.copy(quaternion);
 
     const axlePoint = (x, y, z) => new THREE.Vector3(
-      x * visualScale, y * visualScale, z * visualScale
+      x * visualScale, y * visualScale, z * visualScaleZ
     ).applyQuaternion(quaternion).add(visualPosition);
     for (const link of liveAxleLinks) {
       const side = link.side, isTrailing = link.kind === "trailing";
       const record = damageParts.get(link.segment.group.userData.damagePartId);
       if (record?.detached) continue;
       const chassisAnchor = isTrailing
-        ? new THREE.Vector3(side * 0.22 * visualScale, -0.045 * visualScale, (rearAxleZ - 0.40) * visualScale)
-        : new THREE.Vector3(side * 0.18 * visualScale, 0.12 * visualScale, (rearAxleZ - 0.24) * visualScale);
+        ? new THREE.Vector3(side * 0.22 * visualScale, -0.045 * visualScale, (rearAxleZ - 0.40) * visualScaleZ)
+        : new THREE.Vector3(side * 0.18 * visualScale, 0.12 * visualScale, (rearAxleZ - 0.24) * visualScaleZ);
       const axleAnchor = isTrailing
         ? axlePoint(side * 0.24, 0, 0)
         : axlePoint(-side * 0.13, 0.055, 0);
@@ -927,17 +1193,34 @@ function makeCarVisual(color, playerName = "") {
       if (damageParts.get(shock.group.userData.damagePartId)?.detached) continue;
       updateLiveAxleShock(
         shock.group,
-        new THREE.Vector3(side * 0.205 * visualScale, 0.16 * visualScale, (rearAxleZ - 0.075) * visualScale),
+        new THREE.Vector3(side * 0.205 * visualScale, 0.16 * visualScale, (rearAxleZ - 0.075) * visualScaleZ),
         axlePoint(side * 0.215, 0.065, 0)
       );
     }
-    for (const strap of liveAxleStraps) {
+    if (!damageParts.get(liveAxleDriveshaft.group.userData.damagePartId)?.detached) {
+      updateLiveAxleSegment(
+        liveAxleDriveshaft,
+        new THREE.Vector3(0, 0.09 * visualScale, (rearAxleZ - 0.30) * visualScaleZ),
+        axlePoint(0, -0.005, -0.17)
+      );
+      driveshaftCoupler.position.y = 0.18;
+      driveshaftJoint.position.copy(axlePoint(0, -0.005, -0.17))
+        .sub(liveAxleDriveshaft.group.position)
+        .applyQuaternion(liveAxleDriveshaft.group.quaternion.clone().invert())
+        .divide(new THREE.Vector3(1, Math.max(0.001, liveAxleDriveshaft.group.scale.y), 1));
+    }
+    for (let strapIndex = 0; strapIndex < liveAxleStraps.length; strapIndex++) {
+      const strap = liveAxleStraps[strapIndex];
       const side = strap.side;
       if (damageParts.get(strap.group.userData.damagePartId)?.detached) continue;
+      const strapMaxLength = Array.isArray(state.limitStrapLengths)
+        ? (state.limitStrapLengths[strapIndex] || 0) / rootScale
+        : 0.31 * visualScale;
       updateLimitStrap(
-        strap.group,
-        new THREE.Vector3(side * 0.235 * visualScale, 0.205 * visualScale, (rearAxleZ - 0.085) * visualScale),
-        axlePoint(side * 0.235, 0.12, 0)
+        strap,
+        new THREE.Vector3(side * 0.235 * visualScale, 0.205 * visualScale, (rearAxleZ - 0.085) * visualScaleZ),
+        axlePoint(side * 0.235, 0.12, 0),
+        strapMaxLength
       );
     }
 
@@ -1031,10 +1314,10 @@ function makeCarVisual(color, playerName = "") {
     }
   });
   setShellStyle(shellModel ? "prerunner" : "ranger");
-  setChassisStyle("standard");
   for (const part of [battery, motor, gearing, esc, receiver, powerWiring, signalWiring]) {
-    part.userData.baseChassisZ = part.position.z;
+    part.userData.baseChassisPosition = part.position.clone();
   }
+  setChassisStyle("standard");
 
   // Store the original hierarchy and transforms so every damaged component
   // can be restored by the existing vehicle reset command.
@@ -1682,6 +1965,7 @@ function makeCarVisual(color, playerName = "") {
     setShellStyle,
     setChassisStyle,
     get chassisStyle() { return chassisStyle; },
+    setFrontSuspensionPose,
     setRearAxlePose,
     get shellStyle() { return shellStyle; },
     setPlayerName,
