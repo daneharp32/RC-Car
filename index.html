@@ -270,6 +270,16 @@
     .sandbox-secret-setting strong { color:#77caff; font-variant-numeric:tabular-nums; }
     .sandbox-secret-setting input[type=range] { width:100%; height:20px; margin:0; padding:0; border:0; border-radius:0; background:transparent; accent-color:#269fff; cursor:pointer; }
     .sandbox-secret-divider { height:1px; margin:16px 0; background:rgba(255,255,255,.12); }
+    .sandbox-secret-damage { display:grid; gap:8px; }
+    .sandbox-secret-damage strong { color:#b9e8ff; font:900 11px "Orbitron",sans-serif; letter-spacing:.06em; }
+    .sandbox-secret-damage small { color:#9fb4c6; font-size:9px; line-height:1.5; }
+    .sandbox-secret-damage label { color:#c8d8e6; font-size:9px; font-weight:800; letter-spacing:.08em; }
+    .sandbox-secret-damage select { width:100%; min-height:38px; padding:0 9px; border:1px solid rgba(155,205,255,.25); border-radius:8px; background:#10243a; color:#eef7ff; font:700 10px ui-sans-serif,sans-serif; }
+    .sandbox-secret-damage-actions { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+    .sandbox-secret-damage-actions button { min-height:38px; padding:7px 8px; border:1px solid rgba(91,191,255,.3); border-radius:8px; background:rgba(20,112,191,.22); color:#e4f6ff; font:900 8px "Orbitron",sans-serif; letter-spacing:.04em; }
+    #secretRepairAllButton { grid-column:1 / -1; border-color:rgba(123,224,165,.28); background:rgba(43,135,89,.18); }
+    .sandbox-secret-damage-actions button:disabled { opacity:.35; cursor:not-allowed; }
+    #secretDamagePartStatus { min-height:26px; padding:7px 9px; border:1px solid rgba(255,255,255,.1); border-radius:7px; background:rgba(255,255,255,.035); color:#a9d7ff; font-size:8px; font-weight:800; letter-spacing:.04em; line-height:1.4; overflow-wrap:anywhere; }
     .sandbox-secret-orbital { display:grid; gap:8px; }
     .sandbox-secret-orbital strong { color:#b9e8ff; font:900 11px "Orbitron",sans-serif; letter-spacing:.06em; }
     .sandbox-secret-orbital small { color:#9fb4c6; font-size:9px; line-height:1.5; }
@@ -704,7 +714,7 @@
         <h2 class="sandbox-secret-title">SANDBOX SECRET MENU</h2>
         <button id="secretMenuClose" class="sandbox-secret-close" type="button" aria-label="Close secret menu">×</button>
       </div>
-      <p class="sandbox-secret-copy">Sandbox-only live settings. Press D + H again to close. Controls pause while this panel is open.</p>
+      <p class="sandbox-secret-copy">Sandbox-only live settings. Press D + F again to close. Controls pause while this panel is open.</p>
       <div id="sandboxSecretStatus" class="sandbox-secret-status">STANDARD LIMIT: 3 GADGETS</div>
       <label class="sandbox-secret-toggle">
         <input id="secretNoCooldown" type="checkbox">
@@ -736,6 +746,19 @@
           <input id="secretForwardThrusterPower" type="range" min="12" max="130" step="1" value="48">
         </div>
       </div>
+      <div class="sandbox-secret-divider"></div>
+      <section class="sandbox-secret-damage" aria-label="Vehicle component damage tester">
+        <strong>COMPONENT DAMAGE TESTER</strong>
+        <small>Select a part to reduce its durability or disconnect it immediately. Detached parts become physics debris. Use Repair All to restore the vehicle.</small>
+        <label for="secretDamagePart">SELECT COMPONENT</label>
+        <select id="secretDamagePart" aria-label="Vehicle component to test"></select>
+        <div class="sandbox-secret-damage-actions">
+          <button id="secretDamagePartButton" type="button">APPLY DAMAGE · 45%</button>
+          <button id="secretDetachPartButton" type="button">DETACH NOW</button>
+          <button id="secretRepairAllButton" type="button">REPAIR ALL PARTS</button>
+        </div>
+        <div id="secretDamagePartStatus" aria-live="polite">SELECT A COMPONENT</div>
+      </section>
       <div class="sandbox-secret-divider"></div>
       <div class="sandbox-secret-orbital">
         <strong>CLASSIFIED GADGET · ORBITAL LASER</strong>
