@@ -2,6 +2,7 @@ import { selfId } from "https://esm.sh/trystero@0.26.0";
 
 const DEFAULT_COLLISION_GROUP = 1;
 const JUMP_COLLISION_GROUP = 2;
+const LIVE_AXLE_COLLISION_GROUP = 4;
 
 // Tire grip tuned for a planted short-course truck on packed dirt.
 // A small rear bias allows the back to rotate under hard cornering, but
@@ -124,7 +125,7 @@ const chassisBody = new CANNON.Body({
   collisionFilterGroup: DEFAULT_COLLISION_GROUP,
   // Chassis and shell must not snag on jump faces. Wheel rays still query the
   // jump group, so suspension contact can launch the truck naturally.
-  collisionFilterMask: ~JUMP_COLLISION_GROUP
+  collisionFilterMask: ~(JUMP_COLLISION_GROUP | LIVE_AXLE_COLLISION_GROUP)
 });
 chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), spawnYaw);
 chassisBody.addShape(new CANNON.Box(new CANNON.Vec3(0.30, 0.08, shellFit ? 0.53 : 0.43)));
@@ -333,6 +334,73 @@ function removeLiveAxleDynamics() {
   world.broadphase.dirty = true;
 }
 
+function makeTrailingArm(chassisAnchor, axleAnchor, linkWidth, maxForce, side) {
+  const chassisWorld = pointToWorld(chassisBody, chassisAnchor);
+  const axleWorld = pointToWorld(rearAxleBody, axleAnchor);
+  const rawDirection = difference(axleWorld, chassisWorld);
+  const length = Math.max(0.05, Math.hypot(rawDirection.x, rawDirection.y, rawDirection.z));
+  const direction = scaled(rawDirection, 1 / length);
+  const link = new CANNON.Body({
+    mass: 0.12 * Math.pow(vehicleScale, 3),
+    material: chassisMaterial,
+    linearDamping: 0.06,
+    angularDamping: 0.16,
+    collisionFilterGroup: 0,
+    collisionFilterMask: 0,
+    allowSleep: false
+  });
+  link.addShape(new CANNON.Box(new CANNON.Vec3(linkWidth, length * 0.5, linkWidth)));
+  link.position.set(
+    (chassisWorld.x + axleWorld.x) * 0.5,
+    (chassisWorld.y + axleWorld.y) * 0.5,
+    (chassisWorld.z + axleWorld.z) * 0.5
+  );
+  link.quaternion.setFromVectors(new CANNON.Vec3(0, 1, 0), direction);
+  world.addBody(link);
+
+  // The chassis-side joint is a true transverse hinge. This makes each
+  // trailing arm swing through suspension travel instead of letting its
+  // chassis pivot wander in every direction like a loose ball joint.
+  const hingeAxisWorld = chassisBody.quaternion.vmult(
+    new CANNON.Vec3(1, 0, 0),
+    new CANNON.Vec3()
+  );
+  const inverseLinkQuaternion = new CANNON.Quaternion(
+    -link.quaternion.x,
+    -link.quaternion.y,
+    -link.quaternion.z,
+    link.quaternion.w
+  );
+  const hingeAxisLink = inverseLinkQuaternion.vmult(
+    hingeAxisWorld,
+    new CANNON.Vec3()
+  );
+  const chassisPivot = new CANNON.HingeConstraint(chassisBody, link, {
+    pivotA: chassisAnchor,
+    pivotB: new CANNON.Vec3(0, -length * 0.5, 0),
+    axisA: new CANNON.Vec3(1, 0, 0),
+    axisB: hingeAxisLink,
+    maxForce
+  });
+  const axleJoint = new CANNON.PointToPointConstraint(
+    link,
+    new CANNON.Vec3(0, length * 0.5, 0),
+    rearAxleBody,
+    axleAnchor,
+    maxForce
+  );
+  world.addConstraint(chassisPivot);
+  world.addConstraint(axleJoint);
+  liveAxleLinkBodies.push(link);
+  liveAxleConstraints.push(chassisPivot, axleJoint);
+  return {
+    side,
+    kind: "trailingArm",
+    constraints: [chassisPivot, axleJoint],
+    maxForce
+  };
+}
+
 function makeAxleLink(chassisAnchor, axleAnchor, linkWidth, maxForce, side, kind) {
   const chassisWorld = pointToWorld(chassisBody, chassisAnchor);
   const axleWorld = pointToWorld(rearAxleBody, axleAnchor);
@@ -452,8 +520,8 @@ function createLiveAxleDynamics() {
     material: chassisMaterial,
     linearDamping: 0.10,
     angularDamping: 0.92,
-    collisionFilterGroup: 0,
-    collisionFilterMask: 0,
+    collisionFilterGroup: LIVE_AXLE_COLLISION_GROUP,
+    collisionFilterMask: -1,
     allowSleep: false
   });
   rearAxleBody.addShape(new CANNON.Box(new CANNON.Vec3(0.405 * scale, 0.043 * scale, 0.046 * scale)));
@@ -474,13 +542,12 @@ function createLiveAxleDynamics() {
     { trailingArm: 1, upperLink: 1, shock: 1, strap: 1 }
   ];
   for (const side of [-1, 1]) {
-    liveAxleLinkComponents.push(makeAxleLink(
+    liveAxleLinkComponents.push(makeTrailingArm(
       new CANNON.Vec3(side * 0.22 * scale, -0.045 * scale, rearZ - 0.40 * scale),
       new CANNON.Vec3(side * 0.24 * scale, 0, 0),
       0.019 * scale,
       2600 * Math.pow(scale, 3),
-      side,
-      "trailingArm"
+      side
     ));
     liveAxleLinkComponents.push(makeAxleLink(
       new CANNON.Vec3(side * 0.18 * scale, 0.12 * scale, rearZ - 0.24 * scale),
@@ -675,6 +742,13 @@ function solveLiveRearAxle() {
       hubWorld.z - hitPoint.z
     );
     const tireRadius = 0.158 * scale;
+    // RaycastVehicle reports the ground as soon as its long sensor ray sees
+    // it. That is not the same as tire contact: ignore the early sensor hit
+    // until the tire itself is within a small contact tolerance.
+    if (distance > tireRadius + 0.012 * scale) {
+      wheel.deltaRotation = 0;
+      continue;
+    }
     const penetration = Math.max(0, tireRadius - distance);
     const groundVelocity = result.body?.getVelocityAtWorldPoint
       ? result.body.getVelocityAtWorldPoint(hitPoint, new CANNON.Vec3())
@@ -686,14 +760,10 @@ function solveLiveRearAxle() {
     // penetration, so penetration-only contact would provide no static load.
     // Carry the axle weight plus a rear share of sprung chassis weight, then
     // add compression and velocity response for bumps and landings.
-    const rearContactCount = Math.max(
-      1,
-      vehicle.wheelInfos.slice(2, 4).filter((rearWheel) => rearWheel.isInContact).length
-    );
     const rearStaticLoad = (
       rearAxleBody.mass * 9.82 +
       chassisBody.mass * 9.82 * 0.42
-    ) / rearContactCount;
+    ) * 0.5;
     const normalForce = clamp(
       rearStaticLoad +
         penetration * 2100 * scale * scale -
