@@ -2,6 +2,7 @@ import { selfId } from "https://esm.sh/trystero@0.26.0";
 
 const DEFAULT_COLLISION_GROUP = 1;
 const JUMP_COLLISION_GROUP = 2;
+const LIVE_AXLE_COLLISION_GROUP = 4;
 
 // Tire grip tuned for a planted short-course truck on packed dirt.
 // A small rear bias allows the back to rotate under hard cornering, but
@@ -124,7 +125,7 @@ const chassisBody = new CANNON.Body({
   collisionFilterGroup: DEFAULT_COLLISION_GROUP,
   // Chassis and shell must not snag on jump faces. Wheel rays still query the
   // jump group, so suspension contact can launch the truck naturally.
-  collisionFilterMask: ~JUMP_COLLISION_GROUP
+  collisionFilterMask: ~(JUMP_COLLISION_GROUP | LIVE_AXLE_COLLISION_GROUP)
 });
 chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), spawnYaw);
 chassisBody.addShape(new CANNON.Box(new CANNON.Vec3(0.30, 0.08, shellFit ? 0.53 : 0.43)));
@@ -452,8 +453,8 @@ function createLiveAxleDynamics() {
     material: chassisMaterial,
     linearDamping: 0.10,
     angularDamping: 0.92,
-    collisionFilterGroup: 0,
-    collisionFilterMask: 0,
+    collisionFilterGroup: LIVE_AXLE_COLLISION_GROUP,
+    collisionFilterMask: -1,
     allowSleep: false
   });
   rearAxleBody.addShape(new CANNON.Box(new CANNON.Vec3(0.405 * scale, 0.043 * scale, 0.046 * scale)));
@@ -474,13 +475,12 @@ function createLiveAxleDynamics() {
     { trailingArm: 1, upperLink: 1, shock: 1, strap: 1 }
   ];
   for (const side of [-1, 1]) {
-    liveAxleLinkComponents.push(makeAxleLink(
+    liveAxleLinkComponents.push(makeTrailingArm(
       new CANNON.Vec3(side * 0.22 * scale, -0.045 * scale, rearZ - 0.40 * scale),
       new CANNON.Vec3(side * 0.24 * scale, 0, 0),
       0.019 * scale,
       2600 * Math.pow(scale, 3),
-      side,
-      "trailingArm"
+      side
     ));
     liveAxleLinkComponents.push(makeAxleLink(
       new CANNON.Vec3(side * 0.18 * scale, 0.12 * scale, rearZ - 0.24 * scale),
