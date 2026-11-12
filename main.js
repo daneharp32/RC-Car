@@ -1535,9 +1535,10 @@ function animate(now) {
     const hoodPosition = followedRoot.localToWorld(
       new THREE.Vector3(0, 0.345, -0.34)
     );
+    const cameraCarScale = Math.max(1, followedRoot.scale.x || 1);
     const hoodTarget = hoodPosition.clone()
-      .addScaledVector(fullCarForward, 8.0)
-      .add(new THREE.Vector3(0, 0.08, 0));
+      .addScaledVector(fullCarForward, 8.0 * cameraCarScale)
+      .add(new THREE.Vector3(0, 0.08 * cameraCarScale, 0));
     camera.position.copy(hoodPosition);
     if (camera.fov !== 66) {
       camera.fov = 66;
@@ -1551,9 +1552,10 @@ function animate(now) {
     const interiorPosition = followedRoot.localToWorld(
       new THREE.Vector3(0, 0.355, 0.025)
     );
+    const cameraCarScale = Math.max(1, followedRoot.scale.x || 1);
     const interiorTarget = interiorPosition.clone()
-      .addScaledVector(fullCarForward, 13.0)
-      .add(new THREE.Vector3(0, 0.045, 0));
+      .addScaledVector(fullCarForward, 13.0 * cameraCarScale)
+      .add(new THREE.Vector3(0, 0.045 * cameraCarScale, 0));
     camera.position.copy(interiorPosition);
     if (camera.fov !== 74) {
       camera.fov = 74;
@@ -1569,14 +1571,15 @@ function animate(now) {
     if (carForward.lengthSq() < 0.0001) carForward.set(0, 0, -1);
     carForward.normalize();
     const cameraDirection = carForward.clone().applyAxisAngle(worldUp, controls.cameraOrbitYaw);
+    const cameraCarScale = Math.max(1, followedRoot.scale.x || 1);
     const desiredCamera = followedRoot.position.clone()
-      .addScaledVector(cameraDirection, -5.8)
-      .add(new THREE.Vector3(0, 2.8, 0));
+      .addScaledVector(cameraDirection, -5.8 * cameraCarScale)
+      .add(new THREE.Vector3(0, 2.8 * cameraCarScale, 0));
     camera.position.lerp(desiredCamera, 1 - Math.exp(-2.8 * delta));
     easeCameraFov(58, delta, 4.0);
     const lookTarget = followedRoot.position.clone()
-      .add(new THREE.Vector3(0, 0.28, 0))
-      .addScaledVector(carForward, 0.85);
+      .add(new THREE.Vector3(0, 0.28 * cameraCarScale, 0))
+      .addScaledVector(carForward, 0.85 * cameraCarScale);
     camera.up.copy(worldUp);
     camera.lookAt(lookTarget);
   }
