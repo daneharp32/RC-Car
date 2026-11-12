@@ -744,13 +744,49 @@ function makeCarVisual(color, playerName = "") {
     "One continuous live axle connects both rear hubs. The differential pumpkin, axle tubes and hub ends move together as a single unsprung assembly.",
     "live-axle"
   );
-  cylinderBetween(axleHousing, [-0.395, 0, 0], [0.395, 0, 0], 0.043, darkMetal, 24);
-  roundedBox(axleHousing, [0.245, 0.15, 0.205], carbonEdge, [0, -0.012, 0], null, 0.045);
-  addMesh(axleHousing, new THREE.SphereGeometry(0.112, 22, 16), alloy, [0, 0.018, 0])
-    .scale.set(1.0, 0.82, 1.10);
+  // One continuous axle tube with stepped ends, bearing carriers and a
+  // clearly visible differential pumpkin / rear-facing inspection cover.
+  cylinderBetween(axleHousing, [-0.39, 0, 0], [0.39, 0, 0], 0.034, darkMetal, 24);
   for (const side of [-1, 1]) {
-    cylinderBetween(axleHousing, [side * 0.30, 0, 0], [side * 0.43, 0, 0], 0.060, blackPlastic, 18);
-    cylinderBetween(axleHousing, [side * 0.40, 0, 0], [side * 0.455, 0, 0], 0.035, alloy, 16);
+    cylinderBetween(axleHousing, [side * 0.22, 0, 0], [side * 0.405, 0, 0], 0.050, blackPlastic, 20);
+    cylinderBetween(axleHousing, [side * 0.365, 0, 0], [side * 0.435, 0, 0], 0.061, alloy, 20);
+    cylinderBetween(axleHousing, [side * 0.405, 0, 0], [side * 0.455, 0, 0], 0.042, darkMetal, 18);
+    const hubFlange = addMesh(
+      axleHousing,
+      new THREE.CylinderGeometry(0.073, 0.073, 0.026, 24),
+      alloy,
+      [side * 0.445, 0, 0],
+      [0, 0, Math.PI / 2]
+    );
+    hubFlange.rotation.z = Math.PI / 2;
+    addMesh(axleHousing, new THREE.TorusGeometry(0.060, 0.006, 8, 24), red, [side * 0.462, 0, 0])
+      .rotation.y = Math.PI / 2;
+  }
+  addMesh(axleHousing, new THREE.SphereGeometry(0.122, 24, 18), darkMetal, [0, -0.004, 0])
+    .scale.set(1.0, 0.90, 1.13);
+  roundedBox(axleHousing, [0.215, 0.155, 0.035], carbonEdge, [0, -0.005, 0.112], null, 0.027);
+  addMesh(axleHousing, new THREE.TorusGeometry(0.083, 0.007, 8, 32), alloy, [0, 0.005, 0.135])
+    .rotation.x = Math.PI / 2;
+  addMesh(axleHousing, new THREE.CylinderGeometry(0.074, 0.074, 0.012, 32), darkMetal,
+    [0, 0.005, 0.136], [Math.PI / 2, 0, 0]);
+  for (let bolt = 0; bolt < 10; bolt++) {
+    const angle = bolt * Math.PI * 2 / 10;
+    addMesh(
+      axleHousing,
+      new THREE.CylinderGeometry(0.006, 0.006, 0.012, 8),
+      alloy,
+      [Math.cos(angle) * 0.091, 0.018, 0.137 + Math.sin(angle) * 0.091],
+      [Math.PI / 2, 0, 0]
+    );
+  }
+  const pinionNeck = addMesh(axleHousing, new THREE.CylinderGeometry(0.034, 0.045, 0.11, 16), alloy,
+    [0, -0.005, -0.118]);
+  pinionNeck.rotation.x = Math.PI / 2;
+  addMesh(axleHousing, new THREE.TorusGeometry(0.035, 0.006, 8, 24), red, [0, -0.005, -0.17])
+    .rotation.x = Math.PI / 2;
+  for (const x of [-0.035, 0.035]) {
+    addMesh(axleHousing, new THREE.CylinderGeometry(0.007, 0.007, 0.018, 8), alloy,
+      [x, -0.005, -0.174], [Math.PI / 2, 0, 0]);
   }
   const rearAxleTray = makePart(
     chassisGroup,
@@ -764,20 +800,103 @@ function makeCarVisual(color, playerName = "") {
     roundedBox(rearAxleTray, [0.018, 0.045, 0.39], alloy, [side * 0.18, 0.055, -0.245], null, 0.006);
   }
 
+
+  // A separate rear ladder-frame module makes the swing-arm pivots, upper
+  // link mounts and shock crossmember visibly tied into the chassis rails.
+  const liveAxleFrame = makePart(
+    chassisGroup,
+    "live-axle-rear-frame",
+    "Rear ladder frame and suspension crossmembers",
+    "Twin reinforced side rails and boxed crossmembers carry the live-axle trailing-arm pivots, upper links and coil-over shock mounts.",
+    "live-axle"
+  );
+  for (const side of [-1, 1]) {
+    roundedBox(liveAxleFrame, [0.052, 0.068, 0.57], carbonEdge,
+      [side * 0.205, 0.010, rearAxleZ - 0.18], null, 0.012);
+    roundedBox(liveAxleFrame, [0.075, 0.038, 0.17], blackPlastic,
+      [side * 0.205, -0.036, rearAxleZ - 0.30], null, 0.010);
+    // Double-shear swing-arm pivot ears.
+    for (const earSide of [-1, 1]) {
+      roundedBox(liveAxleFrame, [0.014, 0.105, 0.095], alloy,
+        [side * 0.22 + earSide * 0.032, -0.005, rearAxleZ - 0.40], null, 0.006);
+      cylinderBetween(liveAxleFrame,
+        [side * 0.22 + earSide * 0.032, -0.005, rearAxleZ - 0.40],
+        [side * 0.22 + earSide * 0.032, -0.005, rearAxleZ - 0.40 + 0.01],
+        0.023, red, 12);
+      addBolt(liveAxleFrame, side * 0.22 + earSide * 0.032, 0.025, rearAxleZ - 0.40, 0.007);
+    }
+    // Upper link brackets and shock tower gussets.
+    roundedBox(liveAxleFrame, [0.065, 0.13, 0.055], darkMetal,
+      [side * 0.18, 0.10, rearAxleZ - 0.24], null, 0.009);
+    cylinderBetween(liveAxleFrame,
+      [side * 0.18, 0.12, rearAxleZ - 0.24],
+      [side * 0.205, 0.16, rearAxleZ - 0.075],
+      0.012, alloy, 10);
+    for (const y of [0.135, 0.175]) {
+      addBolt(liveAxleFrame, side * 0.205, y, rearAxleZ - 0.075, 0.006);
+    }
+  }
+  roundedBox(liveAxleFrame, [0.46, 0.055, 0.065], carbon,
+    [0, 0.015, rearAxleZ - 0.39], null, 0.012);
+  roundedBox(liveAxleFrame, [0.44, 0.048, 0.070], darkMetal,
+    [0, 0.11, rearAxleZ - 0.24], null, 0.012);
+  roundedBox(liveAxleFrame, [0.49, 0.045, 0.060], carbonEdge,
+    [0, 0.19, rearAxleZ - 0.075], null, 0.010);
+  for (const side of [-1, 1]) {
+    cylinderBetween(liveAxleFrame,
+      [side * 0.12, 0.19, rearAxleZ - 0.075],
+      [side * 0.205, 0.25, rearAxleZ - 0.075],
+      0.012, alloy, 10);
+  }
+
   function makeLiveAxleSegment(id, label, description, radius, material) {
     const group = makePart(chassisGroup, id, label, description, "live-axle");
-    const mesh = addMesh(group, new THREE.CylinderGeometry(radius, radius, 1, 12), material);
-    return { group, mesh };
+    const mesh = addMesh(group, new THREE.CylinderGeometry(radius, radius, 1, 16), material);
+    const outerRails = [];
+    const crossBraces = [];
+    if (radius > 0.02) {
+      for (const offset of [-0.028, 0.028]) {
+        const rail = addMesh(
+          group,
+          new THREE.CylinderGeometry(0.010, 0.010, 1, 10),
+          carbonEdge,
+          [offset, 0, 0]
+        );
+        outerRails.push(rail);
+      }
+      for (const t of [-0.34, 0.34]) {
+        const brace = addMesh(
+          group,
+          new THREE.CylinderGeometry(0.009, 0.009, 0.065, 10),
+          alloy,
+          [0, t, 0]
+        );
+        brace.rotation.z = Math.PI / 2;
+        brace.scale.y = 1;
+        crossBraces.push(brace);
+      }
+      for (const end of [-0.48, 0.48]) {
+        addMesh(group, new THREE.TorusGeometry(0.025, 0.006, 7, 18), alloy, [0, end, 0])
+          .rotation.x = Math.PI / 2;
+      }
+    } else {
+      addMesh(group, new THREE.SphereGeometry(0.021, 12, 10), red, [0, -0.48, 0]);
+      addMesh(group, new THREE.SphereGeometry(0.021, 12, 10), red, [0, 0.48, 0]);
+    }
+    return { group, mesh, outerRails, crossBraces };
   }
   function updateLiveAxleSegment(segment, start, end) {
     const direction = end.clone().sub(start);
     const length = Math.max(0.001, direction.length());
-    segment.mesh.position.copy(start).add(end).multiplyScalar(0.5);
-    segment.mesh.quaternion.setFromUnitVectors(
+    segment.group.position.copy(start).add(end).multiplyScalar(0.5);
+    segment.group.quaternion.setFromUnitVectors(
       new THREE.Vector3(0, 1, 0),
       direction.normalize()
     );
-    segment.mesh.scale.set(1, length, 1);
+    segment.group.scale.set(1, length, 1);
+    for (const brace of segment.crossBraces) {
+      brace.scale.y = 1 / length;
+    }
   }
   function makeLiveAxleShock(id, label, side) {
     const group = makePart(
