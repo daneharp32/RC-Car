@@ -361,11 +361,25 @@ function makeTrailingArm(chassisAnchor, axleAnchor, linkWidth, maxForce, side) {
   // The chassis-side joint is a true transverse hinge. This makes each
   // trailing arm swing through suspension travel instead of letting its
   // chassis pivot wander in every direction like a loose ball joint.
+  const hingeAxisWorld = chassisBody.quaternion.vmult(
+    new CANNON.Vec3(1, 0, 0),
+    new CANNON.Vec3()
+  );
+  const inverseLinkQuaternion = new CANNON.Quaternion(
+    -link.quaternion.x,
+    -link.quaternion.y,
+    -link.quaternion.z,
+    link.quaternion.w
+  );
+  const hingeAxisLink = inverseLinkQuaternion.vmult(
+    hingeAxisWorld,
+    new CANNON.Vec3()
+  );
   const chassisPivot = new CANNON.HingeConstraint(chassisBody, link, {
     pivotA: chassisAnchor,
     pivotB: new CANNON.Vec3(0, -length * 0.5, 0),
     axisA: new CANNON.Vec3(1, 0, 0),
-    axisB: new CANNON.Vec3(1, 0, 0),
+    axisB: hingeAxisLink,
     maxForce
   });
   const axleJoint = new CANNON.PointToPointConstraint(
