@@ -334,6 +334,59 @@ function removeLiveAxleDynamics() {
   world.broadphase.dirty = true;
 }
 
+function makeTrailingArm(chassisAnchor, axleAnchor, linkWidth, maxForce, side) {
+  const chassisWorld = pointToWorld(chassisBody, chassisAnchor);
+  const axleWorld = pointToWorld(rearAxleBody, axleAnchor);
+  const rawDirection = difference(axleWorld, chassisWorld);
+  const length = Math.max(0.05, Math.hypot(rawDirection.x, rawDirection.y, rawDirection.z));
+  const direction = scaled(rawDirection, 1 / length);
+  const link = new CANNON.Body({
+    mass: 0.12 * Math.pow(vehicleScale, 3),
+    material: chassisMaterial,
+    linearDamping: 0.06,
+    angularDamping: 0.16,
+    collisionFilterGroup: 0,
+    collisionFilterMask: 0,
+    allowSleep: false
+  });
+  link.addShape(new CANNON.Box(new CANNON.Vec3(linkWidth, length * 0.5, linkWidth)));
+  link.position.set(
+    (chassisWorld.x + axleWorld.x) * 0.5,
+    (chassisWorld.y + axleWorld.y) * 0.5,
+    (chassisWorld.z + axleWorld.z) * 0.5
+  );
+  link.quaternion.setFromVectors(new CANNON.Vec3(0, 1, 0), direction);
+  world.addBody(link);
+
+  // The chassis-side joint is a true transverse hinge. This makes each
+  // trailing arm swing through suspension travel instead of letting its
+  // chassis pivot wander in every direction like a loose ball joint.
+  const chassisPivot = new CANNON.HingeConstraint(chassisBody, link, {
+    pivotA: chassisAnchor,
+    pivotB: new CANNON.Vec3(0, -length * 0.5, 0),
+    axisA: new CANNON.Vec3(1, 0, 0),
+    axisB: new CANNON.Vec3(1, 0, 0),
+    maxForce
+  });
+  const axleJoint = new CANNON.PointToPointConstraint(
+    link,
+    new CANNON.Vec3(0, length * 0.5, 0),
+    rearAxleBody,
+    axleAnchor,
+    maxForce
+  );
+  world.addConstraint(chassisPivot);
+  world.addConstraint(axleJoint);
+  liveAxleLinkBodies.push(link);
+  liveAxleConstraints.push(chassisPivot, axleJoint);
+  return {
+    side,
+    kind: "trailingArm",
+    constraints: [chassisPivot, axleJoint],
+    maxForce
+  };
+}
+
 function makeAxleLink(chassisAnchor, axleAnchor, linkWidth, maxForce, side, kind) {
   const chassisWorld = pointToWorld(chassisBody, chassisAnchor);
   const axleWorld = pointToWorld(rearAxleBody, axleAnchor);
