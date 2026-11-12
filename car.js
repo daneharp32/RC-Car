@@ -1,7 +1,7 @@
 import { RoundedBoxGeometry } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/geometries/RoundedBoxGeometry.js";
 
 // Builds the detailed chassis, wheels, and the separately removable shell.
-export function createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellModel = null, rangerShellGeometry = null }) {
+export function createCarVisualFactory({ THREE, CANNON, world, chassisBody, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellModel = null, rangerShellGeometry = null }) {
 function makeCarVisual(color, playerName = "") {
   const root = new THREE.Group();
   const chassisGroup = new THREE.Group();
@@ -37,11 +37,50 @@ function makeCarVisual(color, playerName = "") {
   const wireBlue = new THREE.MeshStandardMaterial({ color: 0x168ad2, roughness: 0.42, metalness: 0.16 });
   const amber = new THREE.MeshStandardMaterial({ color: 0xffbd58, emissive: 0x7d3100, emissiveIntensity: 0.18 });
 
+  const damageParts = new Map();
+  function getDamageProfile(id) {
+    if (id === "main-chassis") return { health: 180, mass: 0.9, sensitivity: 0.34 };
+    if (id.includes("shell-visual") || id.includes("ranger-shell")) return { health: 92, mass: 0.62, sensitivity: 1.22 };
+    if (id.includes("bumper")) return { health: 76, mass: 0.24, sensitivity: 0.72 };
+    if (id.endsWith("-wheel")) return { health: 54, mass: 0.27, sensitivity: 1.18 };
+    if (id.includes("lower-arm") || id.includes("wheel-carrier")) return { health: 48, mass: 0.13, sensitivity: 1.18 };
+    if (id.includes("camber-link")) return { health: 36, mass: 0.055, sensitivity: 1.38 };
+    if (id.includes("oil-shock")) return { health: 44, mass: 0.10, sensitivity: 1.12 };
+    if (id.includes("shock-tower")) return { health: 62, mass: 0.15, sensitivity: 0.98 };
+    if (id === "steering-servo") return { health: 58, mass: 0.10, sensitivity: 1.05 };
+    if (id === "lipo-battery") return { health: 66, mass: 0.24, sensitivity: 1.10 };
+    if (id === "brushless-motor" || id === "electronic-speed-controller") return { health: 62, mass: 0.16, sensitivity: 1.08 };
+    if (id.includes("wiring")) return { health: 38, mass: 0.035, sensitivity: 1.45 };
+    if (id.includes("differential") || id.includes("driveshaft") || id.includes("gears")) return { health: 64, mass: 0.16, sensitivity: 1.05 };
+    return { health: 60, mass: 0.09, sensitivity: 1.0 };
+  }
+
   function makePart(parent, id, label, description) {
     const group = new THREE.Group();
     group.name = id;
     group.userData.partInfo = { id, label, description };
+    group.userData.damagePartId = id;
     parent.add(group);
+    const profile = getDamageProfile(id);
+    damageParts.set(id, {
+      id,
+      label,
+      description,
+      group,
+      maxHealth: profile.health,
+      health: profile.health,
+      mass: profile.mass,
+      sensitivity: profile.sensitivity,
+      detached: false,
+      debrisBody: null,
+      debrisAge: 0,
+      debrisExpired: false,
+      originalParent: null,
+      originalPosition: null,
+      originalQuaternion: null,
+      originalScale: null,
+      originalVisible: true
+    });
     return group;
   }
 
@@ -732,6 +771,335 @@ function makeCarVisual(color, playerName = "") {
   });
   setShellStyle(shellModel ? "prerunner" : "ranger");
 
+  // Store the original hierarchy and transforms so every damaged component
+  // can be restored by the existing vehicle reset command.
+  root.updateMatrixWorld(true);
+  for (const record of damageParts.values()) {
+    record.originalParent = record.group.parent;
+    record.originalPosition = record.group.position.clone();
+    record.originalQuaternion = record.group.quaternion.clone();
+    record.originalScale = record.group.scale.clone();
+    record.originalVisible = record.group.visible;
+  }
+
+  function isPartAttached(record) {
+    let node = record.group;
+    while (node && node !== root) node = node.parent;
+    return node === root;
+  }
+
+  function isPartVisible(record) {
+    let node = record.group;
+    while (node && node !== root) {
+      if (!node.visible) return false;
+      node = node.parent;
+    }
+    return node === root;
+  }
+
+  function getPartHealthRatio(id) {
+    const record = damageParts.get(id);
+    return record ? THREE.MathUtils.clamp(record.health / record.maxHealth, 0, 1) : 1;
+  }
+
+  function isPartDetached(id) {
+    return damageParts.get(id)?.detached === true;
+  }
+
+  function detachPart(record, launch = {}) {
+    if (record.detached || !record.group.parent) return false;
+
+    const group = record.group;
+    group.updateWorldMatrix(true, true);
+    const worldPosition = group.getWorldPosition(new THREE.Vector3());
+    const worldQuaternion = group.getWorldQuaternion(new THREE.Quaternion());
+    const worldScale = group.getWorldScale(new THREE.Vector3());
+    const worldBounds = new THREE.Box3().setFromObject(group);
+    const inverseGroupMatrix = group.matrixWorld.clone().invert();
+    const localBounds = worldBounds.clone().applyMatrix4(inverseGroupMatrix);
+    const localCenter = localBounds.getCenter(new THREE.Vector3());
+    const localSize = localBounds.getSize(new THREE.Vector3());
+
+    scene.attach(group);
+    record.detached = true;
+    record.health = 0;
+    record.debrisAge = 0;
+    record.debrisExpired = false;
+    group.userData.detached = true;
+
+    if (CANNON && world) {
+      const half = new THREE.Vector3(
+        Math.max(0.014, localSize.x * worldScale.x * 0.5),
+        Math.max(0.014, localSize.y * worldScale.y * 0.5),
+        Math.max(0.014, localSize.z * worldScale.z * 0.5)
+      );
+      const center = new THREE.Vector3(
+        localCenter.x * worldScale.x,
+        localCenter.y * worldScale.y,
+        localCenter.z * worldScale.z
+      );
+      const debrisBody = new CANNON.Body({
+        mass: Math.max(0.025, record.mass),
+        material: chassisBody?.material,
+        linearDamping: 0.10,
+        angularDamping: 0.28,
+        allowSleep: true
+      });
+      debrisBody.addShape(
+        new CANNON.Box(new CANNON.Vec3(half.x, half.y, half.z)),
+        new CANNON.Vec3(center.x, center.y, center.z)
+      );
+      debrisBody.position.set(worldPosition.x, worldPosition.y, worldPosition.z);
+      debrisBody.quaternion.set(
+        worldQuaternion.x, worldQuaternion.y, worldQuaternion.z, worldQuaternion.w
+      );
+
+      if (Array.isArray(launch.position) && launch.position.length >= 3) {
+        debrisBody.position.set(launch.position[0], launch.position[1], launch.position[2]);
+      }
+      if (Array.isArray(launch.quaternion) && launch.quaternion.length >= 4) {
+        debrisBody.quaternion.set(
+          launch.quaternion[0], launch.quaternion[1], launch.quaternion[2], launch.quaternion[3]
+        );
+      }
+
+      if (Array.isArray(launch.velocity) && launch.velocity.length >= 3) {
+        debrisBody.velocity.set(launch.velocity[0], launch.velocity[1], launch.velocity[2]);
+      } else {
+        const base = chassisBody?.velocity;
+        const dx = worldPosition.x - (chassisBody?.position.x || 0);
+        const dy = worldPosition.y - (chassisBody?.position.y || 0);
+        const dz = worldPosition.z - (chassisBody?.position.z || 0);
+        const length = Math.hypot(dx, dy, dz) || 1;
+        const kick = Math.min(5.5, Math.max(0.8, (launch.speed || 4) * 0.22));
+        debrisBody.velocity.set(
+          (base?.x || 0) + dx / length * kick,
+          (base?.y || 0) + dy / length * kick + 0.45,
+          (base?.z || 0) + dz / length * kick
+        );
+      }
+
+      if (Array.isArray(launch.angularVelocity) && launch.angularVelocity.length >= 3) {
+        debrisBody.angularVelocity.set(
+          launch.angularVelocity[0], launch.angularVelocity[1], launch.angularVelocity[2]
+        );
+      } else {
+        const hash = record.id.split("").reduce((value, char) => value + char.charCodeAt(0), 0);
+        const spin = 2.2 + (hash % 17) * 0.12;
+        debrisBody.angularVelocity.set(
+          ((hash % 3) - 1) * spin,
+          (((hash >> 2) % 3) - 1) * spin,
+          (((hash >> 4) % 3) - 1) * spin
+        );
+      }
+
+      debrisBody.userData = { rcCarDebris: true, componentId: record.id };
+      world.addBody(debrisBody);
+      record.debrisBody = debrisBody;
+    }
+
+    return true;
+  }
+
+  function damageRecord(record, amount, launch) {
+    if (!record || record.detached || amount <= 0) return false;
+    record.health = Math.max(0, record.health - amount);
+    if (record.health <= 0) {
+      detachPart(record, launch);
+      return true;
+    }
+    return false;
+  }
+
+  function applyImpact(impact) {
+    const speed = Number(impact?.speed);
+    if (!Number.isFinite(speed) || speed < 3.2 || !impact?.point) return null;
+
+    root.updateMatrixWorld(true);
+    const worldPoint = new THREE.Vector3(impact.point.x, impact.point.y, impact.point.z);
+    const localPoint = root.worldToLocal(worldPoint.clone());
+    const inverseRoot = root.matrixWorld.clone().invert();
+    const candidates = [];
+
+    for (const record of damageParts.values()) {
+      if (record.detached || !isPartAttached(record) || !isPartVisible(record)) continue;
+      record.group.updateWorldMatrix(true, true);
+      const bounds = new THREE.Box3().setFromObject(record.group);
+      if (bounds.isEmpty()) continue;
+      const localBounds = bounds.clone().applyMatrix4(inverseRoot);
+      const center = localBounds.getCenter(new THREE.Vector3());
+      const size = localBounds.getSize(new THREE.Vector3());
+      const radius = Math.max(0.12, size.length() * 0.5);
+      let score = localPoint.distanceTo(center) / radius;
+
+      // Prefer the actual exposed impact hardware over the broad shell and
+      // chassis bounds, while still allowing roof/side impacts to damage the
+      // body shell.
+      if (record.id.includes("shell")) score += localPoint.y > 0.16 ? -0.35 : 0.46;
+      if (record.id === "main-chassis") score += 0.72;
+      if (record.id === "front-bumper" && localPoint.z < -0.34) score -= 0.48;
+      if (record.id === "rear-bumper" && localPoint.z > 0.34) score -= 0.48;
+      if (record.id.includes("front") && localPoint.z < -0.24) score -= 0.16;
+      if (record.id.includes("rear") && localPoint.z > 0.24) score -= 0.16;
+      if (record.id.includes("left") && localPoint.x < -0.13) score -= 0.12;
+      if (record.id.includes("right") && localPoint.x > 0.13) score -= 0.12;
+      candidates.push({ record, score });
+    }
+
+    candidates.sort((a, b) => a.score - b.score);
+    const primary = candidates[0]?.record;
+    if (!primary) return null;
+
+    const applyTo = [];
+    const damageAmount = (Math.max(0, speed - 3.0) * 13.0) * primary.sensitivity;
+    const launch = {
+      speed,
+      velocity: impact.velocity ? [impact.velocity.x, impact.velocity.y, impact.velocity.z] : null
+    };
+    const primaryDetached = damageRecord(primary, damageAmount, launch);
+    applyTo.push({ label: primary.label, detached: primaryDetached });
+
+    if (speed >= 8.4 && candidates[1] && candidates[1].score - candidates[0].score < 0.48) {
+      const secondary = candidates[1].record;
+      const secondaryDetached = damageRecord(
+        secondary,
+        damageAmount * 0.36,
+        { ...launch, speed: speed * 0.72 }
+      );
+      applyTo.push({ label: secondary.label, detached: secondaryDetached });
+    }
+
+    return {
+      primary: primary.label,
+      damaged: applyTo.map((item) => item.label),
+      detached: applyTo.filter((item) => item.detached).map((item) => item.label),
+      speed
+    };
+  }
+
+  function updateDebris(delta = 0) {
+    for (const record of damageParts.values()) {
+      if (!record.detached || !record.debrisBody) continue;
+      record.debrisAge += Math.max(0, delta);
+      const body = record.debrisBody;
+      record.group.position.set(body.position.x, body.position.y, body.position.z);
+      record.group.quaternion.set(
+        body.quaternion.x, body.quaternion.y, body.quaternion.z, body.quaternion.w
+      );
+      if (record.debrisAge > 18 || body.position.y < -35) {
+        world?.removeBody?.(body);
+        record.debrisBody = null;
+        record.debrisExpired = true;
+        scene.remove(record.group);
+      }
+    }
+  }
+
+  function restoreRecord(record) {
+    if (record.debrisBody) {
+      world?.removeBody?.(record.debrisBody);
+      record.debrisBody = null;
+    }
+    if (record.group.parent) record.group.parent.remove(record.group);
+    if (record.originalParent) record.originalParent.add(record.group);
+    if (record.originalPosition) record.group.position.copy(record.originalPosition);
+    if (record.originalQuaternion) record.group.quaternion.copy(record.originalQuaternion);
+    if (record.originalScale) record.group.scale.copy(record.originalScale);
+    if (record.id === "uploaded-scx30-ranger-shell") {
+      record.group.visible = shellStyle === "ranger";
+    } else if (record.id === "prerunner-shell-visual") {
+      record.group.visible = shellStyle === "prerunner";
+    } else {
+      record.group.visible = record.originalVisible;
+    }
+    record.group.userData.detached = false;
+    record.detached = false;
+    record.health = record.maxHealth;
+    record.debrisAge = 0;
+    record.debrisExpired = false;
+  }
+
+  function repairAll() {
+    for (const record of damageParts.values()) {
+      if (record.detached || record.health < record.maxHealth) restoreRecord(record);
+    }
+    return getDamageSummary();
+  }
+
+  function getDamageSummary() {
+    const records = [...damageParts.values()];
+    const damaged = records.filter((record) => record.health < record.maxHealth - 0.01);
+    const detached = records.filter((record) => record.detached);
+    return {
+      damaged: damaged.length,
+      detached: detached.length,
+      damagedNames: damaged.map((record) => record.label),
+      detachedNames: detached.map((record) => record.label)
+    };
+  }
+
+  function getDamageSnapshot() {
+    const parts = [];
+    for (const record of damageParts.values()) {
+      if (record.health >= record.maxHealth && !record.detached) continue;
+      const body = record.debrisBody;
+      parts.push({
+        id: record.id,
+        h: Math.max(0, Math.round(record.health * 10) / 10),
+        d: record.detached,
+        p: body ? [body.position.x, body.position.y, body.position.z] : null,
+        q: body ? [body.quaternion.x, body.quaternion.y, body.quaternion.z, body.quaternion.w] : null,
+        v: body ? [body.velocity.x, body.velocity.y, body.velocity.z] : null,
+        w: body ? [body.angularVelocity.x, body.angularVelocity.y, body.angularVelocity.z] : null
+      });
+    }
+    return { parts };
+  }
+
+  function applyDamageSnapshot(snapshot) {
+    if (!snapshot || !Array.isArray(snapshot.parts)) return;
+    const incoming = new Map(snapshot.parts.filter((part) => part && typeof part.id === "string")
+      .map((part) => [part.id, part]));
+
+    for (const record of damageParts.values()) {
+      const data = incoming.get(record.id);
+      if (!data) {
+        if (record.detached || record.health < record.maxHealth) restoreRecord(record);
+        continue;
+      }
+
+      const health = Number.isFinite(data.h)
+        ? THREE.MathUtils.clamp(data.h, 0, record.maxHealth)
+        : record.maxHealth;
+      if (data.d === true) {
+        if (!record.detached) {
+          detachPart(record, {
+            position: data.p,
+            quaternion: data.q,
+            velocity: data.v,
+            angularVelocity: data.w
+          });
+        }
+        record.health = 0;
+        if (record.debrisBody && Array.isArray(data.p)) {
+          record.debrisBody.position.set(data.p[0], data.p[1], data.p[2]);
+          if (Array.isArray(data.q)) {
+            record.debrisBody.quaternion.set(data.q[0], data.q[1], data.q[2], data.q[3]);
+          }
+          if (Array.isArray(data.v)) {
+            record.debrisBody.velocity.set(data.v[0], data.v[1], data.v[2]);
+          }
+          if (Array.isArray(data.w)) {
+            record.debrisBody.angularVelocity.set(data.w[0], data.w[1], data.w[2]);
+          }
+        }
+      } else {
+        if (record.detached) restoreRecord(record);
+        record.health = health;
+      }
+    }
+  }
+
   // The detailed chassis remains unchanged beneath either removable shell.
   // All internal chassis components remain present and retain their original
   // dimensions; either body shell can be removed to inspect the running gear.
@@ -813,7 +1181,15 @@ function makeCarVisual(color, playerName = "") {
     setShellVisible(visible) { shellGroup.visible = !!visible; },
     setShellStyle,
     get shellStyle() { return shellStyle; },
-    setPlayerName
+    setPlayerName,
+    applyImpact,
+    updateDebris,
+    repairAll,
+    getDamageSummary,
+    getDamageSnapshot,
+    applyDamageSnapshot,
+    getPartHealthRatio,
+    isPartDetached
   };
 }
   return makeCarVisual;
