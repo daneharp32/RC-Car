@@ -38,6 +38,7 @@ function makeCarVisual(color, playerName = "") {
   const amber = new THREE.MeshStandardMaterial({ color: 0xffbd58, emissive: 0x7d3100, emissiveIntensity: 0.18 });
 
   const damageParts = new Map();
+  const frontSuspensionVisuals = [];
   let totalled = false;
 
   let chassisStyle = "standard";
@@ -138,7 +139,21 @@ function makeCarVisual(color, playerName = "") {
       a.clone().add(b).multiplyScalar(0.5).toArray()
     );
     object.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+    object.userData.segmentRestLength = length;
     return object;
+  }
+
+  function updateCylinderBetween(object, start, end) {
+    const a = new THREE.Vector3(...start);
+    const b = new THREE.Vector3(...end);
+    const direction = b.clone().sub(a);
+    const length = Math.max(0.001, direction.length());
+    object.position.copy(a).add(b).multiplyScalar(0.5);
+    object.quaternion.setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      direction.normalize()
+    );
+    object.scale.y = length / Math.max(0.001, object.userData.segmentRestLength || length);
   }
 
   function addBolt(parent, x, y, z, radius = 0.008, material = alloy) {
@@ -300,10 +315,17 @@ function makeCarVisual(color, playerName = "") {
     const innerFront = [s * 0.075, -0.055, z - (isFront ? -0.075 : 0.075)];
     const innerRear = [s * 0.075, -0.055, z + (isFront ? -0.075 : 0.075)];
     const outer = [s * 0.292, -0.038, z];
-    cylinderBetween(arm, innerFront, outer, 0.023, carbonEdge, 12, 0.018);
-    cylinderBetween(arm, innerRear, outer, 0.023, carbonEdge, 12, 0.018);
+    const lowerFrontRod = cylinderBetween(arm, innerFront, outer, 0.023, carbonEdge, 12, 0.018);
+    const lowerRearRod = cylinderBetween(arm, innerRear, outer, 0.023, carbonEdge, 12, 0.018);
     cylinderBetween(arm, innerFront, innerRear, 0.018, blackPlastic, 10);
-    addMesh(arm, new THREE.SphereGeometry(0.025, 12, 10), alloy, outer);
+    const outerJoint = addMesh(arm, new THREE.SphereGeometry(0.025, 12, 10), alloy, outer);
+    if (isFront) {
+      frontSuspensionVisuals.push({
+        side: s, z, innerFront, innerRear,
+        lowerFrontRod, lowerRearRod, outerJoint,
+        carrier: null, upperRod: null
+      });
+    }
 
     const upper = makePart(
       chassisGroup,
@@ -312,10 +334,14 @@ function makeCarVisual(color, playerName = "") {
       "Adjustable upper link controls wheel camber and keeps the upright aligned as the suspension travels.",
       isFront ? null : "standard"
     );
-    cylinderBetween(upper, [s * 0.10, 0.17, z + (isFront ? 0.025 : -0.025)],
+    const upperRodStart = [s * 0.10, 0.17, z + (isFront ? 0.025 : -0.025)];
+    const upperRod = cylinderBetween(upper, upperRodStart,
       [s * 0.29, 0.13, z], 0.011, alloy, 10, 0.009);
-    addMesh(upper, new THREE.SphereGeometry(0.015, 12, 10), red,
-      [s * 0.12, 0.17, z + (isFront ? 0.025 : -0.025)]);
+    addMesh(upper, new THREE.SphereGeometry(0.015, 12, 10), red, upperRodStart);
+    if (isFront) {
+      const visual = frontSuspensionVisuals.find((item) => item.side === s);
+      if (visual) { visual.upperRod = upperRod; visual.upperRodStart = upperRodStart; }
+    }
 
     const carrier = makePart(
       chassisGroup,
@@ -328,6 +354,10 @@ function makeCarVisual(color, playerName = "") {
     cylinderBetween(carrier, [s * 0.25, 0.005, z], [s * 0.35, 0.005, z], 0.031, alloy, 16);
     cylinderBetween(carrier, [s * 0.335, 0.005, z], [s * 0.355, 0.005, z], 0.022, red, 12);
     addBolt(carrier, s * 0.30, 0.075, z, 0.007);
+    if (isFront) {
+      const visual = frontSuspensionVisuals.find((item) => item.side === s);
+      if (visual) visual.carrier = carrier;
+    }
   }
 
   // Front and rear shock towers. Holes and braces make the plates read as
@@ -1049,6 +1079,29 @@ function makeCarVisual(color, playerName = "") {
       side,
       ...makeLimitStrap(`rear-${sideName}-limit-strap`, side)
     });
+  }
+
+  function setFrontSuspensionPose(index, position) {
+    const side = index === 0 ? -1 : index === 1 ? 1 : 0;
+    if (!side || !position) return;
+    const visual = frontSuspensionVisuals.find((item) => item.side === side);
+    if (!visual) return;
+    const wheel = new THREE.Vector3(position.x, position.y, position.z);
+    const lowerOuter = wheel.clone();
+    lowerOuter.x = side * 0.292;
+    updateCylinderBetween(visual.lowerFrontRod, visual.innerFront, lowerOuter.toArray());
+    updateCylinderBetween(visual.lowerRearRod, visual.innerRear, lowerOuter.toArray());
+    visual.outerJoint.position.copy(lowerOuter);
+    const upperOuter = lowerOuter.clone();
+    upperOuter.y += 0.105;
+    updateCylinderBetween(visual.upperRod, visual.upperRodStart, upperOuter.toArray());
+    if (visual.carrier) {
+      visual.carrier.position.set(
+        wheel.x - side * 0.295,
+        wheel.y - 0.005,
+        wheel.z - visual.z
+      );
+    }
   }
 
   function setChassisStyle(style) {
@@ -1881,6 +1934,7 @@ function makeCarVisual(color, playerName = "") {
     setShellStyle,
     setChassisStyle,
     get chassisStyle() { return chassisStyle; },
+    setFrontSuspensionPose,
     setRearAxlePose,
     get shellStyle() { return shellStyle; },
     setPlayerName,
