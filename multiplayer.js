@@ -54,6 +54,7 @@ export function createMultiplayerSystem(game) {
       qz: chassisBody.quaternion.z,
       qw: chassisBody.quaternion.w,
       wheels: vehicle.wheelInfos.map((wheel) => wheel.rotation),
+      damage: game.localCar.getDamageSnapshot?.() || { parts: [] },
       steer: vehicle.wheelInfos[0].steering,
       mph: chassisBody.velocity.length() * 2.236936,
       race: game.race ? game.race.getNetworkState() : null,
@@ -268,6 +269,9 @@ export function createMultiplayerSystem(game) {
       const remoteShellStyle = data.shellStyle === "ranger" ? "ranger" : "prerunner";
       if (remote.visual.shellStyle !== remoteShellStyle) {
         remote.visual.setShellStyle?.(remoteShellStyle);
+      }
+      if (Array.isArray(data.damage?.parts)) {
+        remote.visual.applyDamageSnapshot?.(data.damage);
       }
       remote.lastSeen = performance.now();
       if (currentLobby?.mode === "sandbox") {
@@ -983,7 +987,9 @@ export function createMultiplayerSystem(game) {
       if (!remote.target) continue;
       remote.visual.root.position.lerp(remote.target.position, alpha);
       remote.visual.root.quaternion.slerp(remote.target.quaternion, alpha);
+      const wheelPartIds = ["front-left-wheel", "front-right-wheel", "rear-left-wheel", "rear-right-wheel"];
       for (let i = 0; i < 4; i++) {
+        if (remote.visual.isPartDetached?.(wheelPartIds[i])) continue;
         const [x, , z] = wheelPositions[i];
         const pivot = remote.visual.wheelPivots[i];
         pivot.position.set(x, -0.095, z * VISUAL_CHASSIS_LENGTH_SCALE);
@@ -995,6 +1001,7 @@ export function createMultiplayerSystem(game) {
         );
         pivot.quaternion.copy(steerQ).multiply(spinQ);
       }
+      remote.visual.updateDebris?.(delta);
     }
     // Player count is refreshed on join/leave events or when a stale peer
     // is removed; never rewrite the HUD and hidden Sandbox builder each frame.
