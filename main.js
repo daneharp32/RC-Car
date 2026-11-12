@@ -3,6 +3,7 @@ import * as CANNON from "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cann
 import { createPhysicsSystem } from "./physics.js";
 import { createCarVisualFactory } from "./car.js";
 import { createControlsSystem } from "./controls.js";
+import { createImpactDamageSystem } from "./damage-system.js";
 import { createMultiplayerSystem } from "./multiplayer.js";
 import { createGarageSystem } from "./garage.js";
 import { createSandboxSystem } from "./sandbox.js";
@@ -946,8 +947,12 @@ const {
   spawnZ,
   spawnYaw
 } = physicsSystem;
+const impactDamageSystem = createImpactDamageSystem({ CANNON, chassisBody });
 
-const makeCarVisual = createCarVisualFactory({ THREE, scene, VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellModel, rangerShellGeometry });
+const makeCarVisual = createCarVisualFactory({
+  THREE, CANNON, world, chassisBody, scene,
+  VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellModel, rangerShellGeometry
+});
 const localCar = makeCarVisual(0xffa33d);
 let selectedShellStyle = shellModel ? "prerunner" : "ranger";
 function setSelectedShellStyle(style) {
@@ -970,7 +975,9 @@ function updateLocalVisual() {
   const inverseRoot = localCar.root.quaternion.clone().invert();
   const localPosition = new THREE.Vector3();
   const worldWheelQuaternion = new THREE.Quaternion();
+  const wheelPartIds = ["front-left-wheel", "front-right-wheel", "rear-left-wheel", "rear-right-wheel"];
   for (let i = 0; i < 4; i++) {
+    if (localCar.isPartDetached?.(wheelPartIds[i])) continue;
     vehicle.updateWheelTransform(i);
     const transform = vehicle.wheelInfos[i].worldTransform;
     localPosition.set(
@@ -1369,7 +1376,19 @@ function animate(now) {
   sandbox.update(delta, now);
   // The physics world is only active while the truck is on a driving screen.
   // This keeps showroom, menus, and the Sandbox builder completely stationary.
-  if (drivingActive && !isPaused) world.step(FIXED_STEP, delta, 3);
+  if (drivingActive && !isPaused) {
+    world.step(FIXED_STEP, delta, 3);
+    for (const impact of impactDamageSystem.drain()) {
+      const damageResult = localCar.applyImpact?.(impact);
+      if (damageResult) {
+        const detachedText = damageResult.detached.length
+          ? " · " + damageResult.detached.join(", ").toUpperCase() + " DISCONNECTED"
+          : "";
+        showToast(damageResult.primary.toUpperCase() + " DAMAGED" + detachedText);
+      }
+    }
+  }
+  localCar.updateDebris?.(delta);
   // Stabilize the Sandbox chassis after physics so contact forces cannot build into a flip.
   sandbox.postPhysicsUpdate(delta);
   // Read wheel contact and sliding flags before visual wheel transforms refresh them.
@@ -1382,6 +1401,16 @@ function animate(now) {
   $("speedValue").textContent = String(Math.round(speedMph));
   const touching = vehicle.wheelInfos.filter((wheel) => wheel.isInContact).length;
   $("wheelStatus").textContent = touching + " / 4 TIRES IN CONTACT";
+  const damageSummary = localCar.getDamageSummary?.() || { damaged: 0, detached: 0, damagedNames: [] };
+  $("damageValue").textContent = damageSummary.detached
+    ? damageSummary.detached + " PART" + (damageSummary.detached === 1 ? "" : "S") + " DETACHED"
+    : damageSummary.damaged
+      ? damageSummary.damaged + " PART" + (damageSummary.damaged === 1 ? "" : "S") + " DAMAGED"
+      : "ALL SYSTEMS NOMINAL";
+  $("damageDetails").textContent = damageSummary.damaged
+    ? damageSummary.damagedNames.slice(0, 2).join(" · ").toUpperCase() + (damageSummary.damaged > 2 ? " · +" + (damageSummary.damaged - 2) : "")
+    : "0 COMPONENTS DAMAGED";
+  $("damageCard").classList.toggle("damaged", damageSummary.damaged > 0);
 
   // The showroom camera presents the parked truck in menu and garage views.
   if (garage.viewMode === "menu" || garage.viewMode === "mode-select" || garage.viewMode === "create-lobby" || garage.viewMode === "garage" || garage.viewMode === "sandbox-builder") {
