@@ -43,6 +43,14 @@ export function createMultiplayerSystem(game) {
   }
 
   function makeSnapshot() {
+    const frontWheelPoses = vehicle.wheelInfos.map((wheel, index) => {
+      vehicle.updateWheelTransform(index);
+      const local = chassisBody.pointToLocalFrame(
+        wheel.worldTransform.position,
+        new game.CANNON.Vec3()
+      );
+      return [local.x, local.y, local.z];
+    });
     return {
       name: driverName,
       shellStyle: game.getShellStyle?.() === "ranger" ? "ranger" : "prerunner",
@@ -56,6 +64,7 @@ export function createMultiplayerSystem(game) {
       qz: chassisBody.quaternion.z,
       qw: chassisBody.quaternion.w,
       wheels: vehicle.wheelInfos.map((wheel) => wheel.rotation),
+      wheelPoses: frontWheelPoses,
       damage: game.localCar.getDamageSnapshot?.() || { parts: [] },
       steer: vehicle.wheelInfos[0].steering,
       mph: chassisBody.velocity.length() * 2.236936,
@@ -251,6 +260,7 @@ export function createMultiplayerSystem(game) {
         steering: 0,
         chassisStyle: data.chassisStyle === "live-axle" ? "live-axle" : "standard",
         rearAxlePose: null,
+        frontWheelPoses: null,
         name
       };
       remotePlayers.set(peerId, remote);
@@ -270,6 +280,11 @@ export function createMultiplayerSystem(game) {
       remote.wheelRotations = Array.isArray(data.wheels)
         ? data.wheels.slice(0, 4).map((value) => Number.isFinite(value) ? value : 0)
         : remote.wheelRotations;
+      if (Array.isArray(data.wheelPoses) && data.wheelPoses.length >= 2 &&
+          data.wheelPoses.slice(0, 4).every((pose) =>
+            Array.isArray(pose) && pose.length === 3 && pose.every(Number.isFinite))) {
+        remote.frontWheelPoses = data.wheelPoses.slice(0, 4);
+      }
       remote.steering = Number.isFinite(data.steer) ? data.steer : 0;
       const remoteShellStyle = data.shellStyle === "ranger" ? "ranger" : "prerunner";
       if (remote.visual.shellStyle !== remoteShellStyle) {
@@ -1031,15 +1046,31 @@ export function createMultiplayerSystem(game) {
       for (let i = 0; i < 4; i++) {
         if (i >= 2 && remote.chassisStyle === "live-axle") continue;
         if (remote.visual.isPartDetached?.(wheelPartIds[i])) continue;
-        const [x, , z] = wheelPositions[i];
+        const pose = remote.frontWheelPoses?.[i];
+        const [fallbackX, fallbackY, fallbackZ] = wheelPositions[i];
+        const x = pose ? pose[0] : fallbackX;
+        const y = pose ? pose[1] : fallbackY;
+        const z = pose ? pose[2] : fallbackZ;
+        const rootScale = remote.visual.root.scale.x || 1;
         const pivot = remote.visual.wheelPivots[i];
-        pivot.position.set(x, -0.095, z * VISUAL_CHASSIS_LENGTH_SCALE);
+        pivot.position.set(
+          x / rootScale,
+          y / rootScale,
+          z * VISUAL_CHASSIS_LENGTH_SCALE / rootScale
+        );
         const steerQ = new THREE.Quaternion().setFromAxisAngle(
           new THREE.Vector3(0, 1, 0), i < 2 ? remote.steering : 0
         );
         const spinQ = new THREE.Quaternion().setFromAxisAngle(
           new THREE.Vector3(1, 0, 0), remote.wheelRotations[i]
         );
+        if (i < 2 && pose) {
+          remote.visual.setFrontSuspensionPose?.(i, {
+            x: x / rootScale,
+            y: y / rootScale,
+            z: z / rootScale
+          }, steerQ);
+        }
         pivot.quaternion.copy(steerQ).multiply(spinQ);
       }
       remote.visual.updateDebris?.(delta);
