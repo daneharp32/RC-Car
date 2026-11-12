@@ -1081,7 +1081,7 @@ function makeCarVisual(color, playerName = "") {
     });
   }
 
-  function setFrontSuspensionPose(index, position) {
+  function setFrontSuspensionPose(index, position, quaternion = null) {
     const side = index === 0 ? -1 : index === 1 ? 1 : 0;
     if (!side || !position) return;
     const visual = frontSuspensionVisuals.find((item) => item.side === side);
@@ -1101,6 +1101,7 @@ function makeCarVisual(color, playerName = "") {
         wheel.y - 0.005,
         wheel.z - visual.z
       );
+      if (quaternion) visual.carrier.quaternion.copy(quaternion);
     }
   }
 
