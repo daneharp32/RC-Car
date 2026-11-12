@@ -955,6 +955,112 @@ function makeCarVisual(color, playerName = "") {
     return false;
   }
 
+  function applyLaunchStress(stress = {}) {
+    if (totalled) return null;
+
+    const deltaVelocity = Array.isArray(stress.deltaVelocity)
+      ? stress.deltaVelocity.map((value) => Number.isFinite(value) ? value : 0)
+      : [0, 0, 0];
+    const deltaAngular = Array.isArray(stress.deltaAngular)
+      ? stress.deltaAngular.map((value) => Number.isFinite(value) ? value : 0)
+      : [0, 0, 0];
+    const linearChange = Number.isFinite(stress.linearChange)
+      ? Math.max(0, stress.linearChange)
+      : Math.hypot(...deltaVelocity);
+    const angularChange = Number.isFinite(stress.angularChange)
+      ? Math.max(0, stress.angularChange)
+      : Math.hypot(...deltaAngular);
+
+    // A rapid velocity change or sharp spin can flex body mounts and loosen
+    // suspension hardware even without a direct collision with an obstacle.
+    const severity = Math.max(linearChange / 4.8, angularChange / 7.5);
+    if (!Number.isFinite(severity) || severity < 0.85) return null;
+
+    root.updateWorldMatrix(true, false);
+    const inverseRotation = root.getWorldQuaternion(new THREE.Quaternion()).invert();
+    const localKick = new THREE.Vector3(
+      deltaVelocity[0] + deltaAngular[0] * 0.18,
+      deltaVelocity[1] + deltaAngular[1] * 0.18,
+      deltaVelocity[2] + deltaAngular[2] * 0.18
+    ).applyQuaternion(inverseRotation);
+
+    const launchedVelocity = Array.isArray(stress.velocity)
+      ? stress.velocity
+      : chassisBody?.velocity
+        ? [chassisBody.velocity.x, chassisBody.velocity.y, chassisBody.velocity.z]
+        : [0, 0, 0];
+    const launch = { speed: linearChange, velocity: launchedVelocity };
+    const affected = [];
+
+    const activeShell = [...damageParts.values()].find((record) =>
+      (record.id === "uploaded-scx30-ranger-shell" ||
+       record.id === "prerunner-shell-visual") &&
+      isActiveDamageRecord(record) &&
+      !record.detached
+    );
+
+    if (activeShell) {
+      const shellDamage = severity >= 2.65
+        ? activeShell.health
+        : 12 + Math.max(0, severity - 0.85) * 44;
+      const detached = damageRecord(activeShell, shellDamage, launch);
+      affected.push({ id: activeShell.id, detached });
+    }
+
+    // Pick the exposed hardware most aligned with the direction of the fling.
+    const horizontalX = Math.abs(localKick.x);
+    const horizontalZ = Math.abs(localKick.z);
+    let targetIds = [];
+    if (Math.abs(localKick.y) > Math.max(horizontalX, horizontalZ) * 1.15) {
+      const side = localKick.x < 0 ? "left" : "right";
+      const axle = localKick.z < 0 ? "front" : "rear";
+      targetIds = [`${axle}-${side}-oil-shock`];
+    } else if (horizontalX > horizontalZ * 1.12) {
+      const side = localKick.x < 0 ? "left" : "right";
+      const axle = localKick.z < 0 ? "front" : "rear";
+      targetIds = [
+        `${axle}-${side}-lower-arm`,
+        `${axle}-${side}-camber-link`
+      ];
+    } else {
+      targetIds = [localKick.z < 0 ? "front-bumper" : "rear-bumper"];
+    }
+
+    if (severity >= 1.25) {
+      const mount = damageParts.get("body-mount-posts");
+      if (mount && !mount.detached) {
+        const mountDamage = severity >= 3.0
+          ? mount.health
+          : 10 + (severity - 1.25) * 28;
+        const detached = damageRecord(mount, mountDamage, launch);
+        affected.push({ id: mount.id, detached });
+      }
+    }
+
+    if (severity >= 1.4) {
+      const componentDamage = severity >= 2.7
+        ? Infinity
+        : 8 + (severity - 1.4) * 28;
+      for (const id of targetIds) {
+        const record = damageParts.get(id);
+        if (!record || record.detached || !isPartVisible(record)) continue;
+        const detached = damageRecord(record, componentDamage, launch);
+        affected.push({ id, detached });
+        // A medium fling strains one part; only stronger launches spread
+        // the load into a second nearby suspension link.
+        if (severity < 2.15) break;
+      }
+    }
+
+    return {
+      severity,
+      linearChange,
+      angularChange,
+      damaged: affected.map((item) => item.id),
+      detached: affected.filter((item) => item.detached).map((item) => item.id)
+    };
+  }
+
   function applyImpact(impact) {
     const speed = Number(impact?.speed);
     if (!Number.isFinite(speed) || speed < 3.2 || !impact?.point) return null;
@@ -1086,18 +1192,33 @@ function makeCarVisual(color, playerName = "") {
 
       if (record.detached) {
         const body = record.debrisBody;
-        if (body) {
-          const direction = body.position.vsub(
-            new CANNON.Vec3(vehicleCenter.x, vehicleCenter.y, vehicleCenter.z),
-            new CANNON.Vec3()
-          );
-          if (direction.lengthSquared() < 0.01) {
-            direction.set(Math.sin(sequence * 2.1), 0.3, Math.cos(sequence * 2.1));
+        if (
+          body &&
+          body.position &&
+          body.velocity &&
+          body.angularVelocity
+        ) {
+          // Use scalar math here instead of chained Cannon Vec3 operations.
+          // Debris can be mid-cleanup when a total-out is triggered.
+          const dx = body.position.x - vehicleCenter.x;
+          const dy = body.position.y - vehicleCenter.y;
+          const dz = body.position.z - vehicleCenter.z;
+          let length = Math.hypot(dx, dy, dz);
+          let directionX = dx;
+          let directionY = dy;
+          let directionZ = dz;
+          if (!Number.isFinite(length) || length < 0.1) {
+            directionX = Math.sin(sequence * 2.1);
+            directionY = 0.3;
+            directionZ = Math.cos(sequence * 2.1);
+            length = Math.hypot(directionX, directionY, directionZ) || 1;
           }
-          direction.normalize();
-          body.velocity.x += direction.x * 3.0;
-          body.velocity.y += 3.6 + Math.max(0, direction.y) * 1.2;
-          body.velocity.z += direction.z * 3.0;
+          directionX /= length;
+          directionY /= length;
+          directionZ /= length;
+          body.velocity.x += directionX * 3.0;
+          body.velocity.y += 3.6 + Math.max(0, directionY) * 1.2;
+          body.velocity.z += directionZ * 3.0;
           body.angularVelocity.x += 5.0 + (sequence % 3) * 1.4;
           body.angularVelocity.y += 4.0 + (sequence % 4) * 1.1;
           body.angularVelocity.z += 3.5 + (sequence % 2) * 1.8;
@@ -1302,6 +1423,7 @@ function makeCarVisual(color, playerName = "") {
     get shellStyle() { return shellStyle; },
     setPlayerName,
     applyImpact,
+    applyLaunchStress,
     updateDebris,
     repairAll,
     getDamageSummary,
