@@ -982,7 +982,6 @@ function setSelectedChassisStyle(style) {
   localCar.setChassisStyle(selectedChassisStyle);
   chassisBody.velocity.set(0, 0, 0);
   chassisBody.angularVelocity.set(0, 0, 0);
-  physicsSystem.resetSuspension();
   resetLaunchStressBaseline();
   updateLocalVisual();
   return selectedChassisStyle;
