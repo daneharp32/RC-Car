@@ -726,6 +726,9 @@
         <input id="secretInfiniteGadgets" type="checkbox">
         <span>INFINITE GADGETS · REMOVE THE 3-PART LIMIT</span>
       </label>
+      <label class="sandbox-secret-toggle"><input id="secretInvincible" type="checkbox"><span>INVINCIBILITY · IGNORE VEHICLE DAMAGE</span></label>
+      <div class="sandbox-secret-setting"><label for="secretDamageMultiplier">DAMAGE MULTIPLIER <strong id="secretDamageMultiplierValue">1.00×</strong></label><input id="secretDamageMultiplier" type="range" min="0.5" max="4" step="0.25" value="1"></div>
+      <div class="sandbox-secret-setting"><label for="secretFlingResistance">FLING RESISTANCE <strong id="secretFlingResistanceValue">0%</strong></label><input id="secretFlingResistance" type="range" min="0" max="100" step="5" value="0"></div>
       <div class="sandbox-secret-settings">
         <div class="sandbox-secret-setting">
           <label for="secretCarSize"><span>CAR SIZE</span><strong id="secretCarSizeValue">1.00×</strong></label>
@@ -774,7 +777,7 @@
     <div class="menu-content create-lobby-content">
       <div class="menu-kicker">NEW MULTIPLAYER ROOM</div>
       <h1 class="menu-title">CREATE LOBBY</h1>
-      <p class="menu-description">Choose a lobby name and game mode.</p>
+      <p class="menu-description">Choose a lobby name, game mode, and session rules.</p>
 
       <label class="field">
         <span>Lobby name</span>
@@ -808,6 +811,10 @@
         </button>
       </div>
 
+      <div class="lobby-mode-heading">SESSION RULES</div>
+      <label class="sandbox-secret-toggle"><input id="lobbyAllowCheats" type="checkbox"><span>ALLOW SECRET-MENU CHEATS</span></label>
+      <label class="sandbox-secret-toggle"><input id="lobbyDamageEnabled" type="checkbox" checked><span>VEHICLE DAMAGE ENABLED</span></label>
+      <p class="fine-print">These rules apply to everyone who joins this lobby.</p>
       <p id="lobbyMapModeNotice" class="fine-print" style="display:none">RACE AND TIME TRIAL ARE DISABLED ON GRAVEL BASIN. FREE DRIVE IS AVAILABLE.</p>
       <p id="lobbyModeHint" class="fine-print" style="display:none">Your fastest valid lap is compared with the other drivers after the selected number of laps.</p>
       <button id="joinButton" class="menu-button" type="button">CREATE RACE LOBBY</button>
