@@ -330,9 +330,9 @@ function removeLiveAxleDynamics() {
 function makeAxleLink(chassisAnchor, axleAnchor, linkWidth, maxForce) {
   const chassisWorld = pointToWorld(chassisBody, chassisAnchor);
   const axleWorld = pointToWorld(rearAxleBody, axleAnchor);
-  const direction = difference(axleWorld, chassisWorld);
-  const length = Math.max(0.05, Math.hypot(direction.x, direction.y, direction.z));
-  direction.scale(1 / length);
+  const rawDirection = difference(axleWorld, chassisWorld);
+  const length = Math.max(0.05, Math.hypot(rawDirection.x, rawDirection.y, rawDirection.z));
+  const direction = scaled(rawDirection, 1 / length);
   const link = new CANNON.Body({
     mass: 0.12 * Math.pow(vehicleScale, 3),
     material: chassisMaterial,
@@ -648,6 +648,10 @@ function setRearDriveForce(index, force, brake = 0) {
 }
 
 function resetSuspension() {
+  rearWheelRotations[0] = 0;
+  rearWheelRotations[1] = 0;
+  rearDriveRequests = [0, 0];
+  rearBrakeRequests = [0, 0];
   if (chassisStyle === "live-axle") rebuildLiveAxleDynamics();
 }
 
