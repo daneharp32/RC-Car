@@ -70,6 +70,7 @@ function resetCar() {
     x: spawnX, y: 0.24, z: spawnZ, yaw: spawnYaw
   };
   game.localCar?.repairAll?.();
+  game.impactDamageSystem?.clear?.();
   chassisBody.position.set(spawn.x, spawn.y, spawn.z);
   chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), spawn.yaw);
   chassisBody.velocity.set(0, 0, 0);
@@ -239,7 +240,8 @@ function updateDrivingControls(delta) {
     partHealth("brushless-motor"),
     partHealth("power-wiring"),
     partHealth("center-driveshaft"),
-    partHealth("spur-pinion-gears")
+    partHealth("spur-pinion-gears"),
+    partHealth("main-chassis")
   );
   const radioHealth = Math.min(partHealth("radio-receiver"), partHealth("receiver-servo-wiring"));
   for (let i = 0; i < 4; i++) {
