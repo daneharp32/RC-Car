@@ -253,13 +253,19 @@ function updateDrivingControls(delta) {
     (chassisBody.velocity.x * worldForwardAxis.x +
       chassisBody.velocity.z * worldForwardAxis.z) / headingLength
   );
-  const speedSteerScale = THREE.MathUtils.clamp(1 - forwardTravelSpeed / 26, 0.58, 1);
+  const chassisUsesLiveAxle = game.getChassisStyle?.() === "live-axle";
+  const speedSteerScale = THREE.MathUtils.clamp(
+    1 - forwardTravelSpeed / (chassisUsesLiveAxle ? 21 : 26),
+    chassisUsesLiveAxle ? 0.42 : 0.58,
+    1
+  );
   const steeringHealth = Math.min(
     partHealth("steering-servo"),
     partHealth("radio-receiver"),
     partHealth("receiver-servo-wiring")
   );
-  const targetSteeringAngle = steerState * 0.34 * speedSteerScale * steeringHealth;
+  const steeringLimit = chassisUsesLiveAxle ? 0.275 : 0.34;
+  const targetSteeringAngle = steerState * steeringLimit * speedSteerScale * steeringHealth;
   // Respond slightly quicker so counter-steer is available as soon as the
   // driver changes direction during an existing slide.
   const steeringResponse = 1 - Math.exp(-8.5 * delta);
@@ -428,7 +434,10 @@ function updateDrivingControls(delta) {
       minimumGrip,
       baseGrip - totalGripLoad * gripReduction
     );
-    applyWheelDamageModifiers(i, requestedGrip);
+    applyWheelDamageModifiers(
+      i,
+      requestedGrip * (chassisUsesLiveAxle && wheel.isFrontWheel ? 0.94 : 1)
+    );
   }
 
   // Do not apply flight controls while the truck is merely settling at spawn.
