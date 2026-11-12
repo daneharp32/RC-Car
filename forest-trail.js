@@ -48,7 +48,7 @@ function makeForestRibbon(THREE, route, length, heightAt, offset, width, materia
     const x1 = point.x + nx * (offset + width * 0.5), z1 = point.z + nz * (offset + width * 0.5);
     positions.push(x0, heightAt(x0, z0) + lift, z0, x1, heightAt(x1, z1) + lift, z1);
     uvs.push(t * length / 11, 0, t * length / 11, 1);
-    if (i < segments) { const a = i * 2; indices.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+    if (i < segments) { const a = i * 2; indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
@@ -277,7 +277,7 @@ export function createForestTrailSystem({ THREE, scene }) {
   }
   const grassMesh=new THREE.InstancedMesh(
     makeForestGrassGeometry(THREE),
-    new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:1,side:THREE.DoubleSide}),
+    new THREE.MeshStandardMaterial({color:0xffffff,roughness:1,side:THREE.DoubleSide}),
     grassSpots.length
   );
   for(let i=0;i<grassSpots.length;i++) {
@@ -285,9 +285,14 @@ export function createForestTrailSystem({ THREE, scene }) {
     dummy.position.set(grass.x,terrainHeight(grass.x,grass.z)+0.025,grass.z);
     dummy.rotation.set(0,grass.yaw,0); dummy.scale.setScalar(grass.scale);
     dummy.updateMatrix(); grassMesh.setMatrixAt(i,dummy.matrix);
+    grassMesh.setColorAt(i, new THREE.Color().setHSL(
+      0.23 + random() * 0.08, 0.42 + random() * 0.25, 0.22 + random() * 0.18
+    ));
   }
   grassMesh.castShadow=false; grassMesh.receiveShadow=false;
-  grassMesh.instanceMatrix.needsUpdate=true; grassMesh.computeBoundingSphere(); mapGroup.add(grassMesh);
+  grassMesh.instanceMatrix.needsUpdate=true;
+  if(grassMesh.instanceColor) grassMesh.instanceColor.needsUpdate=true;
+  grassMesh.computeBoundingSphere(); mapGroup.add(grassMesh);
 
   const rockSpots=[];
   for(let i=0;i<1150;i++) {
