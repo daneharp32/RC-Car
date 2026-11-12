@@ -863,12 +863,6 @@ function makeCarVisual(color, playerName = "") {
       addBolt(rearAxleTray, side * 0.145, 0.086, z, 0.0055);
     }
   }
-  // Two transverse battery restraints align over the relocated LiPo pack.
-  for (const z of [-0.37, -0.12]) {
-    roundedBox(rearAxleTray, [0.31, 0.012, 0.026], blackPlastic, [0, 0.112, z], null, 0.006);
-    roundedBox(rearAxleTray, [0.31, 0.004, 0.006], red, [0, 0.120, z], null, 0.002);
-  }
-
   // A separate rear ladder-frame module makes the swing-arm pivots, upper
   // link mounts and shock crossmember visibly tied into the chassis rails.
   const liveAxleFrame = makePart(
