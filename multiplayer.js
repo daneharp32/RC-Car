@@ -250,7 +250,7 @@ export function createMultiplayerSystem(game) {
         wheelRotations: [0, 0, 0, 0],
         steering: 0,
         chassisStyle: data.chassisStyle === "live-axle" ? "live-axle" : "standard",
-        rearAxlePose: data.rearAxlePose || null,
+        rearAxlePose: null,
         name
       };
       remotePlayers.set(peerId, remote);
