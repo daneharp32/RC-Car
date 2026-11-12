@@ -81,7 +81,9 @@ export function createImpactDamageSystem({ chassisBody }) {
         point: chassisContactPoint,
         normal,
         velocity: chassisVelocity,
-        time: performance.now()
+        time: typeof performance !== "undefined" && typeof performance.now === "function"
+          ? performance.now()
+          : Date.now()
       };
 
       // Cannon can report several contact equations for one crash. Keep the
@@ -98,7 +100,9 @@ export function createImpactDamageSystem({ chassisBody }) {
       if (pending.length > 6) pending.shift();
     } catch (error) {
       // A malformed collision event must never interrupt the render/physics loop.
-      console.warn("Ignored an incomplete RC car collision event:", error);
+      if (typeof console !== "undefined") {
+        console.warn("Ignored an incomplete RC car collision event:", error);
+      }
     }
   }
 
