@@ -1083,20 +1083,22 @@ function makeCarVisual(color, playerName = "") {
     const quaternion = new THREE.Quaternion(...state.quaternion).normalize();
     const rootScale = root.scale.x || 1;
     const visualScale = scale / rootScale;
+    const visualScaleZ = visualScale / chassisLengthScale;
     const visualPosition = position.clone().divideScalar(rootScale);
+    visualPosition.z /= chassisLengthScale;
     liveAxleAssembly.position.copy(visualPosition);
     liveAxleAssembly.quaternion.copy(quaternion);
 
     const axlePoint = (x, y, z) => new THREE.Vector3(
-      x * visualScale, y * visualScale, z * visualScale
+      x * visualScale, y * visualScale, z * visualScaleZ
     ).applyQuaternion(quaternion).add(visualPosition);
     for (const link of liveAxleLinks) {
       const side = link.side, isTrailing = link.kind === "trailing";
       const record = damageParts.get(link.segment.group.userData.damagePartId);
       if (record?.detached) continue;
       const chassisAnchor = isTrailing
-        ? new THREE.Vector3(side * 0.22 * visualScale, -0.045 * visualScale, (rearAxleZ - 0.40) * visualScale)
-        : new THREE.Vector3(side * 0.18 * visualScale, 0.12 * visualScale, (rearAxleZ - 0.24) * visualScale);
+        ? new THREE.Vector3(side * 0.22 * visualScale, -0.045 * visualScale, (rearAxleZ - 0.40) * visualScaleZ)
+        : new THREE.Vector3(side * 0.18 * visualScale, 0.12 * visualScale, (rearAxleZ - 0.24) * visualScaleZ);
       const axleAnchor = isTrailing
         ? axlePoint(side * 0.24, 0, 0)
         : axlePoint(-side * 0.13, 0.055, 0);
@@ -1107,14 +1109,14 @@ function makeCarVisual(color, playerName = "") {
       if (damageParts.get(shock.group.userData.damagePartId)?.detached) continue;
       updateLiveAxleShock(
         shock.group,
-        new THREE.Vector3(side * 0.205 * visualScale, 0.16 * visualScale, (rearAxleZ - 0.075) * visualScale),
+        new THREE.Vector3(side * 0.205 * visualScale, 0.16 * visualScale, (rearAxleZ - 0.075) * visualScaleZ),
         axlePoint(side * 0.215, 0.065, 0)
       );
     }
     if (!damageParts.get(liveAxleDriveshaft.group.userData.damagePartId)?.detached) {
       updateLiveAxleSegment(
         liveAxleDriveshaft,
-        new THREE.Vector3(0, 0.09 * visualScale, (rearAxleZ - 0.30) * visualScale),
+        new THREE.Vector3(0, 0.09 * visualScale, (rearAxleZ - 0.30) * visualScaleZ),
         axlePoint(0, -0.005, -0.17)
       );
       driveshaftCoupler.position.y = 0.18;
@@ -1132,7 +1134,7 @@ function makeCarVisual(color, playerName = "") {
         : 0.31 * visualScale;
       updateLimitStrap(
         strap,
-        new THREE.Vector3(side * 0.235 * visualScale, 0.205 * visualScale, (rearAxleZ - 0.085) * visualScale),
+        new THREE.Vector3(side * 0.235 * visualScale, 0.205 * visualScale, (rearAxleZ - 0.085) * visualScaleZ),
         axlePoint(side * 0.235, 0.12, 0),
         strapMaxLength
       );
