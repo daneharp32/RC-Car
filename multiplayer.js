@@ -317,7 +317,7 @@ export function createMultiplayerSystem(game) {
       mode.className = "lobby-row-mode";
       const mapLabel = lobby.mapId === "gravel-basin"
         ? "GRAVEL BASIN"
-        : lobby.mapId === "forest-trail" ? "WHISPERING PINES" : "CLUB DIRT CIRCUIT";
+        : "CLUB DIRT CIRCUIT";
       const rules = [lobby.allowCheats ? "CHEATS ON" : "CHEATS OFF", lobby.damageEnabled === false ? "DAMAGE OFF" : "DAMAGE ON"];
       mode.textContent = (lobby.mode === "sandbox"
         ? "SANDBOX · BUILD & DRIVE ANYTIME"
@@ -463,7 +463,7 @@ export function createMultiplayerSystem(game) {
         const mode = ["race", "free-drive", "time-trial", "sandbox"].includes(item.mode)
           ? item.mode
           : "race";
-        const mapId = ["closed-course", "gravel-basin", "forest-trail"].includes(item.mapId)
+        const mapId = ["closed-course", "gravel-basin"].includes(item.mapId)
           ? item.mapId : "closed-course";
         if (mapId === "gravel-basin" && !["free-drive", "sandbox"].includes(mode)) continue;
 
@@ -588,7 +588,7 @@ export function createMultiplayerSystem(game) {
           id: message.id,
           name: name || "Untitled Lobby",
           mode,
-          mapId: ["closed-course", "gravel-basin", "forest-trail"].includes(message.mapId)
+          mapId: ["closed-course", "gravel-basin"].includes(message.mapId)
             ? message.mapId : "closed-course",
           laps: Number.isFinite(message.laps) ? Math.max(1, Math.min(20, Math.floor(message.laps))) : 3,
           allowCheats: message.allowCheats === true,
@@ -733,7 +733,7 @@ export function createMultiplayerSystem(game) {
     if (joined || room) return;
     startDirectory();
 
-    const selectedMapId = ["closed-course", "gravel-basin", "forest-trail"].includes(lobby.mapId)
+    const selectedMapId = ["closed-course", "gravel-basin"].includes(lobby.mapId)
       ? lobby.mapId : "closed-course";
     if (selectedMapId === "gravel-basin" && !["free-drive", "sandbox"].includes(lobby.mode)) {
       showToast("Race and Time Trial are only available on Club Dirt Circuit.");
