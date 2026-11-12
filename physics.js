@@ -728,6 +728,13 @@ function solveLiveRearAxle() {
       hubWorld.z - hitPoint.z
     );
     const tireRadius = 0.158 * scale;
+    // RaycastVehicle reports the ground as soon as its long sensor ray sees
+    // it. That is not the same as tire contact: ignore the early sensor hit
+    // until the tire itself is within a small contact tolerance.
+    if (distance > tireRadius + 0.012 * scale) {
+      wheel.deltaRotation = 0;
+      continue;
+    }
     const penetration = Math.max(0, tireRadius - distance);
     const groundVelocity = result.body?.getVelocityAtWorldPoint
       ? result.body.getVelocityAtWorldPoint(hitPoint, new CANNON.Vec3())
@@ -739,14 +746,10 @@ function solveLiveRearAxle() {
     // penetration, so penetration-only contact would provide no static load.
     // Carry the axle weight plus a rear share of sprung chassis weight, then
     // add compression and velocity response for bumps and landings.
-    const rearContactCount = Math.max(
-      1,
-      vehicle.wheelInfos.slice(2, 4).filter((rearWheel) => rearWheel.isInContact).length
-    );
     const rearStaticLoad = (
       rearAxleBody.mass * 9.82 +
       chassisBody.mass * 9.82 * 0.42
-    ) / rearContactCount;
+    ) * 0.5;
     const normalForce = clamp(
       rearStaticLoad +
         penetration * 2100 * scale * scale -
