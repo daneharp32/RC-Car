@@ -38,6 +38,18 @@ function makeCarVisual(color, playerName = "") {
   const amber = new THREE.MeshStandardMaterial({ color: 0xffbd58, emissive: 0x7d3100, emissiveIntensity: 0.18 });
 
   const damageParts = new Map();
+  let totalled = false;
+
+  function isActiveDamageRecord(record) {
+    if (record.id === "uploaded-scx30-ranger-shell") {
+      return shellStyle === "ranger" && shellGroup.visible && record.group.visible;
+    }
+    if (record.id === "prerunner-shell-visual") {
+      return shellStyle === "prerunner" && shellGroup.visible && record.group.visible;
+    }
+    return true;
+  }
+
   function getDamageProfile(id) {
     if (id === "main-chassis") return { health: 180, mass: 0.9, sensitivity: 0.34 };
     if (id.includes("shell-visual") || id.includes("ranger-shell")) return { health: 92, mass: 0.62, sensitivity: 1.22 };
@@ -1055,16 +1067,89 @@ function makeCarVisual(color, playerName = "") {
     for (const record of damageParts.values()) {
       if (record.detached || record.health < record.maxHealth) restoreRecord(record);
     }
+    totalled = false;
     return getDamageSummary();
   }
 
+  function triggerCatastrophicFailure() {
+    if (totalled) return false;
+    totalled = true;
+    root.updateMatrixWorld(true);
+
+    const vehicleCenter = root.getWorldPosition(new THREE.Vector3());
+    const baseVelocity = chassisBody?.velocity || { x: 0, y: 0, z: 0 };
+    let released = 0;
+    let sequence = 0;
+
+    for (const record of damageParts.values()) {
+      if (!isActiveDamageRecord(record)) continue;
+
+      if (record.detached) {
+        const body = record.debrisBody;
+        if (body) {
+          const direction = body.position.vsub(
+            new CANNON.Vec3(vehicleCenter.x, vehicleCenter.y, vehicleCenter.z),
+            new CANNON.Vec3()
+          );
+          if (direction.lengthSquared() < 0.01) {
+            direction.set(Math.sin(sequence * 2.1), 0.3, Math.cos(sequence * 2.1));
+          }
+          direction.normalize();
+          body.velocity.x += direction.x * 3.0;
+          body.velocity.y += 3.6 + Math.max(0, direction.y) * 1.2;
+          body.velocity.z += direction.z * 3.0;
+          body.angularVelocity.x += 5.0 + (sequence % 3) * 1.4;
+          body.angularVelocity.y += 4.0 + (sequence % 4) * 1.1;
+          body.angularVelocity.z += 3.5 + (sequence % 2) * 1.8;
+        }
+        sequence++;
+        continue;
+      }
+
+      if (!isPartAttached(record) || !isPartVisible(record) || !record.group.parent) continue;
+      record.group.updateWorldMatrix(true, true);
+      const partPosition = record.group.getWorldPosition(new THREE.Vector3());
+      const direction = partPosition.sub(vehicleCenter);
+      if (direction.lengthSq() < 0.01) {
+        direction.set(Math.sin(sequence * 2.399), 0.35, Math.cos(sequence * 2.399));
+      }
+      direction.normalize();
+
+      const launchSpeed = 3.8 + (sequence % 5) * 0.55;
+      const velocity = [
+        (baseVelocity.x || 0) + direction.x * launchSpeed,
+        (baseVelocity.y || 0) + 3.2 + Math.max(0, direction.y) * 1.2,
+        (baseVelocity.z || 0) + direction.z * launchSpeed
+      ];
+      const angularVelocity = [
+        4.5 + (sequence % 4) * 1.6,
+        3.8 + (sequence % 5) * 1.3,
+        4.2 + (sequence % 3) * 1.8
+      ];
+
+      record.health = 0;
+      detachPart(record, { speed: 10, velocity, angularVelocity });
+      released++;
+      sequence++;
+    }
+
+    return released > 0 || totalled;
+  }
+
   function getDamageSummary() {
-    const records = [...damageParts.values()];
+    const records = [...damageParts.values()].filter(isActiveDamageRecord);
     const damaged = records.filter((record) => record.health < record.maxHealth - 0.01);
     const detached = records.filter((record) => record.detached);
+    const totalHealth = records.reduce((sum, record) => sum + record.maxHealth, 0);
+    const remainingHealth = records.reduce((sum, record) => sum + record.health, 0);
+    const damagePercent = totalHealth > 0
+      ? THREE.MathUtils.clamp(Math.round((1 - remainingHealth / totalHealth) * 100), 0, 100)
+      : 0;
     return {
       damaged: damaged.length,
       detached: detached.length,
+      damagePercent,
+      totalled,
       damagedNames: damaged.map((record) => record.label),
       detachedNames: detached.map((record) => record.label)
     };
@@ -1085,7 +1170,7 @@ function makeCarVisual(color, playerName = "") {
         w: body ? [body.angularVelocity.x, body.angularVelocity.y, body.angularVelocity.z] : null
       });
     }
-    return { parts };
+    return { parts, totalled };
   }
 
   function applyDamageSnapshot(snapshot) {
@@ -1131,6 +1216,7 @@ function makeCarVisual(color, playerName = "") {
         record.health = health;
       }
     }
+    totalled = snapshot.totalled === true;
   }
 
   // The detailed chassis remains unchanged beneath either removable shell.
@@ -1225,7 +1311,9 @@ function makeCarVisual(color, playerName = "") {
     isPartDetached,
     getDamagePartOptions,
     debugDamagePart,
-    debugDetachPart
+    debugDetachPart,
+    triggerCatastrophicFailure,
+    isTotalled() { return totalled; }
   };
 }
   return makeCarVisual;
