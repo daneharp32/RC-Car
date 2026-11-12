@@ -1493,15 +1493,16 @@ function animate(now) {
   // The showroom camera presents the parked truck in menu and garage views.
   if (garage.viewMode === "menu" || garage.viewMode === "mode-select" || garage.viewMode === "create-lobby" || garage.viewMode === "garage" || garage.viewMode === "sandbox-builder") {
     easeCameraFov(58, delta, 4.0);
-    const distance = garage.viewMode === "sandbox-builder" ? 3.45 : garage.viewMode === "garage" ? 2.35 : 5.1;
-    const height = garage.viewMode === "sandbox-builder" ? 1.55 : garage.viewMode === "garage" ? 1.18 : 2.15;
+    const showroomScale = Math.max(1, localCar.root.scale.x || 1);
+    const distance = (garage.viewMode === "sandbox-builder" ? 3.45 : garage.viewMode === "garage" ? 2.35 : 5.1) * showroomScale;
+    const height = (garage.viewMode === "sandbox-builder" ? 1.55 : garage.viewMode === "garage" ? 1.18 : 2.15) * showroomScale;
     const orbitDirection = new THREE.Vector3(0, 0, 1)
       .applyAxisAngle(new THREE.Vector3(0, 1, 0), controls.cameraOrbitYaw + (garage.viewMode === "menu" ? -0.18 : 0));
     const showroomCamera = localCar.root.position.clone()
       .addScaledVector(orbitDirection, distance)
       .add(new THREE.Vector3(0, height, 0));
     camera.position.lerp(showroomCamera, 1 - Math.exp(-3.2 * delta));
-    camera.lookAt(localCar.root.position.clone().add(new THREE.Vector3(0, 0.12, 0)));
+    camera.lookAt(localCar.root.position.clone().add(new THREE.Vector3(0, 0.12 * showroomScale, 0)));
     garage.updateHoverBounds();
   } else {
   // Finished drivers can spectate a live opponent; otherwise each camera
