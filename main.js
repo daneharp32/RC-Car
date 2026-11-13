@@ -6,6 +6,7 @@ import { createControlsSystem } from "./controls.js";
 import { createImpactDamageSystem } from "./damage-system.js";
 import { createMultiplayerSystem } from "./multiplayer.js";
 import { createGarageSystem } from "./garage.js";
+import { createPartsLabSystem } from "./parts-lab.js";
 import { createSandboxSystem } from "./sandbox.js";
 import { createTrackSystem } from "./track.js";
 import { createGravelBasinSystem } from "./gravel-map.js";
@@ -1230,6 +1231,8 @@ const multiplayer = createMultiplayerSystem(game);
 game.multiplayer = multiplayer;
 const garage = createGarageSystem(game);
 game.garage = garage;
+const partsLab = createPartsLabSystem(game);
+game.partsLab = partsLab;
 const sandbox = createSandboxSystem(game);
 game.sandbox = sandbox;
 
@@ -1419,6 +1422,7 @@ $("openCreateLobbyButton").addEventListener("click", () => {
 });
 $("modeBackButton").addEventListener("click", () => garage.showMainMenu());
 $("menuGarageButton").addEventListener("click", () => garage.showGarage());
+$("menuPartsLabButton").addEventListener("click", () => garage.showPartsLab());
 $("garageBackButton").addEventListener("click", () => garage.showMainMenu());
 $("driveBackButton").addEventListener("click", () => garage.showModeSelect());
 
@@ -1470,6 +1474,7 @@ function animate(now) {
     }
   }
   garage.updateGarageShellAnimation(now);
+  partsLab.update(delta, now, garage.viewMode === "parts-lab");
   sandbox.update(delta, now);
   // The physics world is only active while the truck is on a driving screen.
   // This keeps showroom, menus, and the Sandbox builder completely stationary.
@@ -1576,18 +1581,20 @@ function animate(now) {
   $("damageCard").classList.toggle("totalled", damageSummary.totalled);
 
   // The showroom camera presents the parked truck in menu and garage views.
-  if (garage.viewMode === "menu" || garage.viewMode === "mode-select" || garage.viewMode === "create-lobby" || garage.viewMode === "garage" || garage.viewMode === "sandbox-builder") {
+  if (garage.viewMode === "menu" || garage.viewMode === "mode-select" || garage.viewMode === "create-lobby" || garage.viewMode === "garage" || garage.viewMode === "sandbox-builder" || garage.viewMode === "parts-lab") {
     easeCameraFov(58, delta, 4.0);
     const showroomScale = Math.max(1, localCar.root.scale.x || 1);
-    const distance = (garage.viewMode === "sandbox-builder" ? 3.45 : garage.viewMode === "garage" ? 2.35 : 5.1) * showroomScale;
-    const height = (garage.viewMode === "sandbox-builder" ? 1.55 : garage.viewMode === "garage" ? 1.18 : 2.15) * showroomScale;
+    const isPartsLab = garage.viewMode === "parts-lab";
+    const distance = (isPartsLab ? 3.7 : garage.viewMode === "sandbox-builder" ? 3.45 : garage.viewMode === "garage" ? 2.35 : 5.1) * showroomScale;
+    const height = (isPartsLab ? 1.65 : garage.viewMode === "sandbox-builder" ? 1.55 : garage.viewMode === "garage" ? 1.18 : 2.15) * showroomScale;
     const orbitDirection = new THREE.Vector3(0, 0, 1)
       .applyAxisAngle(new THREE.Vector3(0, 1, 0), controls.cameraOrbitYaw + (garage.viewMode === "menu" ? -0.18 : 0));
-    const showroomCamera = localCar.root.position.clone()
+    const showroomAnchor = isPartsLab ? partsLab.getFocusPosition() : localCar.root.position.clone();
+    const showroomCamera = showroomAnchor.clone()
       .addScaledVector(orbitDirection, distance)
       .add(new THREE.Vector3(0, height, 0));
     camera.position.lerp(showroomCamera, 1 - Math.exp(-3.2 * delta));
-    camera.lookAt(localCar.root.position.clone().add(new THREE.Vector3(0, 0.12 * showroomScale, 0)));
+    camera.lookAt(isPartsLab ? showroomAnchor : localCar.root.position.clone().add(new THREE.Vector3(0, 0.12 * showroomScale, 0)));
     garage.updateHoverBounds();
   } else {
   // Finished drivers can spectate a live opponent; otherwise each camera
