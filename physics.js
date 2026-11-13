@@ -303,10 +303,9 @@ function applyCoupledRearSuspension() {
 
   const antiRollRate = 110 * vehicleScale * vehicleScale;
   const forceLimit = 14 * Math.pow(vehicleScale, 3);
-  const forceMagnitude = clamp(
-    differentialTravel * antiRollRate,
+  const forceMagnitude = Math.max(
     -forceLimit,
-    forceLimit
+    Math.min(forceLimit, differentialTravel * antiRollRate)
   ) * contactScale;
   if (Math.abs(forceMagnitude) < 0.01) return;
 
