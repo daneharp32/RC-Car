@@ -965,7 +965,8 @@ function makeCarVisual(color, playerName = "") {
         1
       );
       const sagDirection = new THREE.Vector3(0, -1, 0);
-      sagDirection.addScaledVector(strapDirection, -sagDirection.dot(strapDirection));
+      const strapAxis = strapDirection.clone().normalize();
+      sagDirection.addScaledVector(strapAxis, -sagDirection.dot(strapAxis));
       if (sagDirection.lengthSq() < 0.0001) sagDirection.set(0, 0, 1);
       sagDirection.normalize().multiplyScalar((1 - extension) * 0.038);
 
