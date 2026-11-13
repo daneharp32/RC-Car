@@ -753,6 +753,67 @@
       *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
     }
 
+
+    /* Standalone development workbench for uninstalled component prototypes. */
+    #mainMenuPanel .menu-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    #partsLabPanel {
+      position: fixed; z-index: 4; left: 20px; top: 50%; transform: translateY(-50%);
+      width: min(390px, calc(100vw - 40px)); max-height: calc(100vh - 34px);
+      padding: 22px; overflow-y: auto; overscroll-behavior: contain;
+      border: 1px solid rgba(125,190,235,.23); border-radius: 18px;
+      background: linear-gradient(145deg, rgba(12,24,37,.96), rgba(6,13,22,.96));
+      box-shadow: 0 28px 90px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.04);
+      backdrop-filter: blur(22px);
+    }
+    .parts-lab-kicker, .parts-lab-section-label {
+      color: #79c5ff; font-size: 9px; font-weight: 900; letter-spacing: .16em;
+    }
+    .parts-lab-title {
+      margin: 8px 0 7px; font: 900 24px/1.1 "Orbitron", ui-sans-serif, sans-serif;
+      letter-spacing: -.035em; color: #f4f8fc;
+    }
+    .parts-lab-copy { margin: 0 0 17px; color: #aebdca; font-size: 11px; line-height: 1.55; }
+    .parts-lab-part-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin: 9px 0 13px; }
+    .parts-lab-part-button {
+      min-width: 0; min-height: 56px; padding: 8px 5px; display: flex; flex-direction: column;
+      justify-content: center; gap: 4px; color: #dce8f2;
+      border: 1px solid rgba(175,200,222,.16); border-radius: 10px;
+      background: rgba(255,255,255,.045); text-align: center;
+    }
+    .parts-lab-part-button strong { font: 800 10px "Orbitron", ui-sans-serif, sans-serif; }
+    .parts-lab-part-button small { color: #91a5b7; font-size: 8px; letter-spacing: .08em; }
+    .parts-lab-part-button.active {
+      color: #fff; border-color: rgba(103,188,255,.8);
+      background: linear-gradient(145deg, rgba(36,125,195,.62), rgba(13,52,91,.72));
+      box-shadow: inset 0 0 0 1px rgba(175,225,255,.12), 0 5px 18px rgba(29,130,210,.15);
+    }
+    .parts-lab-part-button.active small { color: #c5e6ff; }
+    .parts-lab-info {
+      padding: 14px; border: 1px solid rgba(120,181,225,.18); border-radius: 11px;
+      background: linear-gradient(145deg, rgba(39,75,105,.2), rgba(4,11,19,.48));
+    }
+    .parts-lab-part-name { color: #eff7fd; font: 800 12px/1.4 "Orbitron", ui-sans-serif, sans-serif; }
+    .parts-lab-part-description { margin: 8px 0 11px; color: #b3c2cf; font-size: 10px; line-height: 1.55; }
+    .parts-lab-part-specs {
+      margin: 0; padding-top: 10px; border-top: 1px solid rgba(170,200,224,.12);
+      color: #83c6f6; font: 700 9px/1.8 ui-monospace, SFMono-Regular, Consolas, monospace;
+      white-space: pre-wrap;
+    }
+    .parts-lab-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+    .parts-lab-controls .menu-button { min-height: 40px; padding: 0 7px; font-size: 8px; }
+    .parts-lab-hint { margin: 12px 0 10px; color: #8296a8; font-size: 8px; line-height: 1.5; letter-spacing: .07em; text-align: center; }
+    .parts-lab-back { width: 100%; min-height: 40px; font-size: 9px; }
+    @media (max-width: 700px) {
+      #mainMenuPanel .menu-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      #mainMenuPanel .menu-button { padding: 0 7px; font-size: 8px; }
+      #partsLabPanel {
+        left: 12px; right: 12px; top: auto; bottom: 12px; transform: none;
+        width: auto; max-height: min(66dvh, 600px); padding: 15px;
+      }
+      .parts-lab-title { font-size: 21px; }
+      .parts-lab-copy { margin-bottom: 12px; }
+    }
+
   </style>
   <script type="importmap">
     {
@@ -784,6 +845,7 @@
       <div class="menu-actions">
         <button id="menuDriveButton" class="menu-button" type="button">DRIVE</button>
         <button id="menuGarageButton" class="menu-button secondary" type="button">GARAGE</button>
+        <button id="menuPartsLabButton" class="menu-button secondary" type="button">WIP PARTS</button>
       </div>
     </div>
   </section>
@@ -845,6 +907,35 @@
     </div>
     <button id="shellToggleButton" class="menu-button secondary" type="button">REMOVE BODY SHELL</button>
     <button id="garageBackButton" type="button">BACK TO MAIN MENU</button>
+  </section>
+
+  <section id="partsLabPanel" aria-labelledby="partsLabTitle" style="display:none">
+    <div class="parts-lab-kicker">COMPONENT DEVELOPMENT · NOT INSTALLED</div>
+    <h2 id="partsLabTitle" class="parts-lab-title">WIP PARTS LAB</h2>
+    <p class="parts-lab-copy">Inspect the new standalone component models. These are display models only and are not connected to either truck chassis.</p>
+    <div class="parts-lab-section-label">SELECT A COMPONENT</div>
+    <div class="parts-lab-part-list" role="group" aria-label="Choose a work-in-progress component">
+      <button class="parts-lab-part-button active" type="button" data-wip-part="servo" aria-pressed="true">
+        <strong>SERVO</strong><small>STEERING</small>
+      </button>
+      <button class="parts-lab-part-button" type="button" data-wip-part="motor" aria-pressed="false">
+        <strong>MOTOR</strong><small>BRUSHLESS</small>
+      </button>
+      <button class="parts-lab-part-button" type="button" data-wip-part="esc" aria-pressed="false">
+        <strong>ESC</strong><small>CONTROLLER</small>
+      </button>
+    </div>
+    <div class="parts-lab-info" aria-live="polite">
+      <div id="partsLabPartName" class="parts-lab-part-name">DIGITAL STEERING SERVO</div>
+      <p id="partsLabPartDescription" class="parts-lab-part-description">Loading component details...</p>
+      <pre id="partsLabPartSpecs" class="parts-lab-part-specs"></pre>
+    </div>
+    <div class="parts-lab-controls">
+      <button id="partsLabMotionToggle" class="menu-button" type="button" aria-pressed="true">PAUSE MOTION</button>
+      <button id="partsLabResetView" class="menu-button secondary" type="button">RESET VIEW</button>
+    </div>
+    <p class="parts-lab-hint">DRAG THE VIEW TO ROTATE · ANIMATIONS RUN IN REAL TIME</p>
+    <button id="partsLabBackButton" class="menu-button secondary parts-lab-back" type="button">BACK TO MAIN MENU</button>
   </section>
 
   <section id="sandboxBuilderPanel" class="menu-screen" style="display:none">
