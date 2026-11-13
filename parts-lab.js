@@ -676,7 +676,7 @@ export function createPartsLabSystem(game) {
     }
     addTube(springGroup,springPoints,0.027,materials.orange,8);
     addTorus(body,0.18,0.025,materials.darkAlloy,[0,0.47,0],[0,0,0],32);
-    addTorus(body,0.18,0.025,materials.darkAlloy,[0,1.34,0],[0,0,0],32);
+    addTorus(moving,0.18,0.025,materials.darkAlloy,[0,1.34,0],[0,0,0],32);
     return {body,moving,springGroup};
   }
   const shockParts = buildShock();
@@ -693,7 +693,6 @@ export function createPartsLabSystem(game) {
     const body=new THREE.Group();
     springModel.add(body);
     addTorus(body,0.22,0.035,materials.darkAlloy,[0,0.36,0],[0,0,0],36);
-    addTorus(body,0.22,0.035,materials.darkAlloy,[0,1.38,0],[0,0,0],36);
     const springGroup=new THREE.Group();
     springGroup.position.y=0.36;
     body.add(springGroup);
@@ -703,6 +702,7 @@ export function createPartsLabSystem(game) {
       points.push([Math.cos(a)*0.20,t,Math.sin(a)*0.20]);
     }
     addTube(springGroup,points,0.032,materials.orange,8);
+    addTorus(springGroup,0.22,0.035,materials.darkAlloy,[0,1,0],[0,0,0],36);
     return {body,springGroup};
   }
   const standaloneSpring=buildStandaloneSpring();
