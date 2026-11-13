@@ -45,7 +45,9 @@ export function createMultiplayerSystem(game) {
   function makeSnapshot() {
     return {
       name: driverName,
-      shellStyle: game.getShellStyle?.() === "ranger" ? "ranger" : "prerunner",
+      shellStyle: ["ranger", "prerunner", "none"].includes(game.getShellStyle?.())
+        ? game.getShellStyle()
+        : "prerunner",
       chassisStyle: game.getChassisStyle?.() === "solid-axle" ? "solid-axle" : "standard",
       rearSuspension: game.physicsSystem?.getRearSuspensionState?.() || [],
       x: chassisBody.position.x,
@@ -241,7 +243,10 @@ export function createMultiplayerSystem(game) {
     if (!remote) {
       const name = cleanPlayerName(data.name) || "Driver";
       const visual = makeCarVisual(colorForPeer(peerId), name);
-      visual.setShellStyle?.(data.shellStyle === "ranger" ? "ranger" : "prerunner");
+      visual.setShellStyle?.(
+        data.shellStyle === "none" ? "none" :
+          data.shellStyle === "ranger" ? "ranger" : "prerunner"
+      );
       visual.setChassisStyle?.(data.chassisStyle === "solid-axle" ? "solid-axle" : "standard");
       remote = {
         visual,
@@ -271,7 +276,9 @@ export function createMultiplayerSystem(game) {
         ? data.wheels.slice(0, 4).map((value) => Number.isFinite(value) ? value : 0)
         : remote.wheelRotations;
       remote.steering = Number.isFinite(data.steer) ? data.steer : 0;
-      const remoteShellStyle = data.shellStyle === "ranger" ? "ranger" : "prerunner";
+      const remoteShellStyle = data.shellStyle === "none"
+        ? "none"
+        : data.shellStyle === "ranger" ? "ranger" : "prerunner";
       if (remote.visual.shellStyle !== remoteShellStyle) {
         remote.visual.setShellStyle?.(remoteShellStyle);
       }
