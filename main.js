@@ -972,7 +972,9 @@ let selectedChassisStyle = "standard";
 localCar.setChassisStyle(selectedChassisStyle);
 let selectedShellStyle = shellModel ? "prerunner" : "ranger";
 function setSelectedShellStyle(style) {
-  selectedShellStyle = style === "ranger" ? "ranger" : "prerunner";
+  selectedShellStyle = style === "none"
+    ? "none"
+    : style === "ranger" ? "ranger" : "prerunner";
   selectedShellStyle = localCar.setShellStyle(selectedShellStyle);
   return selectedShellStyle;
 }
