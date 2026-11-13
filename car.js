@@ -38,9 +38,23 @@ function makeCarVisual(color, playerName = "") {
   const amber = new THREE.MeshStandardMaterial({ color: 0xffbd58, emissive: 0x7d3100, emissiveIntensity: 0.18 });
 
   const damageParts = new Map();
+  let chassisStyle = "standard";
+  const rearIndependentPartIds = new Set([
+    "rear-differential",
+    "rear-shock-tower",
+    "rear-left-lower-arm",
+    "rear-right-lower-arm",
+    "rear-left-camber-link",
+    "rear-right-camber-link",
+    "rear-left-wheel-carrier",
+    "rear-right-wheel-carrier",
+    "rear-left-oil-shock",
+    "rear-right-oil-shock"
+  ]);
   let totalled = false;
 
   function isActiveDamageRecord(record) {
+    if (chassisStyle === "solid-axle" && rearIndependentPartIds.has(record.id)) return false;
     if (record.id === "uploaded-scx30-ranger-shell") {
       return shellStyle === "ranger" && shellGroup.visible && record.group.visible;
     }
@@ -237,6 +251,7 @@ function makeCarVisual(color, playerName = "") {
     roundedBox(chassis, [0.018, 0.012, 0.085], blackPlastic, [-0.105 + i * 0.035, 0.012, 0.32], null, 0.004);
   }
 
+  const rearIndependentParts = [];
   // Front and rear bulkheads / differential cases.
   for (const end of [
     { z: frontAxleZ, id: "front-differential", label: "Front differential housing", desc: "Sealed front gearcase transfers drive to the left and right front half-shafts." },
@@ -250,6 +265,7 @@ function makeCarVisual(color, playerName = "") {
       cylinderBetween(diff, [side * 0.12, 0.018, end.z], [side * 0.30, -0.005, end.z], 0.014, alloy, 12);
     }
     for (const x of [-0.12, 0.12]) addBolt(diff, x, 0.095, end.z, 0.006);
+    if (end.id === "rear-differential") rearIndependentParts.push(diff);
   }
 
   // Central longitudinal driveshaft with separate couplers and a center support.
@@ -280,6 +296,7 @@ function makeCarVisual(color, playerName = "") {
       `${corner.name} lower suspension arm`,
       "Molded reinforced A-arm connects the chassis hinge pins to the wheel carrier and lets the wheel move vertically with the suspension."
     );
+    if (!isFront) rearIndependentParts.push(arm);
     const s = corner.side;
     const z = corner.z;
     const innerFront = [s * 0.075, -0.055, z - (isFront ? -0.075 : 0.075)];
@@ -296,6 +313,7 @@ function makeCarVisual(color, playerName = "") {
       `${corner.name} upper camber link`,
       "Adjustable upper link controls wheel camber and keeps the upright aligned as the suspension travels."
     );
+    if (!isFront) rearIndependentParts.push(upper);
     cylinderBetween(upper, [s * 0.10, 0.17, z + (isFront ? 0.025 : -0.025)],
       [s * 0.29, 0.13, z], 0.011, alloy, 10, 0.009);
     addMesh(upper, new THREE.SphereGeometry(0.015, 12, 10), red,
@@ -307,6 +325,7 @@ function makeCarVisual(color, playerName = "") {
       `${corner.name} wheel carrier / hub`,
       "The upright holds the axle bearings and connects the steering or rear toe links to the suspension arms."
     );
+    if (!isFront) rearIndependentParts.push(carrier);
     roundedBox(carrier, [0.075, 0.13, 0.085], blackPlastic, [s * 0.295, 0.005, z], null, 0.018);
     cylinderBetween(carrier, [s * 0.25, 0.005, z], [s * 0.35, 0.005, z], 0.031, alloy, 16);
     cylinderBetween(carrier, [s * 0.335, 0.005, z], [s * 0.355, 0.005, z], 0.022, red, 12);
@@ -325,6 +344,7 @@ function makeCarVisual(color, playerName = "") {
       end.label,
       "Reinforced vertical plate that anchors the upper shock eyes and suspension bracing."
     );
+    if (end.id === "rear-shock-tower") rearIndependentParts.push(tower);
     // Shorter tower plates keep the top mounts lower without changing any
     // wheel, arm, or physics attachment coordinates.
     roundedBox(tower, [0.47, 0.145, 0.032], carbonEdge, [0, 0.13, end.z], null, 0.012);
@@ -353,7 +373,7 @@ function makeCarVisual(color, playerName = "") {
     // lower eye stays in the same visual position; physics shocks are separate.
     const top = [s * 0.19, 0.195, z + (z < 0 ? 0.045 : -0.045)];
     const bottom = [s * 0.272, -0.012, z];
-    addShock(
+    const shock = addShock(
       chassisGroup,
       `${corner.label.toLowerCase().replace(" ", "-")}-oil-shock`,
       `${corner.label} oil-filled shock`,
@@ -362,6 +382,7 @@ function makeCarVisual(color, playerName = "") {
       bottom,
       springSilver
     );
+    if (corner.z > 0) rearIndependentParts.push(shock);
   }
 
   // Steering servo, servo saver, rack and two front steering links.
