@@ -158,7 +158,7 @@ export function createPartsLabSystem(game) {
 
   const servoModel = new THREE.Group();
   servoModel.name = "Detailed digital steering servo";
-  servoModel.position.y = 0.27;
+  servoModel.position.y = 0.21;
   showcase.add(servoModel);
 
   function buildServo() {
@@ -264,7 +264,7 @@ export function createPartsLabSystem(game) {
 
   const motorModel = new THREE.Group();
   motorModel.name = "Detailed 540 brushless motor";
-  motorModel.position.y = 0.27;
+  motorModel.position.y = 0.15;
   motorModel.visible = false;
   showcase.add(motorModel);
 
@@ -353,7 +353,7 @@ export function createPartsLabSystem(game) {
 
   const escModel = new THREE.Group();
   escModel.name = "Detailed brushless electronic speed controller";
-  escModel.position.y = 0.27;
+  escModel.position.y = 0.145;
   escModel.visible = false;
   showcase.add(escModel);
 
