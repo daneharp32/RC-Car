@@ -1431,7 +1431,7 @@ function resize() {
 }
 window.addEventListener("resize", resize);
 
-const CATASTROPHIC_DAMAGE_THRESHOLD = 25;
+const CATASTROPHIC_DAMAGE_THRESHOLD = 70;
 let lastTime = performance.now();
 let drivingControlErrorReported = false;
 function animate(now) {
@@ -1500,8 +1500,8 @@ function animate(now) {
 
     const stressNow = typeof performance !== "undefined" ? performance.now() : Date.now();
     if (
-      stressNow - lastLaunchStressAt >= 280 &&
-      (linearChange >= 4.1 || angularChange >= 7.0)
+      stressNow - lastLaunchStressAt >= 500 &&
+      (linearChange >= 6.0 || angularChange >= 10.0)
     ) {
       lastLaunchStressAt = stressNow;
       localCar.setDamageMultiplier?.(cheatModifiers.damageMultiplier);

@@ -67,7 +67,7 @@ export function createImpactDamageSystem({ chassisBody }) {
         relativeVelocity.y * normal.y +
         relativeVelocity.z * normal.z
       );
-      if (!Number.isFinite(impactSpeed) || impactSpeed < 3.2) return;
+      if (!Number.isFinite(impactSpeed) || impactSpeed < 5.0) return;
 
       const chassisPosition = readVector(chassisBody.position);
       const chassisContactPoint = {
@@ -89,7 +89,7 @@ export function createImpactDamageSystem({ chassisBody }) {
       // Cannon can report several contact equations for one crash. Keep the
       // strongest one in a short window instead of damaging multiple parts
       // repeatedly from the same impact.
-      if (hit.time - lastImpactAt < 150) {
+      if (hit.time - lastImpactAt < 260) {
         const last = pending[pending.length - 1];
         if (last && hit.speed > last.speed) pending[pending.length - 1] = hit;
         return;

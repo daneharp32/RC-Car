@@ -65,20 +65,20 @@ function makeCarVisual(color, playerName = "") {
   }
 
   function getDamageProfile(id) {
-    if (id === "main-chassis") return { health: 180, mass: 0.9, sensitivity: 0.34 };
-    if (id.includes("shell-visual") || id.includes("ranger-shell")) return { health: 92, mass: 0.62, sensitivity: 1.22 };
-    if (id.includes("bumper")) return { health: 76, mass: 0.24, sensitivity: 0.72 };
-    if (id.endsWith("-wheel")) return { health: 54, mass: 0.27, sensitivity: 1.18 };
-    if (id.includes("lower-arm") || id.includes("wheel-carrier")) return { health: 48, mass: 0.13, sensitivity: 1.18 };
-    if (id.includes("camber-link")) return { health: 36, mass: 0.055, sensitivity: 1.38 };
-    if (id.includes("oil-shock")) return { health: 44, mass: 0.10, sensitivity: 1.12 };
-    if (id.includes("shock-tower")) return { health: 62, mass: 0.15, sensitivity: 0.98 };
-    if (id === "steering-servo") return { health: 58, mass: 0.10, sensitivity: 1.05 };
-    if (id === "lipo-battery") return { health: 66, mass: 0.24, sensitivity: 1.10 };
-    if (id === "brushless-motor" || id === "electronic-speed-controller") return { health: 62, mass: 0.16, sensitivity: 1.08 };
-    if (id.includes("wiring")) return { health: 38, mass: 0.035, sensitivity: 1.45 };
-    if (id.includes("differential") || id.includes("driveshaft") || id.includes("gears")) return { health: 64, mass: 0.16, sensitivity: 1.05 };
-    return { health: 60, mass: 0.09, sensitivity: 1.0 };
+    if (id === "main-chassis") return { health: 360, mass: 0.9, sensitivity: 0.24 };
+    if (id.includes("shell-visual") || id.includes("ranger-shell")) return { health: 190, mass: 0.62, sensitivity: 0.74 };
+    if (id.includes("bumper")) return { health: 160, mass: 0.24, sensitivity: 0.48 };
+    if (id.endsWith("-wheel")) return { health: 120, mass: 0.27, sensitivity: 0.72 };
+    if (id.includes("lower-arm") || id.includes("wheel-carrier")) return { health: 115, mass: 0.13, sensitivity: 0.70 };
+    if (id.includes("camber-link")) return { health: 95, mass: 0.055, sensitivity: 0.72 };
+    if (id.includes("oil-shock")) return { health: 105, mass: 0.10, sensitivity: 0.68 };
+    if (id.includes("shock-tower")) return { health: 140, mass: 0.15, sensitivity: 0.62 };
+    if (id === "steering-servo") return { health: 130, mass: 0.10, sensitivity: 0.68 };
+    if (id === "lipo-battery") return { health: 145, mass: 0.24, sensitivity: 0.72 };
+    if (id === "brushless-motor" || id === "electronic-speed-controller") return { health: 140, mass: 0.16, sensitivity: 0.68 };
+    if (id.includes("wiring")) return { health: 90, mass: 0.035, sensitivity: 0.80 };
+    if (id.includes("differential") || id.includes("driveshaft") || id.includes("gears")) return { health: 145, mass: 0.16, sensitivity: 0.68 };
+    return { health: 130, mass: 0.09, sensitivity: 0.68 };
   }
 
   function makePart(parent, id, label, description) {
@@ -1237,6 +1237,9 @@ function makeCarVisual(color, playerName = "") {
     return false;
   }
 
+  // Ordinary impacts now remove less health; the Sandbox damage multiplier
+  // remains available for players who deliberately want harsher damage.
+  const DURABILITY_DAMAGE_FACTOR = 0.55;
   let damageMultiplier = 1;
   function setDamageMultiplier(value) { damageMultiplier = Number.isFinite(value) ? THREE.MathUtils.clamp(value, 0.1, 8) : 1; }
   function applyLaunchStress(stress = {}) {
@@ -1257,8 +1260,8 @@ function makeCarVisual(color, playerName = "") {
 
     // A rapid velocity change or sharp spin can flex body mounts and loosen
     // suspension hardware even without a direct collision with an obstacle.
-    const severity = Math.max(linearChange / 4.8, angularChange / 7.5);
-    if (!Number.isFinite(severity) || severity < 0.85) return null;
+    const severity = Math.max(linearChange / 6.0, angularChange / 10.0);
+    if (!Number.isFinite(severity) || severity < 1.1) return null;
 
     root.updateWorldMatrix(true, false);
     const inverseRotation = root.getWorldQuaternion(new THREE.Quaternion()).invert();
@@ -1284,9 +1287,10 @@ function makeCarVisual(color, playerName = "") {
     );
 
     if (activeShell) {
-      const shellDamage = (severity >= 2.65
+      const shellDamage = (severity >= 4.5
         ? activeShell.health
-        : 12 + Math.max(0, severity - 0.85) * 44) * damageMultiplier;
+        : 7 + Math.max(0, severity - 1.1) * 24) *
+        damageMultiplier * DURABILITY_DAMAGE_FACTOR;
       const detached = damageRecord(activeShell, shellDamage, launch);
       affected.push({ id: activeShell.id, detached });
     }
@@ -1310,21 +1314,22 @@ function makeCarVisual(color, playerName = "") {
       targetIds = [localKick.z < 0 ? "front-bumper" : "rear-bumper"];
     }
 
-    if (severity >= 1.25) {
+    if (severity >= 1.6) {
       const mount = damageParts.get("body-mount-posts");
       if (mount && !mount.detached) {
-        const mountDamage = severity >= 3.0
+        const mountDamage = severity >= 5.0
           ? mount.health
-          : 10 + (severity - 1.25) * 28;
+          : 5 + (severity - 1.6) * 15;
         const detached = damageRecord(mount, mountDamage, launch);
         affected.push({ id: mount.id, detached });
       }
     }
 
-    if (severity >= 1.4) {
-      const componentDamage = (severity >= 2.7
+    if (severity >= 1.8) {
+      const componentDamage = (severity >= 5.0
         ? Infinity
-        : 8 + (severity - 1.4) * 28) * damageMultiplier;
+        : 4 + (severity - 1.8) * 15) *
+        damageMultiplier * DURABILITY_DAMAGE_FACTOR;
       for (const id of targetIds) {
         const record = damageParts.get(id);
         if (!record || record.detached || !isPartVisible(record)) continue;
@@ -1332,7 +1337,7 @@ function makeCarVisual(color, playerName = "") {
         affected.push({ id, detached });
         // A medium fling strains one part; only stronger launches spread
         // the load into a second nearby suspension link.
-        if (severity < 2.15) break;
+        if (severity < 3.0) break;
       }
     }
 
@@ -1347,7 +1352,7 @@ function makeCarVisual(color, playerName = "") {
 
   function applyImpact(impact) {
     const speed = Number(impact?.speed);
-    if (!Number.isFinite(speed) || speed < 3.2 || !impact?.point) return null;
+    if (!Number.isFinite(speed) || speed < 5.0 || !impact?.point) return null;
 
     root.updateMatrixWorld(true);
     const worldPoint = new THREE.Vector3(impact.point.x, impact.point.y, impact.point.z);
@@ -1385,7 +1390,8 @@ function makeCarVisual(color, playerName = "") {
     if (!primary) return null;
 
     const applyTo = [];
-    const damageAmount = (Math.max(0, speed - 3.0) * 13.0) * primary.sensitivity * damageMultiplier;
+    const damageAmount = (Math.max(0, speed - 4.5) * 7.0) *
+      primary.sensitivity * damageMultiplier * DURABILITY_DAMAGE_FACTOR;
     const launch = {
       speed,
       velocity: impact.velocity ? [impact.velocity.x, impact.velocity.y, impact.velocity.z] : null
@@ -1393,7 +1399,7 @@ function makeCarVisual(color, playerName = "") {
     const primaryDetached = damageRecord(primary, damageAmount, launch);
     applyTo.push({ label: primary.label, detached: primaryDetached });
 
-    if (speed >= 8.4 && candidates[1] && candidates[1].score - candidates[0].score < 0.48) {
+    if (speed >= 11.0 && candidates[1] && candidates[1].score - candidates[0].score < 0.48) {
       const secondary = candidates[1].record;
       const secondaryDetached = damageRecord(
         secondary,
