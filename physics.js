@@ -303,10 +303,9 @@ function applyCoupledRearSuspension() {
 
   const antiRollRate = 110 * vehicleScale * vehicleScale;
   const forceLimit = 14 * Math.pow(vehicleScale, 3);
-  const forceMagnitude = clamp(
-    differentialTravel * antiRollRate,
+  const forceMagnitude = Math.max(
     -forceLimit,
-    forceLimit
+    Math.min(forceLimit, differentialTravel * antiRollRate)
   ) * contactScale;
   if (Math.abs(forceMagnitude) < 0.01) return;
 
@@ -329,8 +328,18 @@ function applyCoupledRearSuspension() {
 
   // If the left tire is more compressed, push down on the left frame mount
   // and up on the right one. The forces cancel vertically and only resist roll.
-  chassisBody.applyForce(scaled(up, -forceMagnitude), leftOffset);
-  chassisBody.applyForce(scaled(up, forceMagnitude), rightOffset);
+  const leftForce = new CANNON.Vec3(
+    up.x * -forceMagnitude,
+    up.y * -forceMagnitude,
+    up.z * -forceMagnitude
+  );
+  const rightForce = new CANNON.Vec3(
+    up.x * forceMagnitude,
+    up.y * forceMagnitude,
+    up.z * forceMagnitude
+  );
+  chassisBody.applyForce(leftForce, leftOffset);
+  chassisBody.applyForce(rightForce, rightOffset);
 }
 
 // RaycastVehicle.addToWorld registers its wheel/contact update first. This
