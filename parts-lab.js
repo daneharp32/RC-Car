@@ -77,13 +77,18 @@ export function createPartsLabSystem(game) {
   }
 
   function addScrew(parent, position, size = 0.045, material = materials.brightAlloy, axis = "y") {
-    const rotation = axis === "z" ? [Math.PI / 2, 0, 0] : [0, 0, 0];
+    const alongZ = axis === "z";
+    const rotation = alongZ ? [Math.PI / 2, 0, 0] : [0, 0, 0];
     addCylinder(parent, size, size, 0.025, material, position, rotation, 16);
-    const slot = addBox(parent,
-      axis === "z" ? [size * 1.15, 0.012, 0.012] : [size * 1.15, 0.012, 0.012],
-      [position[0], position[1] + (axis === "y" ? 0.014 : 0), position[2]],
-      materials.black, 0.002);
-    if (axis === "z") slot.rotation.z = 0;
+    // Put the screwdriver slot on the exposed face of the head, along the
+    // plane normal to the screw axis rather than buried in its cylindrical side.
+    const slotSize = alongZ
+      ? [size * 1.25, size * 0.22, 0.006]
+      : [size * 1.25, 0.006, size * 0.22];
+    const slotPosition = alongZ
+      ? [position[0], position[1], position[2] + 0.014]
+      : [position[0], position[1] + 0.014, position[2]];
+    addBox(parent, slotSize, slotPosition, materials.black, 0.001);
   }
 
   function makeLabelTexture(title, subtitle = "") {
