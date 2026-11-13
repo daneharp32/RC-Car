@@ -12,21 +12,108 @@ showroomFloor.rotation.x = -Math.PI / 2;
 showroomFloor.position.y = -0.035;
 showroomFloor.receiveShadow = true;
 garageGroup.add(showroomFloor);
-const showroomBackWall = new THREE.Mesh(new THREE.BoxGeometry(24, 8, 0.35),
-  new THREE.MeshStandardMaterial({ color: 0x172433, roughness: 0.85 }));
-showroomBackWall.position.set(0, 3.9, -5.2);
+const showroomRoomMaterials = {
+  wall: new THREE.MeshStandardMaterial({ color: 0x172433, roughness: 0.86, metalness: 0.08 }),
+  side: new THREE.MeshStandardMaterial({ color: 0x243747, roughness: 0.82, metalness: 0.14 }),
+  roof: new THREE.MeshStandardMaterial({ color: 0x101b27, roughness: 0.9, metalness: 0.18 }),
+  trim: new THREE.MeshStandardMaterial({ color: 0x718797, roughness: 0.42, metalness: 0.72 }),
+  darkTrim: new THREE.MeshStandardMaterial({ color: 0x0b141e, roughness: 0.68, metalness: 0.4 }),
+  glass: new THREE.MeshStandardMaterial({ color: 0x163d58, roughness: 0.22, metalness: 0.35, emissive: 0x071a2b, emissiveIntensity: 0.35 }),
+  blueGlow: new THREE.MeshBasicMaterial({ color: 0x2798ff }),
+  warmGlow: new THREE.MeshBasicMaterial({ color: 0xffd59a })
+};
+function showroomBox(size, position, material, castShadow = false, receiveShadow = false) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(size[0], size[1], size[2]), material);
+  mesh.position.set(position[0], position[1], position[2]);
+  mesh.castShadow = castShadow;
+  mesh.receiveShadow = receiveShadow;
+  garageGroup.add(mesh);
+  return mesh;
+}
+
+// A larger enclosed workshop volume: a full rear wall, two long side walls,
+// a front roller door, and a roof. The room remains centered on the display pad.
+const showroomRoomBackZ = -11.72;
+const showroomRoomFrontZ = 11.72;
+const showroomBackWall = new THREE.Mesh(
+  new THREE.BoxGeometry(24, 8, 0.35),
+  showroomRoomMaterials.wall
+);
 showroomBackWall.receiveShadow = true;
 garageGroup.add(showroomBackWall);
-const showroomSideMaterial = new THREE.MeshStandardMaterial({ color: 0x25384b, roughness: 0.82 });
-for (const x of [-8.5, 8.5]) {
-  const column = new THREE.Mesh(new THREE.BoxGeometry(0.22, 5.8, 0.28), showroomSideMaterial);
-  column.position.set(x, 2.85, -2.7);
-  garageGroup.add(column);
-}
+showroomBackWall.position.set(0, 3.9, showroomRoomBackZ);
+showroomBackWall.material = showroomRoomMaterials.wall;
 const showroomStripe = new THREE.Mesh(new THREE.BoxGeometry(9, 0.025, 0.045),
-  new THREE.MeshBasicMaterial({ color: 0x2798ff }));
-showroomStripe.position.set(0, 2.65, -4.98);
+  showroomRoomMaterials.blueGlow);
+showroomStripe.position.set(0, 2.65, showroomRoomBackZ + 0.22);
 garageGroup.add(showroomStripe);
+
+// Full left and right walls with inset-looking glazed workshop windows.
+for (const side of [-1, 1]) {
+  showroomBox([0.38, 8, 23.45], [side * 11.82, 3.9, 0], showroomRoomMaterials.side, true, true);
+  showroomBox([0.48, 8.1, 0.48], [side * 11.72, 3.9, -11.48], showroomRoomMaterials.trim);
+  showroomBox([0.48, 8.1, 0.48], [side * 11.72, 3.9, 11.48], showroomRoomMaterials.trim);
+
+  for (const z of [-7.2, -1.5, 4.2]) {
+    showroomBox([0.055, 2.0, 3.5], [side * 11.61, 4.35, z], showroomRoomMaterials.glass);
+    for (const y of [3.30, 5.40]) {
+      showroomBox([0.10, 0.075, 3.65], [side * 11.57, y, z], showroomRoomMaterials.trim);
+    }
+    for (const offset of [-1.82, 1.82]) {
+      showroomBox([0.10, 2.15, 0.075], [side * 11.57, 4.35, z + offset], showroomRoomMaterials.trim);
+    }
+  }
+
+  showroomBox([0.08, 0.055, 20.5], [side * 11.57, 6.95, 0], showroomRoomMaterials.blueGlow);
+  showroomBox([0.08, 0.045, 20.5], [side * 11.57, 1.05, 0], showroomRoomMaterials.darkTrim);
+  for (let z = -9.6; z <= 9.61; z += 2.4) {
+    showroomBox([0.08, 7.8, 0.10], [side * 11.56, 3.85, z], showroomRoomMaterials.darkTrim);
+  }
+}
+
+// Front wall with a wide industrial roller shutter, perimeter framing and
+// upper glazed panels. This completes the enclosure without closing the view
+// from the usual showroom camera position.
+showroomBox([7.1, 8, 0.36], [-8.45, 3.9, showroomRoomFrontZ], showroomRoomMaterials.side, true, true);
+showroomBox([7.1, 8, 0.36], [8.45, 3.9, showroomRoomFrontZ], showroomRoomMaterials.side, true, true);
+showroomBox([9.9, 1.65, 0.36], [0, 7.18, showroomRoomFrontZ], showroomRoomMaterials.side, true, true);
+showroomBox([9.35, 5.9, 0.12], [0, 3.05, showroomRoomFrontZ - 0.18], showroomRoomMaterials.darkTrim);
+showroomBox([9.08, 5.64, 0.055], [0, 3.05, showroomRoomFrontZ - 0.105], showroomRoomMaterials.wall);
+for (let y = 0.45; y <= 5.55; y += 0.38) {
+  showroomBox([8.85, 0.035, 0.035], [0, y, showroomRoomFrontZ - 0.064], showroomRoomMaterials.trim);
+}
+for (let x of [-4.25, 4.25]) {
+  showroomBox([0.035, 5.8, 0.045], [x, 3.05, showroomRoomFrontZ - 0.055], showroomRoomMaterials.blueGlow);
+}
+for (const x of [-8.45, 8.45]) {
+  showroomBox([5.9, 1.55, 0.07], [x, 6.0, showroomRoomFrontZ - 0.20], showroomRoomMaterials.glass);
+  showroomBox([6.05, 0.07, 0.12], [x, 6.80, showroomRoomFrontZ - 0.16], showroomRoomMaterials.trim);
+}
+
+// Continuous roof slab and exposed cross beams make the room read as a
+// complete indoor garage from high orbit and during showroom rotation.
+showroomBox([24, 0.36, 24], [0, 8.05, 0], showroomRoomMaterials.roof, true, true);
+for (const z of [-9, -4.5, 0, 4.5, 9]) {
+  showroomBox([23.4, 0.20, 0.24], [0, 7.78, z], showroomRoomMaterials.darkTrim);
+}
+for (const x of [-7.5, 0, 7.5]) {
+  showroomBox([0.20, 0.20, 22.8], [x, 7.77, 0], showroomRoomMaterials.darkTrim);
+}
+for (const x of [-5.5, 0, 5.5]) {
+  showroomBox([3.7, 0.035, 1.25], [x, 7.72, 0], showroomRoomMaterials.darkTrim);
+  showroomBox([3.35, 0.025, 0.96], [x, 7.69, 0], showroomRoomMaterials.warmGlow);
+  showroomBox([3.50, 0.02, 0.035], [x, 7.665, -0.48], showroomRoomMaterials.blueGlow);
+}
+
+// Two soft ceiling fills illuminate the enlarged room without adding shadow maps.
+for (const [x, z, color, intensity] of [
+  [-5.0, 1.8, 0xffd8ad, 10],
+  [5.0, 1.8, 0x8bcaff, 10]
+]) {
+  const light = new THREE.PointLight(color, intensity, 16, 2);
+  light.position.set(x, 6.95, z);
+  garageGroup.add(light);
+}
 const displayPad = new THREE.Mesh(new THREE.CylinderGeometry(1.75, 1.9, 0.12, 64),
   new THREE.MeshStandardMaterial({ color: 0x34495d, metalness: 0.42, roughness: 0.42 }));
 displayPad.position.set(0, -0.06, 0);
@@ -230,6 +317,8 @@ try {
   benchWorkshopLight.position.set(-3.7, 2.15, -3.35);
   workshopGroup.add(benchWorkshopLight);
 
+  // Move the existing detailed workbench and pegboard onto the new rear wall.
+  workshopGroup.position.z = -6.45;
   garageGroup.add(workshopGroup);
 } catch (error) {
   // Keep the original simple showroom visible if optional workshop details fail.
