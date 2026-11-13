@@ -35,6 +35,12 @@ function showroomBox(size, position, material, castShadow = false, receiveShadow
 // a front roller door, and a roof. The room remains centered on the display pad.
 const showroomRoomBackZ = -11.72;
 const showroomRoomFrontZ = 11.72;
+const showroomBackWall = new THREE.Mesh(
+  new THREE.BoxGeometry(24, 8, 0.35),
+  showroomRoomMaterials.wall
+);
+showroomBackWall.receiveShadow = true;
+garageGroup.add(showroomBackWall);
 showroomBackWall.position.set(0, 3.9, showroomRoomBackZ);
 showroomBackWall.material = showroomRoomMaterials.wall;
 const showroomStripe = new THREE.Mesh(new THREE.BoxGeometry(9, 0.025, 0.045),
@@ -108,10 +114,6 @@ for (const [x, z, color, intensity] of [
   light.position.set(x, 6.95, z);
   garageGroup.add(light);
 }
-const showroomStripe = new THREE.Mesh(new THREE.BoxGeometry(9, 0.025, 0.045),
-  new THREE.MeshBasicMaterial({ color: 0x2798ff }));
-showroomStripe.position.set(0, 2.65, showroomRoomBackZ + 0.22);
-garageGroup.add(showroomStripe);
 const displayPad = new THREE.Mesh(new THREE.CylinderGeometry(1.75, 1.9, 0.12, 64),
   new THREE.MeshStandardMaterial({ color: 0x34495d, metalness: 0.42, roughness: 0.42 }));
 displayPad.position.set(0, -0.06, 0);
