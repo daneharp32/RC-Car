@@ -424,6 +424,17 @@ function setVehicleScale(value) {
   }
 
   chassisBody.mass = baseChassisMass * massScale;
+  if (chassisStyle === "solid-axle") {
+    for (const index of [2, 3]) {
+      const base = baseWheelSettings[index];
+      const wheel = vehicle.wheelInfos[index];
+      wheel.suspensionStiffness = base.suspensionStiffness * 0.91 * nextScale * nextScale;
+      wheel.dampingCompression = base.dampingCompression * 1.16 * nextScale * nextScale;
+      wheel.dampingRelaxation = base.dampingRelaxation * 1.14 * nextScale * nextScale;
+      wheel.maxSuspensionTravel = base.maxSuspensionTravel * 0.92 * nextScale;
+      wheel.rollInfluence = base.rollInfluence * 0.78;
+    }
+  }
   chassisBody.position.y += 0.24 * (nextScale - previousScale);
   chassisBody.updateMassProperties();
   chassisBody.updateBoundingRadius();
