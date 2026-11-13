@@ -287,6 +287,9 @@ function applyCoupledRearSuspension() {
   const left = vehicle.wheelInfos[2];
   const right = vehicle.wheelInfos[3];
   if (!left || !right || (!left.isInContact && !right.isInContact)) return;
+  // A smaller coupling remains when only one side has ground contact, avoiding
+  // a strong anti-roll kick during single-wheel landings.
+  const contactScale = left.isInContact && right.isInContact ? 1 : 0.35;
 
   // The stock RaycastVehicle has already calculated both rear wheel contacts
   // and applied their normal suspension/tire impulses in its earlier preStep
@@ -298,9 +301,13 @@ function applyCoupledRearSuspension() {
   const differentialTravel = leftCompression - rightCompression;
   if (!Number.isFinite(differentialTravel)) return;
 
-  const antiRollRate = 185 * vehicleScale * vehicleScale;
-  const forceLimit = 26 * Math.pow(vehicleScale, 3);
-  const forceMagnitude = clamp(differentialTravel * antiRollRate, -forceLimit, forceLimit);
+  const antiRollRate = 110 * vehicleScale * vehicleScale;
+  const forceLimit = 14 * Math.pow(vehicleScale, 3);
+  const forceMagnitude = clamp(
+    differentialTravel * antiRollRate,
+    -forceLimit,
+    forceLimit
+  ) * contactScale;
   if (Math.abs(forceMagnitude) < 0.01) return;
 
   const up = chassisBody.vectorToWorldFrame(
