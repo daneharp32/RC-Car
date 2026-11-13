@@ -876,7 +876,10 @@ function makeCarVisual(color, playerName = "") {
   function setChassisStyle(style) {
     chassisStyle = style === "solid-axle" ? "solid-axle" : "standard";
     const useSolidAxle = chassisStyle === "solid-axle";
-    for (const part of rearIndependentParts) part.visible = !useSolidAxle;
+    for (const part of rearIndependentParts) {
+      const record = damageParts.get(part.userData.damagePartId);
+      if (!record?.detached) part.visible = !useSolidAxle;
+    }
     liveAxleAssembly.visible = useSolidAxle;
 
     chassis.position.copy(standardChassisPosition);
