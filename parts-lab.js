@@ -570,74 +570,113 @@ export function createPartsLabSystem(game) {
 
   const batteryModel = new THREE.Group();
   batteryModel.name = "Standalone 2S hardcase LiPo battery";
-  batteryModel.position.y = 0.16;
+  batteryModel.position.y = 0.09;
   batteryModel.visible = false;
   showcase.add(batteryModel);
 
   function buildBattery() {
     const body = new THREE.Group();
+    body.name = "Single-piece battery hardcase";
     batteryModel.add(body);
-    addBox(body, [1.45, 0.30, 0.54], [0, 0.36, 0], materials.black, 0.075);
-    addBox(body, [1.39, 0.245, 0.49], [0, 0.39, 0], materials.shell, 0.055);
-    addBox(body, [1.30, 0.025, 0.43], [0, 0.525, 0], materials.shellLight, 0.025);
-    // Two-cell hardcase seam and molded reinforcement ribs.
-    addBox(body, [0.018, 0.018, 0.46], [0, 0.54, 0], materials.darkAlloy, 0.005);
-    for (const x of [-0.59, -0.30, 0.30, 0.59]) {
-      addBox(body, [0.025, 0.018, 0.44], [x, 0.548, 0], materials.darkAlloy, 0.005);
+
+    // One continuous hardcase with a narrow perimeter lid seam. The older
+    // nested boxes looked like three separate plates stacked on one another.
+    addBox(body, [1.45, 0.50, 0.62], [0, 0.43, 0], materials.black, 0.085);
+    addBox(body, [1.405, 0.035, 0.585], [0, 0.687, 0], materials.shell, 0.045);
+
+    // Subtle molded ribs along the short side walls only.
+    for (const z of [-0.305, 0.305]) {
+      addBox(body, [1.12, 0.025, 0.014], [0, 0.37, z], materials.darkAlloy, 0.004);
     }
-    for (const z of [-0.26, 0.26]) {
-      addBox(body, [1.16, 0.035, 0.025], [0, 0.26, z], materials.darkAlloy, 0.008);
+
+    // Small centered identification sticker sits just above the lid surface.
+    addTopLabel(body, "2S LIPO", "7.4V HARDCASE", 0.66, 0.19, [0, 0.711, 0]);
+
+    // Main red/black power lead exits one end through a shared strain relief.
+    addBox(body, [0.24, 0.12, 0.09], [0.35, 0.39, -0.32], materials.darkAlloy, 0.025);
+    addTube(body, [
+      [0.28, 0.40, -0.34],
+      [0.28, 0.34, -0.47],
+      [0.33, 0.31, -0.58]
+    ], 0.027, materials.red, 7);
+    addTube(body, [
+      [0.40, 0.40, -0.34],
+      [0.42, 0.34, -0.47],
+      [0.45, 0.31, -0.58]
+    ], 0.027, materials.black, 7);
+    addBox(body, [0.24, 0.13, 0.15], [0.39, 0.31, -0.65], materials.orange, 0.025);
+    addBox(body, [0.17, 0.045, 0.08], [0.39, 0.385, -0.65], materials.black, 0.012);
+
+    // A separate fine balance lead and small three-pin plug.
+    addTube(body, [
+      [-0.40, 0.45, -0.30],
+      [-0.47, 0.36, -0.43],
+      [-0.50, 0.31, -0.55]
+    ], 0.014, materials.white, 6);
+    addBox(body, [0.12, 0.085, 0.10], [-0.50, 0.31, -0.60], materials.black, 0.012);
+    for (let i = 0; i < 3; i++) {
+      addCylinder(body, 0.012, 0.012, 0.025, materials.gold,
+        [-0.54 + i * 0.04, 0.31, -0.665], [Math.PI / 2, 0, 0], 10);
     }
-    addTopLabel(body, "2S LIPO", "7.4V HARDCASE PACK", 0.72, 0.24, [0, 0.566, 0]);
-    // Balance lead and main power lead emerge from the same end.
-    addTube(body, [[-0.40,0.38,-0.24],[-0.52,0.30,-0.42],[-0.62,0.30,-0.57]], 0.025, materials.white, 7);
-    addBox(body, [0.18,0.13,0.12], [-0.64,0.30,-0.61], materials.black, 0.018);
-    for (let i=0;i<3;i++) addCylinder(body,0.018,0.018,0.045,materials.gold,[-0.70+i*0.055,0.30,-0.68],[Math.PI/2,0,0],12);
-    addTube(body, [[0.42,0.38,-0.24],[0.54,0.30,-0.43],[0.66,0.29,-0.59]], 0.045, materials.red, 8);
-    addTube(body, [[0.32,0.38,-0.24],[0.43,0.27,-0.44],[0.54,0.26,-0.59]], 0.045, materials.black, 8);
-    addBox(body, [0.27,0.16,0.17], [0.60,0.27,-0.68], materials.orange, 0.025);
-    addBox(body, [0.17,0.045,0.12], [0.60,0.36,-0.68], materials.black, 0.012);
-    return {body};
+    return { body };
   }
   const batteryParts = buildBattery();
   batchStaticMeshes(batteryParts.body);
 
   const gearboxModel = new THREE.Group();
   gearboxModel.name = "Standalone short-course gearbox";
-  gearboxModel.position.y = 0.16;
+  gearboxModel.position.y = 0.09;
   gearboxModel.visible = false;
   showcase.add(gearboxModel);
 
   function buildGearbox() {
     const body = new THREE.Group();
+    body.name = "Clean short-course center gearbox housing";
     gearboxModel.add(body);
-    // Two-piece molded composite transmission case.
-    addBox(body,[1.10,0.78,0.72],[0,0.70,0],materials.shell,0.13);
-    addBox(body,[1.02,0.64,0.08],[0,0.70,0.39],materials.black,0.08);
-    addBox(body,[0.90,0.55,0.035],[0,0.70,0.445],materials.shellLight,0.055);
-    addBox(body,[0.76,0.035,0.04],[0,1.10,0.42],materials.darkAlloy,0.012);
-    // Differential inspection cover and bearing bosses.
-    addCylinder(body,0.31,0.31,0.09,materials.darkAlloy,[0,0.72,0.52],[Math.PI/2,0,0],40);
-    addCylinder(body,0.25,0.25,0.045,materials.black,[0,0.72,0.58],[Math.PI/2,0,0],36);
-    addTorus(body,0.285,0.018,materials.brightAlloy,[0,0.72,0.585],[Math.PI/2,0,0],40);
-    for(let i=0;i<8;i++){
-      const a=i/8*Math.PI*2;
-      addScrew(body,[Math.cos(a)*0.255,0.72+Math.sin(a)*0.255,0.62],0.025,materials.brightAlloy,"z");
+
+    // Single assembled transmission case. Its lower edge is set at the stand
+    // surface so the gearbox sits on the pedestal instead of hovering.
+    addBox(body, [1.14, 0.72, 0.78], [0, 0.54, 0], materials.shell, 0.105);
+    addBox(body, [1.09, 0.055, 0.74], [0, 0.895, 0], materials.darkAlloy, 0.035);
+    addBox(body, [1.02, 0.022, 0.68], [0, 0.932, 0], materials.shellLight, 0.018);
+
+    // A single centered differential cover mounted directly onto the front
+    // face. The old offset gold disc and separate hoop have been removed.
+    addBox(body, [1.02, 0.62, 0.045], [0, 0.54, 0.395], materials.black, 0.055);
+    addCylinder(body, 0.275, 0.275, 0.075, materials.darkAlloy,
+      [0, 0.55, 0.448], [Math.PI / 2, 0, 0], 40);
+    addCylinder(body, 0.225, 0.225, 0.035, materials.black,
+      [0, 0.55, 0.503], [Math.PI / 2, 0, 0], 36);
+    addTorus(body, 0.252, 0.014, materials.brightAlloy,
+      [0, 0.55, 0.523], [0, 0, 0], 40);
+    for (let i = 0; i < 8; i++) {
+      const angle = i / 8 * Math.PI * 2;
+      addScrew(body, [Math.cos(angle) * 0.245, 0.55 + Math.sin(angle) * 0.245, 0.526],
+        0.022, materials.brightAlloy, "z");
     }
-    // Output cups on both sides of the differential.
-    for(const side of [-1,1]){
-      addCylinder(body,0.105,0.105,0.22,materials.darkAlloy,[side*0.64,0.69,0],[0,0,Math.PI/2],28);
-      addTorus(body,0.09,0.015,materials.brightAlloy,[side*0.76,0.69,0],[0,Math.PI/2,0],28);
-      addCylinder(body,0.055,0.055,0.18,materials.alloy,[side*0.83,0.69,0],[0,0,Math.PI/2],20);
+
+    // Opposing output cups share the differential centreline and overlap
+    // the gearbox side walls, leaving no floating bearing rings.
+    for (const side of [-1, 1]) {
+      addCylinder(body, 0.105, 0.105, 0.20, materials.darkAlloy,
+        [side * 0.61, 0.54, 0], [0, 0, Math.PI / 2], 28);
+      addTorus(body, 0.078, 0.012, materials.brightAlloy,
+        [side * 0.70, 0.54, 0], [0, Math.PI / 2, 0], 24);
+      addCylinder(body, 0.052, 0.052, 0.17, materials.alloy,
+        [side * 0.79, 0.54, 0], [0, 0, Math.PI / 2], 20);
     }
-    // A modest spur-gear detail sits behind a partial side inspection window.
-    addBox(body,[0.34,0.30,0.025],[0.30,0.72,0.64],materials.black,0.035);
-    addCylinder(body,0.19,0.19,0.045,materials.gold,[0.30,0.72,0.68],[Math.PI/2,0,0],36);
-    addTorus(body,0.16,0.012,materials.darkAlloy,[0.30,0.72,0.71],[Math.PI/2,0,0],32);
-    addTopLabel(body,"SEALED GEARBOX","DIFFERENTIAL / OUTPUT CUPS",0.72,0.22,[0,1.105,0]);
-    for(const x of [-0.42,0.42]) addScrew(body,[x,1.10,0.18],0.03,materials.brightAlloy);
-    return {body};
+
+    // Four shallow case fasteners on the top cover.
+    for (const x of [-0.43, 0.43]) {
+      for (const z of [-0.25, 0.25]) {
+        addScrew(body, [x, 0.951, z], 0.024, materials.brightAlloy);
+      }
+    }
+    return { body };
   }
+  const gearboxParts = buildGearbox();
+  batchStaticMeshes(gearboxParts.body);
+
   const gearboxParts = buildGearbox();
   batchStaticMeshes(gearboxParts.body);
 
