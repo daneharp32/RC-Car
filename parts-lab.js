@@ -41,7 +41,7 @@ export function createPartsLabSystem(game) {
   function addBox(parent, size, position, material, radius = 0.035, rotation = [0, 0, 0]) {
     const smallest = Math.min(size[0], size[1], size[2]);
     const geometry = radius > 0
-      ? new RoundedBoxGeometry(size[0], size[1], size[2], 2, Math.min(radius, smallest * 0.44))
+      ? new RoundedBoxGeometry(size[0], size[1], size[2], 3, Math.min(radius, smallest * 0.44))
       : new THREE.BoxGeometry(size[0], size[1], size[2]);
     const object = new THREE.Mesh(geometry, material);
     object.position.set(position[0], position[1], position[2]);
@@ -52,7 +52,7 @@ export function createPartsLabSystem(game) {
     return object;
   }
 
-  function addCylinder(parent, radiusTop, radiusBottom, length, material, position, rotation = [0, 0, 0], radialSegments = 24) {
+  function addCylinder(parent, radiusTop, radiusBottom, length, material, position, rotation = [0, 0, 0], radialSegments = 32) {
     const object = new THREE.Mesh(
       new THREE.CylinderGeometry(radiusTop, radiusBottom, length, radialSegments, 1),
       material
@@ -65,7 +65,7 @@ export function createPartsLabSystem(game) {
     return object;
   }
 
-  function addTorus(parent, radius, tube, material, position, rotation = [0, 0, 0], tubularSegments = 32) {
+  function addTorus(parent, radius, tube, material, position, rotation = [0, 0, 0], tubularSegments = 48) {
     const object = new THREE.Mesh(new THREE.TorusGeometry(radius, tube, 10, tubularSegments), material);
     object.position.set(position[0], position[1], position[2]);
     object.rotation.set(rotation[0], rotation[1], rotation[2]);
@@ -76,7 +76,7 @@ export function createPartsLabSystem(game) {
 
   function addTube(parent, points, radius, material, radialSegments = 8) {
     const curve = new THREE.CatmullRomCurve3(points.map((point) => new THREE.Vector3(point[0], point[1], point[2])));
-    const object = new THREE.Mesh(new THREE.TubeGeometry(curve, Math.max(12, points.length * 6), radius, radialSegments, false), material);
+    const object = new THREE.Mesh(new THREE.TubeGeometry(curve, Math.max(16, points.length * 9), radius, radialSegments, false), material);
     object.castShadow = true;
     parent.add(object);
     return object;
@@ -84,7 +84,7 @@ export function createPartsLabSystem(game) {
 
   function addScrew(parent, position, size = 0.045, material = materials.brightAlloy, axis = "y") {
     const rotation = axis === "z" ? [Math.PI / 2, 0, 0] : [0, 0, 0];
-    addCylinder(parent, size, size, 0.025, material, position, rotation, 12);
+    addCylinder(parent, size, size, 0.025, material, position, rotation, 16);
     const slot = addBox(parent,
       axis === "z" ? [size * 1.15, 0.012, 0.012] : [size * 1.15, 0.012, 0.012],
       [position[0], position[1] + (axis === "y" ? 0.014 : 0), position[2]],
