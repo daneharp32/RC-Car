@@ -338,7 +338,11 @@ function setChassisStyle(style) {
   for (const index of [2, 3]) {
     const base = baseWheelSettings[index];
     const wheel = vehicle.wheelInfos[index];
-    wheel.chassisConnectionPointLocal.copy(base.connection).scale(vehicleScale);
+    wheel.chassisConnectionPointLocal.set(
+      base.connection.x * vehicleScale,
+      base.connection.y * vehicleScale,
+      base.connection.z * vehicleScale
+    );
     wheel.radius = base.radius * vehicleScale;
     wheel.suspensionRestLength = base.suspensionRestLength * vehicleScale;
     wheel.suspensionLength = base.suspensionRestLength * vehicleScale;
