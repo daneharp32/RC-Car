@@ -15,7 +15,6 @@ export function createPartsLabSystem(game) {
     alloy: new THREE.MeshStandardMaterial({ color: 0xabb8c1, roughness: 0.28, metalness: 0.82 }),
     brightAlloy: new THREE.MeshStandardMaterial({ color: 0xd7e0e6, roughness: 0.22, metalness: 0.88 }),
     darkAlloy: new THREE.MeshStandardMaterial({ color: 0x52616b, roughness: 0.34, metalness: 0.82 }),
-    brass: new THREE.MeshStandardMaterial({ color: 0xb88743, roughness: 0.3, metalness: 0.8 }),
     copper: new THREE.MeshStandardMaterial({ color: 0xb66a3d, roughness: 0.35, metalness: 0.78 }),
     red: new THREE.MeshStandardMaterial({ color: 0xa82730, roughness: 0.42, metalness: 0.4 }),
     orange: new THREE.MeshStandardMaterial({ color: 0xf07827, roughness: 0.4, metalness: 0.42 }),
@@ -23,11 +22,6 @@ export function createPartsLabSystem(game) {
     greenBoard: new THREE.MeshStandardMaterial({ color: 0x174d42, roughness: 0.62, metalness: 0.12 }),
     gold: new THREE.MeshStandardMaterial({ color: 0xd4aa50, roughness: 0.26, metalness: 0.84 }),
     white: new THREE.MeshStandardMaterial({ color: 0xe2e8eb, roughness: 0.5, metalness: 0.1 }),
-    clear: new THREE.MeshPhysicalMaterial({
-      color: 0x79b8d1, roughness: 0.18, metalness: 0.08,
-      transparent: true, opacity: 0.27, transmission: 0.18,
-      thickness: 0.08, depthWrite: false, side: THREE.DoubleSide
-    })
   };
 
   const labRoot = new THREE.Group();
@@ -90,22 +84,6 @@ export function createPartsLabSystem(game) {
       [position[0], position[1] + (axis === "y" ? 0.014 : 0), position[2]],
       materials.black, 0.002);
     if (axis === "z") slot.rotation.z = 0;
-  }
-
-  function addGear(parent, x, y, z, radius, teeth, material = materials.brass) {
-    const gear = new THREE.Group();
-    gear.position.set(x, y, z);
-    parent.add(gear);
-    addCylinder(gear, radius, radius, 0.075, material, [0, 0, 0], [0, 0, 0], Math.max(24, teeth * 2));
-    for (let i = 0; i < teeth; i++) {
-      const angle = i / teeth * Math.PI * 2;
-      const tooth = addBox(gear, [0.055, 0.07, 0.048],
-        [Math.cos(angle) * (radius + 0.012), 0, Math.sin(angle) * (radius + 0.012)],
-        material, 0.008, [0, -angle, 0]);
-    }
-    addCylinder(gear, radius * 0.35, radius * 0.35, 0.09, materials.darkAlloy, [0, 0.005, 0], [0, 0, 0], 24);
-    addCylinder(gear, 0.035, 0.035, 0.105, materials.brightAlloy, [0, 0.008, 0], [0, 0, 0], 20);
-    return gear;
   }
 
   function makeLabelTexture(title, subtitle = "") {
@@ -218,15 +196,20 @@ export function createPartsLabSystem(game) {
   }
 
   // A low-profile, machined display plinth anchors each isolated component.
-  const plinthLower = addCylinder(showcase, 1.22, 1.32, 0.16, materials.black, [0, 0.08, 0], [0, 0, 0], 72);
-  const plinthUpper = addCylinder(showcase, 1.2, 1.2, 0.085, materials.shellLight, [0, 0.19, 0], [0, 0, 0], 72);
-  addTorus(showcase, 1.205, 0.018, materials.blue, [0, 0.238, 0], [Math.PI / 2, 0, 0], 72);
-  const plinthTop = addCylinder(showcase, 1.08, 1.08, 0.035, materials.black, [0, 0.25, 0], [0, 0, 0], 72);
+  const plinthGroup = new THREE.Group();
+  plinthGroup.name = "Shared WIP component display plinth";
+  showcase.add(plinthGroup);
+  const plinthLower = addCylinder(plinthGroup, 1.22, 1.32, 0.16, materials.black, [0, 0.08, 0], [0, 0, 0], 72);
+  const plinthUpper = addCylinder(plinthGroup, 1.2, 1.2, 0.085, materials.shellLight, [0, 0.19, 0], [0, 0, 0], 72);
+  addTorus(plinthGroup, 1.205, 0.018, materials.blue, [0, 0.238, 0], [Math.PI / 2, 0, 0], 72);
+  const plinthTop = addCylinder(plinthGroup, 1.08, 1.08, 0.035, materials.black, [0, 0.25, 0], [0, 0, 0], 72);
   for (let i = 0; i < 8; i++) {
     const angle = i / 8 * Math.PI * 2;
-    addCylinder(showcase, 0.025, 0.025, 0.018, materials.brightAlloy,
+    addCylinder(plinthGroup, 0.025, 0.025, 0.018, materials.brightAlloy,
       [Math.cos(angle) * 1.12, 0.172, Math.sin(angle) * 1.12], [0, 0, 0], 12);
   }
+
+  batchStaticMeshes(plinthGroup);
 
   const servoModel = new THREE.Group();
   servoModel.name = "Detailed digital steering servo";
