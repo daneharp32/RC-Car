@@ -637,6 +637,122 @@
       .garage-copy { margin-bottom: 12px; }
       .garage-hint { margin-bottom: 10px; }
     }
+
+    /* Unified UI refresh: quieter surfaces, clearer hierarchy, consistent controls. */
+    :root {
+      --panel: rgba(11, 18, 27, .94);
+      --panel-border: rgba(170, 198, 222, .16);
+      --muted: #a6b5c4;
+      --text: #f3f7fb;
+      --accent: #ffad45;
+      --logo-blue: #2798ff;
+      --green: #7be0a5;
+    }
+    button, input, select, textarea { font: inherit; }
+    button {
+      cursor: pointer;
+      border-radius: 10px;
+      transition: transform .16s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease, filter .16s ease;
+    }
+    button:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.08); }
+    button:active:not(:disabled) { transform: translateY(0) scale(.985); }
+    button:focus-visible, input:focus-visible, select:focus-visible {
+      outline: 2px solid rgba(100,190,255,.9); outline-offset: 2px;
+    }
+    button:disabled { cursor: not-allowed; opacity: .48; }
+    input:not([type=checkbox]):not([type=range]), select, textarea {
+      width: 100%; min-height: 42px; padding: 0 12px;
+      color: #edf5fb; background: rgba(5,12,20,.76);
+      border: 1px solid rgba(162,191,216,.2); border-radius: 9px;
+      font-size: 12px; outline: none;
+    }
+    input::placeholder { color: #718496; }
+    select { cursor: pointer; }
+    .topbar { left: 22px; right: 22px; top: 18px; }
+    .brand-mark { width: 42px; height: 42px; border-radius: 12px; }
+    .brand-name { font-size: 13px; letter-spacing: .12em; }
+    .brand-sub { font-size: 9px; letter-spacing: .15em; }
+    .top-status { background: rgba(7,14,22,.72); border-color: rgba(190,215,235,.16); }
+    .menu-screen {
+      background: radial-gradient(ellipse at 50% 40%, rgba(10,22,36,.12), rgba(3,9,16,.42) 72%),
+        linear-gradient(180deg, rgba(4,10,18,.12), rgba(4,10,18,.22));
+    }
+    .menu-content, .panel, #garagePanel, .sandbox-builder-card, .pause-menu-card {
+      border: 1px solid rgba(166,200,230,.18);
+      background: linear-gradient(145deg, rgba(13,24,37,.94), rgba(7,14,23,.94));
+      box-shadow: 0 28px 90px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.035);
+      backdrop-filter: blur(22px);
+    }
+    .menu-content {
+      border-radius: 20px; padding: 30px 32px;
+      max-height: min(88vh, 900px); overflow-y: auto;
+    }
+    .menu-kicker, .sandbox-builder-kicker, .garage-hint, .lobby-mode-heading {
+      color: #79c5ff; letter-spacing: .18em;
+    }
+    .menu-title { text-shadow: 0 8px 36px rgba(39,152,255,.18); }
+    .menu-description { color: #b3c1ce; line-height: 1.6; }
+    .menu-button, .mode-option, #joinButton, #sandboxEnterMapButton {
+      border: 1px solid rgba(106,185,255,.42);
+      background: linear-gradient(145deg, #2388dc, #1559ae);
+      box-shadow: 0 8px 24px rgba(12,89,166,.2);
+    }
+    .menu-button { min-height: 44px; border-radius: 10px; font-size: 10px; letter-spacing: .055em; }
+    .menu-button.secondary, #modeBackButton, #garageBackButton, #driveBackButton {
+      border: 1px solid rgba(175,200,222,.18); background: rgba(255,255,255,.055);
+      box-shadow: none; color: #d9e5ef;
+    }
+    .menu-actions { gap: 12px; }
+    .mode-option {
+      min-height: 68px; border-radius: 12px; padding: 13px 15px;
+    }
+    .mode-option-copy strong { font-size: 12px; }
+    .mode-option-copy small { line-height: 1.45; }
+    .lobby-menu-content { width: min(760px, calc(100vw - 32px)); }
+    .create-lobby-content { width: min(540px, calc(100vw - 32px)); }
+    .lobby-row {
+      border-color: rgba(165,195,220,.13); border-radius: 10px;
+      background: rgba(255,255,255,.035); padding: 12px 14px;
+    }
+    .lobby-row:hover { border-color: rgba(100,185,255,.42); background: rgba(45,105,155,.12); }
+    .lobby-empty { border-color: rgba(165,195,220,.2); }
+    #garagePanel {
+      left: 20px; width: min(360px, calc(100vw - 40px));
+      padding: 22px; border-radius: 18px;
+    }
+    .garage-title { font-size: 22px; letter-spacing: -.025em; }
+    .garage-shell-choice { border-radius: 9px; }
+    .garage-shell-choice.active { box-shadow: inset 0 0 0 1px rgba(180,225,255,.18), 0 5px 18px rgba(45,151,245,.16); }
+    .part-inspector { border-radius: 10px; background: rgba(35,75,112,.16); }
+    #shellToggleButton { border-radius: 10px; }
+    .sandbox-builder-card { border-radius: 18px; }
+    .sandbox-part-card { border-radius: 10px; transition: .16s ease; }
+    .sandbox-part-card:hover { border-color: rgba(100,185,255,.48); background: rgba(45,105,155,.14); }
+    .sandbox-secret-menu { border-color: rgba(120,190,245,.25); border-radius: 16px; }
+    .pause-menu-card { border-radius: 18px; }
+    #pauseButton {
+      border-radius: 10px; background: rgba(7,14,22,.82);
+      border-color: rgba(180,205,228,.18);
+    }
+    #toast { border-color: rgba(180,205,228,.18); box-shadow: 0 8px 30px rgba(0,0,0,.24); }
+    @media (max-width: 700px) {
+      .topbar { left: 12px; right: 12px; top: 12px; }
+      .top-status { max-width: 48vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .menu-content { top: 50%; left: 50%; transform: translate(-50%,-50%); width: min(520px,calc(100vw - 24px)); padding: 22px 18px; }
+      .lobby-menu-content, .create-lobby-content {
+        top: 50%; left: 50%; transform: translate(-50%,-50%);
+        width: calc(100vw - 20px); max-height: calc(100dvh - 20px);
+        padding: 18px 14px; overflow-y: auto;
+      }
+      #garagePanel { left: 12px; bottom: 12px; width: min(310px,calc(100vw - 24px)); max-height: min(72dvh,620px); }
+      .sandbox-builder-card { left: 10px; right: 10px; width: auto; }
+      .menu-actions { gap: 8px; }
+      .menu-button { min-height: 42px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+    }
+
   </style>
   <script type="importmap">
     {
