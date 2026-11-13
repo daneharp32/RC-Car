@@ -675,7 +675,7 @@ export function createPartsLabSystem(game) {
 
   const shockModel = new THREE.Group();
   shockModel.name = "Animated oil-filled RC shock absorber";
-  shockModel.position.y = 0.14;
+  shockModel.position.y = 0.06;
   shockModel.visible = false;
   showcase.add(shockModel);
 
@@ -729,9 +729,9 @@ export function createPartsLabSystem(game) {
   function buildStandaloneSpring(){
     const body=new THREE.Group();
     springModel.add(body);
-    addTorus(body,0.22,0.035,materials.darkAlloy,[0,0.36,0],[Math.PI/2,0,0],36);
+    addTorus(body,0.22,0.035,materials.darkAlloy,[0,0.15,0],[Math.PI/2,0,0],36);
     const springGroup=new THREE.Group();
-    springGroup.position.y=0.36;
+    springGroup.position.y=0.15;
     body.add(springGroup);
     const points=[],turns=8,samples=turns*18;
     for(let i=0;i<=samples;i++){
@@ -739,7 +739,7 @@ export function createPartsLabSystem(game) {
       points.push([Math.cos(a)*0.20,t,Math.sin(a)*0.20]);
     }
     addTube(springGroup,points,0.032,materials.orange,8);
-    addTorus(springGroup,0.22,0.035,materials.darkAlloy,[0,1,0],[Math.PI/2,0,0],36);
+    addTorus(springGroup,0.22,0.035,materials.darkAlloy,[0,0.88,0],[Math.PI/2,0,0],36);
     return {body,springGroup};
   }
   const standaloneSpring=buildStandaloneSpring();
