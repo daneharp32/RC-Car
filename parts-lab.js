@@ -230,7 +230,7 @@ export function createPartsLabSystem(game) {
 
   const servoModel = new THREE.Group();
   servoModel.name = "Detailed digital steering servo";
-  servoModel.position.y = 0.21;
+  servoModel.position.y = 0.14;
   showcase.add(servoModel);
 
   function buildServo() {
@@ -429,120 +429,154 @@ export function createPartsLabSystem(game) {
 
   function buildEsc() {
     const body = new THREE.Group();
+    body.name = "Tall 1/10 scale brushless ESC";
     escModel.add(body);
 
-    // Layered sealed controller enclosure with raised top cover and edge rails.
-    addBox(body, [1.84, 0.43, 1.38], [0, 0.34, 0], materials.red, 0.11);
-    addBox(body, [1.70, 0.16, 1.26], [0, 0.62, 0], materials.shell, 0.075);
-    addBox(body, [1.55, 0.045, 1.10], [0, 0.715, 0], materials.black, 0.04);
-    for (const x of [-0.79, 0.79]) {
-      addBox(body, [0.08, 0.15, 1.15], [x, 0.66, 0], materials.orange, 0.018);
-      for (const z of [-0.50, 0.50]) addScrew(body, [x, 0.75, z], 0.035);
+    // Typical 1/10 truck ESC proportions: compact square footprint with a
+    // substantial case depth and cooling hardware mounted above it.
+    for (const x of [-0.55, 0.55]) {
+      for (const z of [-0.45, 0.45]) {
+        addBox(body, [0.18, 0.15, 0.18], [x, 0.16, z], materials.rubber, 0.04);
+      }
     }
+    addBox(body, [1.38, 0.075, 1.16], [0, 0.205, 0], materials.black, 0.06);
+    addBox(body, [1.32, 0.49, 1.10], [0, 0.48, 0], materials.shell, 0.085);
+    addBox(body, [1.29, 0.13, 1.075], [0, 0.785, 0], materials.black, 0.055);
+    addBox(body, [1.20, 0.025, 0.99], [0, 0.862, 0], materials.shellLight, 0.022);
 
-    // Large finned aluminum heat sink occupying the rear half of the ESC.
-    addBox(body, [1.05, 0.09, 0.52], [0, 0.79, -0.37], materials.darkAlloy, 0.025);
-    for (let i = 0; i < 11; i++) {
-      const x = -0.47 + i * 0.094;
-      addBox(body, [0.045, 0.24, 0.49], [x, 0.945, -0.37], materials.alloy, 0.012);
-      addBox(body, [0.014, 0.15, 0.46], [x + 0.024, 0.95, -0.37], materials.darkAlloy, 0.004);
+    // Raised side rails and horizontal case ribs make the enclosure read as
+    // a deeper molded controller body rather than a thin slab.
+    for (const z of [-0.555, 0.555]) {
+      addBox(body, [1.12, 0.055, 0.035], [0, 0.32, z], materials.darkAlloy, 0.012);
+      addBox(body, [1.12, 0.055, 0.035], [0, 0.46, z], materials.shellLight, 0.012);
+      addBox(body, [1.12, 0.055, 0.035], [0, 0.60, z], materials.darkAlloy, 0.012);
     }
-    addBox(body, [1.12, 0.045, 0.07], [0, 1.075, -0.37], materials.brightAlloy, 0.01);
-
-    // Twin low-ESR capacitor cans, vented tops, and retaining straps.
-    for (const x of [-0.62, 0.62]) {
-      addCylinder(body, 0.135, 0.135, 0.43, materials.alloy, [x, 0.91, -0.45], [0, 0, 0], 32);
-      addCylinder(body, 0.12, 0.12, 0.04, materials.black, [x, 1.145, -0.45], [0, 0, 0], 32);
-      addTorus(body, 0.095, 0.012, materials.brightAlloy, [x, 1.17, -0.45], [0, 0, 0], 32);
-      addBox(body, [0.035, 0.30, 0.08], [x, 0.91, -0.45], materials.darkAlloy, 0.01);
-      addBox(body, [0.06, 0.035, 0.33], [x, 0.72, -0.45], materials.black, 0.01);
-    }
-
-    // A physically modelled, rotating seven-blade fan below its safety grille.
-    const fanFrame = addBox(body, [0.98, 0.095, 0.98], [0, 0.79, 0.31], materials.shellLight, 0.075);
-    addBox(body, [0.79, 0.022, 0.79], [0, 0.848, 0.31], materials.black, 0.05);
-    const fanRotor = new THREE.Group();
-    fanRotor.position.set(0, 0.89, 0.31);
-    body.add(fanRotor);
-
-    const bladeShape = new THREE.Shape();
-    bladeShape.moveTo(0.06, -0.065);
-    bladeShape.bezierCurveTo(0.20, -0.15, 0.39, -0.17, 0.47, -0.055);
-    bladeShape.bezierCurveTo(0.44, 0.03, 0.30, 0.12, 0.13, 0.105);
-    bladeShape.lineTo(0.06, -0.065);
-    const bladeGeometry = new THREE.ExtrudeGeometry(bladeShape, { depth: 0.035, bevelEnabled: true, bevelSegments: 2, steps: 1, bevelSize: 0.008, bevelThickness: 0.006 });
-    for (let i = 0; i < 7; i++) {
-      const blade = new THREE.Mesh(bladeGeometry, i % 2 ? materials.blue : materials.shellLight);
-      blade.rotation.x = -Math.PI / 2;
-      blade.rotation.z = 0;
-      blade.rotation.y = 0;
-      blade.position.y = 0;
-      blade.rotation.order = "YXZ";
-      blade.userData.angle = i / 7 * Math.PI * 2;
-      blade.rotation.y = blade.userData.angle;
-      blade.castShadow = true;
-      fanRotor.add(blade);
-    }
-    addCylinder(fanRotor, 0.15, 0.17, 0.08, materials.darkAlloy, [0, 0.02, 0], [0, 0, 0], 32);
-    addCylinder(fanRotor, 0.095, 0.095, 0.09, materials.brightAlloy, [0, 0.065, 0], [0, 0, 0], 32);
-    addCylinder(fanRotor, 0.04, 0.04, 0.10, materials.blue, [0, 0.085, 0], [0, 0, 0], 24);
-
-    // Raised circular fan guard, radial supports, corner screws, and duct lip.
-    addTorus(body, 0.48, 0.035, materials.brightAlloy, [0, 0.92, 0.31], [Math.PI / 2, 0, 0], 64);
-    addTorus(body, 0.405, 0.012, materials.darkAlloy, [0, 0.925, 0.31], [Math.PI / 2, 0, 0], 64);
-    for (let i = 0; i < 8; i++) {
-      const angle = i / 8 * Math.PI * 2;
-      addBox(body, [0.78, 0.018, 0.025], [0, 0.955, 0.31],
-        materials.darkAlloy, 0.008, [0, -angle, 0]);
-    }
-    for (const x of [-0.39, 0.39]) {
-      for (const z of [-0.08, 0.70]) {
-        addScrew(body, [x, 0.93, z], 0.032);
+    for (const x of [-0.59, 0.59]) {
+      for (const z of [-0.46, 0.46]) {
+        addScrew(body, [x, 0.87, z], 0.03, materials.brightAlloy);
       }
     }
 
-    // Controller PCB edge ports, switch, status LEDs, and wiring harness.
-    addBox(body, [0.68, 0.035, 0.24], [0, 0.75, 0.55], materials.greenBoard, 0.018);
+    // Broad aluminum cooling plate and upright fins on the rear half.
+    addBox(body, [1.04, 0.075, 0.43], [0, 0.91, -0.325], materials.darkAlloy, 0.025);
+    for (let i = 0; i < 9; i++) {
+      const x = -0.46 + i * 0.115;
+      addBox(body, [0.052, 0.22, 0.40], [x, 1.055, -0.325], materials.alloy, 0.012);
+      addBox(body, [0.012, 0.16, 0.37], [x + 0.027, 1.06, -0.325], materials.darkAlloy, 0.004);
+    }
+    addBox(body, [1.00, 0.035, 0.045], [0, 1.18, -0.325], materials.brightAlloy, 0.008);
+
+    // Two capacitor cans beside the heat-sink bank, with stamped vent tops.
+    for (const x of [-0.54, 0.54]) {
+      addCylinder(body, 0.105, 0.105, 0.30, materials.alloy, [x, 0.98, -0.43], [0, 0, 0], 28);
+      addCylinder(body, 0.097, 0.097, 0.035, materials.black, [x, 1.147, -0.43], [0, 0, 0], 28);
+      addTorus(body, 0.078, 0.010, materials.brightAlloy, [x, 1.168, -0.43], [0, 0, 0], 24);
+      addBox(body, [0.026, 0.25, 0.07], [x, 0.98, -0.43], materials.darkAlloy, 0.008);
+    }
+
+    // Raised square cooling-fan shroud with vertical side walls.
+    const fanCenterZ = 0.20;
+    addBox(body, [0.90, 0.075, 0.90], [0, 0.925, fanCenterZ], materials.darkAlloy, 0.045);
+    for (const x of [-0.43, 0.43]) {
+      addBox(body, [0.075, 0.25, 0.92], [x, 1.065, fanCenterZ], materials.shellLight, 0.025);
+    }
+    for (const zOffset of [-0.43, 0.43]) {
+      addBox(body, [0.92, 0.25, 0.075], [0, 1.065, fanCenterZ + zOffset], materials.shellLight, 0.025);
+    }
+
+    // Seven swept fan blades are one rotating assembly, not an effect sprite.
+    const fanRotor = new THREE.Group();
+    fanRotor.name = "Animated seven blade ESC fan";
+    fanRotor.position.set(0, 1.02, fanCenterZ);
+    body.add(fanRotor);
+
+    const bladeShape = new THREE.Shape();
+    bladeShape.moveTo(0.055, -0.052);
+    bladeShape.bezierCurveTo(0.17, -0.13, 0.32, -0.14, 0.39, -0.045);
+    bladeShape.bezierCurveTo(0.36, 0.025, 0.25, 0.095, 0.115, 0.08);
+    bladeShape.lineTo(0.055, -0.052);
+    const bladeGeometry = new THREE.ExtrudeGeometry(bladeShape, {
+      depth: 0.032, bevelEnabled: true, bevelSegments: 1, steps: 1,
+      bevelSize: 0.006, bevelThickness: 0.005, curveSegments: 5
+    });
+    for (let i = 0; i < 7; i++) {
+      const blade = new THREE.Mesh(bladeGeometry, i % 2 ? materials.blue : materials.black);
+      blade.rotation.x = -Math.PI / 2;
+      blade.rotation.order = "YXZ";
+      blade.rotation.y = i / 7 * Math.PI * 2;
+      blade.castShadow = false;
+      blade.receiveShadow = false;
+      fanRotor.add(blade);
+    }
+    addCylinder(fanRotor, 0.135, 0.15, 0.07, materials.darkAlloy, [0, 0.018, 0], [0, 0, 0], 28);
+    addCylinder(fanRotor, 0.09, 0.09, 0.075, materials.brightAlloy, [0, 0.062, 0], [0, 0, 0], 24);
+    addCylinder(fanRotor, 0.035, 0.035, 0.085, materials.blue, [0, 0.078, 0], [0, 0, 0], 20);
+
+    // Raised perimeter guard, cross braces and four mounting bolts.
+    addTorus(body, 0.435, 0.026, materials.brightAlloy, [0, 1.17, fanCenterZ], [Math.PI / 2, 0, 0], 48);
+    addTorus(body, 0.365, 0.010, materials.darkAlloy, [0, 1.174, fanCenterZ], [Math.PI / 2, 0, 0], 40);
+    for (let i = 0; i < 4; i++) {
+      const angle = i / 4 * Math.PI * 2;
+      addBox(body, [0.72, 0.016, 0.022], [0, 1.185, fanCenterZ],
+        materials.darkAlloy, 0.006, [0, -angle, 0]);
+    }
+    for (const x of [-0.39, 0.39]) {
+      for (const z of [fanCenterZ - 0.39, fanCenterZ + 0.39]) {
+        addScrew(body, [x, 1.18, z], 0.026, materials.brightAlloy);
+      }
+    }
+
+    // Top-side control board, status LEDs, set button and connector bank.
+    addBox(body, [0.72, 0.025, 0.20], [0, 0.885, 0.50], materials.greenBoard, 0.012);
     for (let i = 0; i < 5; i++) {
-      addBox(body, [0.07, 0.025, 0.06], [-0.24 + i * 0.12, 0.78, 0.55], materials.gold, 0.008);
+      addBox(body, [0.065, 0.022, 0.055], [-0.25 + i * 0.125, 0.91, 0.50], materials.gold, 0.006);
     }
-    addBox(body, [0.16, 0.09, 0.09], [0.69, 0.72, 0.47], materials.black, 0.02);
-    addBox(body, [0.09, 0.035, 0.05], [0.69, 0.79, 0.47], materials.orange, 0.01);
+    addBox(body, [0.14, 0.075, 0.09], [0.48, 0.91, 0.49], materials.black, 0.015);
+    addBox(body, [0.075, 0.025, 0.05], [0.48, 0.964, 0.49], materials.orange, 0.007);
     for (let i = 0; i < 3; i++) {
-      addCylinder(body, 0.025, 0.025, 0.022, i === 0 ? materials.greenBoard : materials.blue,
-        [-0.43 + i * 0.10, 0.77, 0.56], [0, 0, 0], 16);
+      addCylinder(body, 0.018, 0.018, 0.018, i === 0 ? materials.greenBoard : materials.blue,
+        [-0.42 + i * 0.095, 0.915, 0.50], [0, 0, 0], 12);
     }
 
-    // Heavy battery leads and three motor phase wires with molded plugs.
-    const powerColors = [materials.red, materials.black];
+    // Branded plate on the front vertical face.
+    addBox(body, [0.88, 0.24, 0.025], [0, 0.47, 0.563], materials.black, 0.025);
+    addSideLabel(body, "BRUSHLESS ESC", "1/10 TRUCK CONTROLLER", 0.78, 0.20, [0, 0.47, 0.578]);
+
+    // Battery leads and three motor phase wires leave separate sides of the case.
+    const batteryColors = [materials.red, materials.black];
     for (let i = 0; i < 2; i++) {
-      const x = -0.42 + i * 0.18;
+      const x = -0.34 + i * 0.17;
       addTube(body, [
-        [x, 0.43, -0.63],
-        [x - 0.06, 0.32, -0.86],
-        [x - 0.10, 0.38, -1.12],
-        [x - 0.10, 0.46, -1.30]
-      ], 0.065, powerColors[i], 10);
-      addCylinder(body, 0.09, 0.09, 0.24, materials.black,
-        [x - 0.10, 0.46, -1.40], [Math.PI / 2, 0, 0], 24);
-      addTorus(body, 0.073, 0.014, materials.gold,
-        [x - 0.10, 0.46, -1.525], [Math.PI / 2, 0, 0], 24);
+        [x, 0.36, -0.54],
+        [x - 0.03, 0.27, -0.72],
+        [x - 0.05, 0.25, -0.92],
+        [x - 0.05, 0.30, -1.02]
+      ], 0.047, batteryColors[i], 8);
+      addCylinder(body, 0.067, 0.067, 0.17, materials.black,
+        [x - 0.05, 0.30, -1.10], [Math.PI / 2, 0, 0], 20);
+      addTorus(body, 0.052, 0.010, materials.gold,
+        [x - 0.05, 0.30, -1.19], [Math.PI / 2, 0, 0], 20);
     }
+    const phaseColors = [materials.orange, materials.gold, materials.blue];
     for (let i = 0; i < 3; i++) {
-      const x = 0.28 + i * 0.16;
-      const color = [materials.orange, materials.yellow || materials.gold, materials.blue][i];
+      const z = 0.35 + i * 0.12;
       addTube(body, [
-        [x, 0.44, -0.63],
-        [x + 0.08, 0.30, -0.82],
-        [x + 0.12, 0.36, -1.08]
-      ], 0.043, color);
+        [0.64, 0.43, z],
+        [0.79, 0.34, z + 0.05],
+        [0.95, 0.31, z + 0.08],
+        [1.08, 0.33, z + 0.08]
+      ], 0.034, phaseColors[i], 7);
     }
 
-    addTopLabel(body, "BRUSHLESS ESC", "PROGRAMMABLE / 120A CLASS", 0.58, 0.23, [0.51, 0.75, 0.06]);
-    return fanRotor;
+    return { body, fanRotor };
   }
 
-  const escFan = buildEsc();
+  const escParts = buildEsc();
+  const escFan = escParts.fanRotor;
+  batchStaticMeshes(escParts.body, [escFan]);
+  batchStaticMeshes(escFan, [], { castShadow: false, receiveShadow: false });
+
+
 
   const componentModels = {
     servo: servoModel,
@@ -553,8 +587,8 @@ export function createPartsLabSystem(game) {
   const partDetails = {
     servo: {
       name: "DIGITAL STEERING SERVO",
-      description: "A detailed standard-size steering servo mock-up. The case includes a visible gear train, control board, motor, mounting ears, connector harness, spline and an animated aluminum steering horn.",
-      specs: "MOVEMENT  ·  ±35° output-horn sweep\nDRIVE       ·  Multi-stage metal gear train\nCASE        ·  Reinforced composite housing\nCONNECTION  ·  Three-wire receiver lead"
+      description: "A standard-size closed-case steering servo with a taller rectangular body, mounting ears, metal output spline, three-wire receiver lead and an animated single-arm aluminum servo horn.",
+      specs: "MOVEMENT  ·  ±35° output-horn sweep\nCASE        ·  Standard 40 × 20 × 36 mm class\nOUTPUT      ·  Raised metal spline and horn\nCONNECTION  ·  Three-wire receiver lead"
     },
     motor: {
       name: "540 BRUSHLESS MOTOR",
@@ -563,8 +597,8 @@ export function createPartsLabSystem(game) {
     },
     esc: {
       name: "BRUSHLESS ESC",
-      description: "A standalone electronic speed controller mock-up with a finned aluminum heat sink, capacitor bank, controller board, battery leads, motor phase wires and a working seven-blade cooling fan.",
-      specs: "ENCLOSURE   ·  Sealed composite case\nCOOLING     ·  Animated seven-blade fan\nTHERMAL     ·  Finned aluminum heat sink\nCONNECTION  ·  Battery and three-phase leads"
+      description: "A taller, compact 1/10 truck ESC mock-up with a deeper enclosure, raised square fan shroud, aluminum heat sink, capacitor cans, controller details and separate battery and motor leads.",
+      specs: "ENCLOSURE   ·  Tall 1/10-scale controller case\nCOOLING     ·  Raised seven-blade fan\nTHERMAL     ·  Upright aluminum heat-sink fins\nCONNECTION  ·  Battery and three-phase leads"
     }
   };
 
@@ -602,9 +636,6 @@ export function createPartsLabSystem(game) {
     }
     if (!motionEnabled) {
       servoParts.hornPivot.rotation.y = 0;
-      servoParts.gearOne.rotation.y = 0;
-      servoParts.gearTwo.rotation.y = 0;
-      servoParts.outputGear.rotation.y = 0;
       motorShaft.rotation.z = 0;
       escFan.rotation.y = 0;
     }
@@ -616,6 +647,7 @@ export function createPartsLabSystem(game) {
     visible = next;
     labRoot.visible = visible;
     if (visible) {
+      renderer.shadowMap.needsUpdate = true;
       previousCarVisibility = localCar.root.visible;
       localCar.root.visible = false;
     } else {
@@ -630,13 +662,13 @@ export function createPartsLabSystem(game) {
   function update(delta, now, isActive) {
     if (!visible || !isActive || !motionEnabled) return;
     const time = now * 0.001;
-    const servoAngle = Math.sin(time * 1.75) * 0.62;
-    servoParts.hornPivot.rotation.y = servoAngle;
-    servoParts.gearOne.rotation.y = time * 0.65;
-    servoParts.gearTwo.rotation.y = -time * 0.82;
-    servoParts.outputGear.rotation.y = -servoAngle * 0.7;
-    motorShaft.rotation.z = time * 22;
-    escFan.rotation.y = time * 31;
+    if (activePart === "servo") {
+      servoParts.hornPivot.rotation.y = Math.sin(time * 1.75) * 0.62;
+    } else if (activePart === "motor") {
+      motorShaft.rotation.z = time * 22;
+    } else if (activePart === "esc") {
+      escFan.rotation.y = time * 31;
+    }
   }
 
   for (const button of document.querySelectorAll("[data-wip-part]")) {
