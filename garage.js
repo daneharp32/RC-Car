@@ -540,6 +540,7 @@ function parkCarForShowroom() {
   updateLocalVisual();
 }
 function showMainMenu() {
+  game.partsLab?.setVisible(false);
   clearGaragePartHover();
   resetGarageShellState(true);
   viewMode = "menu";
@@ -553,6 +554,7 @@ function showMainMenu() {
   parkCarForShowroom();
 }
 function showModeSelect() {
+  game.partsLab?.setVisible(false);
   clearGaragePartHover();
   resetGarageShellState(true);
   viewMode = "mode-select";
@@ -567,6 +569,7 @@ function showModeSelect() {
   game.multiplayer?.openLobbyBrowser?.();
 }
 function showCreateLobby() {
+  game.partsLab?.setVisible(false);
   clearGaragePartHover();
   resetGarageShellState(true);
   viewMode = "create-lobby";
@@ -582,6 +585,7 @@ function showCreateLobby() {
   $("lobbyName").focus();
 }
 function showGarage() {
+  game.partsLab?.setVisible(false);
   clearGaragePartHover();
   resetGarageShellState(true);
   viewMode = "garage";
@@ -595,6 +599,20 @@ function showGarage() {
   parkCarForShowroom();
   updateGarageShellChoiceButtons();
   updateGarageChassisChoiceButtons();
+}
+function showPartsLab() {
+  clearGaragePartHover();
+  resetGarageShellState(true);
+  viewMode = "parts-lab";
+  mainMenuPanel.style.display = "none";
+  modeSelectPanel.style.display = "none";
+  garagePanel.style.display = "none";
+  joinPanel.style.display = "none";
+  hud.style.display = "none";
+  $("topStatus").style.display = "none";
+  setArenaVisible(false);
+  parkCarForShowroom();
+  game.partsLab?.setVisible(true);
 }
 function setGarageShellVisible(visible) {
   if (game.getShellStyle?.() === "none" || garageShellAnimation || visible === garageShellInstalled) return;
@@ -621,6 +639,7 @@ $("shellToggleButton").addEventListener("click", () => {
 });
 
 function showDriveScreen() {
+  game.partsLab?.setVisible(false);
   viewMode = "drive";
   mainMenuPanel.style.display = "none";
   modeSelectPanel.style.display = "none";
@@ -646,6 +665,7 @@ function showDriveScreen() {
     showModeSelect,
     showCreateLobby,
     showGarage,
+    showPartsLab,
     showDriveScreen,
     setGarageShellVisible,
     chooseGarageShell,
