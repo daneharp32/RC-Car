@@ -214,6 +214,7 @@ export function createPartsLabSystem(game) {
   const servoModel = new THREE.Group();
   servoModel.name = "Detailed digital steering servo";
   servoModel.position.y = 0.14;
+  servoModel.scale.y = 1.10;
   showcase.add(servoModel);
 
   function buildServo() {
@@ -406,7 +407,8 @@ export function createPartsLabSystem(game) {
 
   const escModel = new THREE.Group();
   escModel.name = "Detailed brushless electronic speed controller";
-  escModel.position.y = 0.145;
+  escModel.position.y = 0.19;
+  escModel.scale.y = 0.94;
   escModel.visible = false;
   showcase.add(escModel);
 
@@ -581,7 +583,7 @@ export function createPartsLabSystem(game) {
     esc: {
       name: "BRUSHLESS ESC",
       description: "A taller, compact 1/10 truck ESC mock-up with a deeper enclosure, raised square fan shroud, aluminum heat sink, capacitor cans, controller details and separate battery and motor leads.",
-      specs: "ENCLOSURE   ·  Tall 1/10-scale controller case\nCOOLING     ·  Raised seven-blade fan\nTHERMAL     ·  Upright aluminum heat-sink fins\nCONNECTION  ·  Battery and three-phase leads"
+      specs: "REFERENCE   ·  43 × 36.8 × 32.3 mm class\nCOOLING     ·  25 mm framed seven-blade fan\nTHERMAL     ·  Upright aluminum heat-sink fins\nCONNECTION  ·  Battery and three-phase leads"
     }
   };
 
