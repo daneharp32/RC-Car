@@ -90,7 +90,8 @@
     }
     #garagePanel {
       position: fixed; z-index: 4; left: 22px; top: 50%; transform: translateY(-50%);
-      width: min(340px, calc(100vw - 36px)); padding: 22px;
+      width: min(340px, calc(100vw - 36px)); max-height: calc(100vh - 32px);
+      padding: 22px; overflow-y: auto; overscroll-behavior: contain;
       border: 1px solid rgba(155,205,255,.2); border-radius: 18px;
       background: rgba(9,20,34,.88); backdrop-filter: blur(15px);
       box-shadow: 0 22px 75px rgba(0,0,0,.3);
