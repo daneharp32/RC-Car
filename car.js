@@ -1029,23 +1029,31 @@ function makeCarVisual(color, playerName = "") {
   // Keep the two actual uploaded body meshes available as separate choices.
   let shellStyle = "prerunner";
   function setShellStyle(style) {
-    const requested = style === "ranger" ? "ranger" : "prerunner";
+    const requested = style === "none"
+      ? "none"
+      : style === "ranger" ? "ranger" : "prerunner";
     shellStyle = requested === "ranger" && rangerShellGeometry
       ? "ranger"
-      : "prerunner";
+      : requested === "ranger" ? "prerunner" : requested;
     rangerShellVisual.visible = shellStyle === "ranger";
     prerunnerShellVisual.visible = shellStyle === "prerunner";
-    shellGroup.userData.partInfo = shellStyle === "ranger"
+    shellGroup.userData.partInfo = shellStyle === "none"
       ? {
-          id: "short-course-body-shell",
-          label: "Orange SCX30 Ranger shell",
-          description: "The original uploaded orange SCX30 single-cab Ranger mesh, preserved as its own body option."
+          id: "no-body-shell",
+          label: "No body shell",
+          description: "The truck is configured to drive with its body shell removed, leaving the chassis, suspension, wheels and electronics exposed."
         }
-      : {
-          id: "short-course-body-shell",
-          label: "Concept4 Desert Racer prerunner shell",
-          description: "Painted blue Concept4 Desert Racer shell with its original proportions preserved and uniformly fitted to the chassis."
-        };
+      : shellStyle === "ranger"
+        ? {
+            id: "short-course-body-shell",
+            label: "Orange SCX30 Ranger shell",
+            description: "The original uploaded orange SCX30 single-cab Ranger mesh, preserved as its own body option."
+          }
+        : {
+            id: "short-course-body-shell",
+            label: "Concept4 Desert Racer prerunner shell",
+            description: "Painted blue Concept4 Desert Racer shell with its original proportions preserved and uniformly fitted to the chassis."
+          };
     return shellStyle;
   }
 
