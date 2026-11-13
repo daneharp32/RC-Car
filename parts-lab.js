@@ -337,12 +337,11 @@ export function createPartsLabSystem(game) {
       const angle = i / 14 * Math.PI * 2;
       const x = Math.cos(angle);
       const y = Math.sin(angle);
-      addBox(body, [0.052, 0.18, 0.25],
-        [x * 0.525, 0.84 + y * 0.525, 0.02],
-        materials.black, 0.009, [0, 0, angle]);
-      addBox(body, [0.022, 0.12, 0.16],
-        [x * 0.537, 0.84 + y * 0.537, 0.02],
-        materials.blue, 0.005, [0, 0, angle]);
+      // Shallow dark cooling slots sit partly inside the can surface and
+      // follow its radius; no raised blue tabs or floating trim blocks.
+      addBox(body, [0.018, 0.135, 0.20],
+        [x * 0.523, 0.84 + y * 0.523, 0.02],
+        materials.black, 0.006, [0, 0, angle]);
     }
 
     // End-bell screw circle and rear ventilation slots.
@@ -396,7 +395,7 @@ export function createPartsLabSystem(game) {
         [x * 1.25, 0.73, -1.405], [Math.PI / 2, 0, 0], 20);
     }
 
-    addTopLabel(body, "540 BRUSHLESS", "SENSORLESS MOTOR / 4-POLE", 0.74, 0.28, [0, 1.385, -0.05]);
+    addTopLabel(body, "540 BRUSHLESS", "SENSORLESS MOTOR / 4-POLE", 0.74, 0.28, [0, 1.365, -0.05]);
     return { body, shaftGroup };
   }
 
@@ -563,10 +562,161 @@ export function createPartsLabSystem(game) {
 
 
 
+
+  const batteryModel = new THREE.Group();
+  batteryModel.name = "Standalone 2S hardcase LiPo battery";
+  batteryModel.position.y = 0.16;
+  batteryModel.visible = false;
+  showcase.add(batteryModel);
+
+  function buildBattery() {
+    const body = new THREE.Group();
+    batteryModel.add(body);
+    addBox(body, [1.45, 0.30, 0.54], [0, 0.36, 0], materials.black, 0.075);
+    addBox(body, [1.39, 0.245, 0.49], [0, 0.39, 0], materials.shell, 0.055);
+    addBox(body, [1.30, 0.025, 0.43], [0, 0.525, 0], materials.shellLight, 0.025);
+    // Two-cell hardcase seam and molded reinforcement ribs.
+    addBox(body, [0.018, 0.018, 0.46], [0, 0.54, 0], materials.darkAlloy, 0.005);
+    for (const x of [-0.59, -0.30, 0.30, 0.59]) {
+      addBox(body, [0.025, 0.018, 0.44], [x, 0.548, 0], materials.darkAlloy, 0.005);
+    }
+    for (const z of [-0.26, 0.26]) {
+      addBox(body, [1.16, 0.035, 0.025], [0, 0.26, z], materials.darkAlloy, 0.008);
+    }
+    addTopLabel(body, "2S LIPO", "7.4V HARDCASE PACK", 0.72, 0.24, [0, 0.566, 0]);
+    // Balance lead and main power lead emerge from the same end.
+    addTube(body, [[-0.40,0.38,-0.24],[-0.52,0.30,-0.42],[-0.62,0.30,-0.57]], 0.025, materials.white, 7);
+    addBox(body, [0.18,0.13,0.12], [-0.64,0.30,-0.61], materials.black, 0.018);
+    for (let i=0;i<3;i++) addCylinder(body,0.018,0.018,0.045,materials.gold,[-0.70+i*0.055,0.30,-0.68],[Math.PI/2,0,0],12);
+    addTube(body, [[0.42,0.38,-0.24],[0.54,0.30,-0.43],[0.66,0.29,-0.59]], 0.045, materials.red, 8);
+    addTube(body, [[0.32,0.38,-0.24],[0.43,0.27,-0.44],[0.54,0.26,-0.59]], 0.045, materials.black, 8);
+    addBox(body, [0.27,0.16,0.17], [0.60,0.27,-0.68], materials.orange, 0.025);
+    addBox(body, [0.17,0.045,0.12], [0.60,0.36,-0.68], materials.black, 0.012);
+    return {body};
+  }
+  const batteryParts = buildBattery();
+  batchStaticMeshes(batteryParts.body);
+
+  const gearboxModel = new THREE.Group();
+  gearboxModel.name = "Standalone short-course gearbox";
+  gearboxModel.position.y = 0.16;
+  gearboxModel.visible = false;
+  showcase.add(gearboxModel);
+
+  function buildGearbox() {
+    const body = new THREE.Group();
+    gearboxModel.add(body);
+    // Two-piece molded composite transmission case.
+    addBox(body,[1.10,0.78,0.72],[0,0.70,0],materials.shell,0.13);
+    addBox(body,[1.02,0.64,0.08],[0,0.70,0.39],materials.black,0.08);
+    addBox(body,[0.90,0.55,0.035],[0,0.70,0.445],materials.shellLight,0.055);
+    addBox(body,[0.76,0.035,0.04],[0,1.10,0.42],materials.darkAlloy,0.012);
+    // Differential inspection cover and bearing bosses.
+    addCylinder(body,0.31,0.31,0.09,materials.darkAlloy,[0,0.72,0.52],[Math.PI/2,0,0],40);
+    addCylinder(body,0.25,0.25,0.045,materials.black,[0,0.72,0.58],[Math.PI/2,0,0],36);
+    addTorus(body,0.285,0.018,materials.brightAlloy,[0,0.72,0.585],[Math.PI/2,0,0],40);
+    for(let i=0;i<8;i++){
+      const a=i/8*Math.PI*2;
+      addScrew(body,[Math.cos(a)*0.255,0.72+Math.sin(a)*0.255,0.62],0.025,materials.brightAlloy,"z");
+    }
+    // Output cups on both sides of the differential.
+    for(const side of [-1,1]){
+      addCylinder(body,0.105,0.105,0.22,materials.darkAlloy,[side*0.64,0.69,0],[0,0,Math.PI/2],28);
+      addTorus(body,0.09,0.015,materials.brightAlloy,[side*0.76,0.69,0],[0,Math.PI/2,0],28);
+      addCylinder(body,0.055,0.055,0.18,materials.alloy,[side*0.83,0.69,0],[0,0,Math.PI/2],20);
+    }
+    // A modest spur-gear detail sits behind a partial side inspection window.
+    addBox(body,[0.34,0.30,0.025],[0.30,0.72,0.64],materials.black,0.035);
+    addCylinder(body,0.19,0.19,0.045,materials.gold,[0.30,0.72,0.68],[Math.PI/2,0,0],36);
+    addTorus(body,0.16,0.012,materials.darkAlloy,[0.30,0.72,0.71],[Math.PI/2,0,0],32);
+    addTopLabel(body,"SEALED GEARBOX","DIFFERENTIAL / OUTPUT CUPS",0.72,0.22,[0,1.105,0]);
+    for(const x of [-0.42,0.42]) addScrew(body,[x,1.10,0.18],0.03,materials.brightAlloy);
+    return {body};
+  }
+  const gearboxParts = buildGearbox();
+  batchStaticMeshes(gearboxParts.body);
+
+  const shockModel = new THREE.Group();
+  shockModel.name = "Animated oil-filled RC shock absorber";
+  shockModel.position.y = 0.14;
+  shockModel.visible = false;
+  showcase.add(shockModel);
+
+  function buildShock() {
+    const body = new THREE.Group();
+    shockModel.add(body);
+    // Lower threaded damper body, eyelet and lower spring seat.
+    addCylinder(body,0.13,0.145,0.64,materials.darkAlloy,[0,0.53,0],[0,0,0],32);
+    addCylinder(body,0.115,0.115,0.49,materials.alloy,[0,0.55,0],[0,0,0],32);
+    addTorus(body,0.13,0.018,materials.black,[0,0.84,0],[0,0,0],32);
+    addCylinder(body,0.18,0.18,0.075,materials.shellLight,[0,0.88,0],[0,0,0],32);
+    for(let i=0;i<10;i++){
+      const y=0.30+i*0.055;
+      addTorus(body,0.137,0.008,materials.black,[0,y,0],[0,0,0],28);
+    }
+    // Piston rod and upper eyelet move with the compression cycle.
+    const moving = new THREE.Group();
+    moving.name = "Moving shock piston rod and top eyelet";
+    body.add(moving);
+    addCylinder(moving,0.038,0.038,0.66,materials.brightAlloy,[0,0.48,0],[0,0,0],20);
+    addBox(moving,[0.22,0.11,0.16],[0,0.86,0],materials.shell,0.04);
+    addCylinder(moving,0.055,0.055,0.18,materials.black,[0,0.93,0],[0,0,Math.PI/2],20);
+    addTorus(moving,0.05,0.012,materials.brightAlloy,[0,1.025,0],[Math.PI/2,0,0],24);
+    // Helical coil spring is a separate group so its pitch contracts visibly.
+    const springGroup = new THREE.Group();
+    springGroup.name = "Compressing coil spring";
+    springGroup.position.y = 0.45;
+    body.add(springGroup);
+    const springPoints=[];
+    const turns=7.5, samples=turns*16;
+    for(let i=0;i<=samples;i++){
+      const t=i/samples;
+      const a=t*turns*Math.PI*2;
+      springPoints.push([Math.cos(a)*0.17,t*0.88,Math.sin(a)*0.17]);
+    }
+    addTube(springGroup,springPoints,0.027,materials.orange,8);
+    addTorus(body,0.18,0.025,materials.darkAlloy,[0,0.47,0],[0,0,0],32);
+    addTorus(moving,0.18,0.025,materials.darkAlloy,[0,1.34,0],[0,0,0],32);
+    return {body,moving,springGroup};
+  }
+  const shockParts = buildShock();
+  batchStaticMeshes(shockParts.body,[shockParts.moving,shockParts.springGroup]);
+  batchStaticMeshes(shockParts.moving,[],{castShadow:false,receiveShadow:false});
+  batchStaticMeshes(shockParts.springGroup,[],{castShadow:false,receiveShadow:false});
+
+  const springModel = new THREE.Group();
+  springModel.name = "Standalone suspension coil spring";
+  springModel.position.y = 0.14;
+  springModel.visible = false;
+  showcase.add(springModel);
+  function buildStandaloneSpring(){
+    const body=new THREE.Group();
+    springModel.add(body);
+    addTorus(body,0.22,0.035,materials.darkAlloy,[0,0.36,0],[0,0,0],36);
+    const springGroup=new THREE.Group();
+    springGroup.position.y=0.36;
+    body.add(springGroup);
+    const points=[],turns=8,samples=turns*18;
+    for(let i=0;i<=samples;i++){
+      const t=i/samples,a=t*turns*Math.PI*2;
+      points.push([Math.cos(a)*0.20,t,Math.sin(a)*0.20]);
+    }
+    addTube(springGroup,points,0.032,materials.orange,8);
+    addTorus(springGroup,0.22,0.035,materials.darkAlloy,[0,1,0],[0,0,0],36);
+    return {body,springGroup};
+  }
+  const standaloneSpring=buildStandaloneSpring();
+  batchStaticMeshes(standaloneSpring.body,[standaloneSpring.springGroup]);
+  batchStaticMeshes(standaloneSpring.springGroup,[],{castShadow:false,receiveShadow:false});
+
   const componentModels = {
     servo: servoModel,
     motor: motorModel,
-    esc: escModel
+    esc: escModel,
+    battery: batteryModel,
+    gearbox: gearboxModel,
+    shock: shockModel,
+    spring: springModel
   };
 
   const partDetails = {
@@ -584,6 +734,26 @@ export function createPartsLabSystem(game) {
       name: "BRUSHLESS ESC",
       description: "A taller, compact 1/10 truck ESC mock-up with a deeper enclosure, raised square fan shroud, aluminum heat sink, capacitor cans, controller details and separate battery and motor leads.",
       specs: "REFERENCE   ·  43 × 36.8 × 32.3 mm class\nCOOLING     ·  25 mm framed seven-blade fan\nTHERMAL     ·  Upright aluminum heat-sink fins\nCONNECTION  ·  Battery and three-phase leads"
+    },
+    battery: {
+      name: "2S HARDCASE LIPO BATTERY",
+      description: "A simple full-length hardcase pack with molded case seams, cell markings, balance lead, and main power connector.",
+      specs: "FORMAT      ·  2S hardcase pack\nVOLTAGE     ·  7.4 V nominal\nCASE        ·  Molded protective shell\nLEADS       ·  Main power and balance"
+    },
+    gearbox: {
+      name: "SHORT-COURSE GEARBOX",
+      description: "A compact molded transmission housing with differential cover, bearing bosses, output cups, fasteners, and a restrained gear detail.",
+      specs: "TYPE        ·  Enclosed transmission\nDRIVE       ·  Differential output cups\nHOUSING     ·  Two-piece composite case\nDETAIL      ·  Bearing and cover hardware"
+    },
+    shock: {
+      name: "OIL-FILLED SHOCK ABSORBER",
+      description: "A standalone coil-over damper with an aluminum body, piston rod, threaded preload area, mounting eyelets, and a spring that compresses and extends.",
+      specs: "ACTION      ·  Repeated compression cycle\nDAMPER      ·  Oil-filled style body\nSPRING      ·  Variable coil pitch\nMOUNT       ·  Upper and lower eyelets"
+    },
+    spring: {
+      name: "SUSPENSION COIL SPRING",
+      description: "A standalone suspension spring with visible coils and a repeating compression and extension demonstration.",
+      specs: "ACTION      ·  Repeated compression cycle\nTYPE        ·  Steel coil-over spring\nSEATS       ·  Upper and lower retainers\nMOTION      ·  Animated pitch change"
     }
   };
 
@@ -623,6 +793,9 @@ export function createPartsLabSystem(game) {
       servoParts.hornPivot.rotation.y = 0;
       motorShaft.rotation.z = 0;
       escFan.rotation.y = 0;
+      shockParts.moving.position.y = 0;
+      shockParts.springGroup.scale.y = 1;
+      standaloneSpring.springGroup.scale.y = 1;
     }
   }
 
@@ -653,6 +826,11 @@ export function createPartsLabSystem(game) {
       motorShaft.rotation.z = time * 22;
     } else if (activePart === "esc") {
       escFan.rotation.y = time * 31;
+    } else if (activePart === "shock" || activePart === "spring") {
+      const compression = 0.72 + (0.28 * (0.5 + 0.5 * Math.sin(time * 2.6)));
+      shockParts.moving.position.y = activePart === "shock" ? -(1 - compression) * 0.82 : 0;
+      shockParts.springGroup.scale.y = activePart === "shock" ? compression : 1;
+      standaloneSpring.springGroup.scale.y = activePart === "spring" ? compression : 1;
     }
   }
 
