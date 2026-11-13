@@ -547,6 +547,7 @@ function showMainMenu() {
   mainMenuPanel.style.display = "block";
   modeSelectPanel.style.display = "none";
   garagePanel.style.display = "none";
+  $("partsLabPanel").style.display = "none";
   joinPanel.style.display = "none";
   hud.style.display = "none";
   $("topStatus").style.display = "none";
@@ -561,6 +562,7 @@ function showModeSelect() {
   mainMenuPanel.style.display = "none";
   modeSelectPanel.style.display = "block";
   garagePanel.style.display = "none";
+  $("partsLabPanel").style.display = "none";
   joinPanel.style.display = "none";
   hud.style.display = "none";
   $("topStatus").style.display = "none";
@@ -576,6 +578,7 @@ function showCreateLobby() {
   mainMenuPanel.style.display = "none";
   modeSelectPanel.style.display = "none";
   garagePanel.style.display = "none";
+  $("partsLabPanel").style.display = "none";
   joinPanel.style.display = "block";
   hud.style.display = "none";
   $("topStatus").style.display = "none";
@@ -592,6 +595,7 @@ function showGarage() {
   mainMenuPanel.style.display = "none";
   modeSelectPanel.style.display = "none";
   garagePanel.style.display = "block";
+  $("partsLabPanel").style.display = "none";
   joinPanel.style.display = "none";
   hud.style.display = "none";
   $("topStatus").style.display = "none";
@@ -607,6 +611,7 @@ function showPartsLab() {
   mainMenuPanel.style.display = "none";
   modeSelectPanel.style.display = "none";
   garagePanel.style.display = "none";
+  $("partsLabPanel").style.display = "block";
   joinPanel.style.display = "none";
   hud.style.display = "none";
   $("topStatus").style.display = "none";
@@ -644,6 +649,7 @@ function showDriveScreen() {
   mainMenuPanel.style.display = "none";
   modeSelectPanel.style.display = "none";
   garagePanel.style.display = "none";
+  $("partsLabPanel").style.display = "none";
   joinPanel.style.display = "none";
   hud.style.display = "block";
   $("topStatus").style.display = "flex";
