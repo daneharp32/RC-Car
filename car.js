@@ -732,6 +732,255 @@ function makeCarVisual(color, playerName = "") {
   }
 
 
+  // Optional solid rear axle appearance. This assembly has no separate
+  // physics body: its rigid beam follows the two stock RaycastVehicle rear
+  // wheel transforms, while the physics layer couples their suspension travel.
+  const liveAxleAssembly = new THREE.Group();
+  liveAxleAssembly.name = "coupled-solid-rear-axle";
+  liveAxleAssembly.visible = false;
+  root.add(liveAxleAssembly);
+
+  const axleBeamGroup = new THREE.Group();
+  liveAxleAssembly.add(axleBeamGroup);
+  const axleTube = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.037, 0.037, 1, 24),
+    darkMetal
+  );
+  axleTube.rotation.z = Math.PI / 2;
+  axleTube.castShadow = true;
+  axleBeamGroup.add(axleTube);
+  const differentialPumpkin = new THREE.Mesh(
+    new THREE.SphereGeometry(0.118, 24, 18),
+    darkMetal
+  );
+  differentialPumpkin.scale.set(1.0, 0.94, 1.15);
+  differentialPumpkin.position.y = -0.012;
+  differentialPumpkin.castShadow = true;
+  axleBeamGroup.add(differentialPumpkin);
+  const differentialCover = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.080, 0.080, 0.018, 28),
+    alloy
+  );
+  differentialCover.rotation.x = Math.PI / 2;
+  differentialCover.position.set(0, 0.005, 0.116);
+  axleBeamGroup.add(differentialCover);
+  const axlePinion = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.032, 0.040, 0.105, 16),
+    alloy
+  );
+  axlePinion.rotation.x = Math.PI / 2;
+  axlePinion.position.set(0, -0.018, -0.105);
+  axleBeamGroup.add(axlePinion);
+
+  for (const side of [-1, 1]) {
+    const axleTubeEnd = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.052, 0.052, 0.22, 18),
+      carbonEdge
+    );
+    axleTubeEnd.rotation.z = Math.PI / 2;
+    axleTubeEnd.position.x = side * 0.285;
+    axleBeamGroup.add(axleTubeEnd);
+
+    const hubFlange = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.070, 0.070, 0.026, 24),
+      alloy
+    );
+    hubFlange.rotation.z = Math.PI / 2;
+    hubFlange.position.x = side * 0.405;
+    axleBeamGroup.add(hubFlange);
+  }
+
+  function makeAxleLinkMesh(width, thickness, material) {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, 1, thickness), material);
+    mesh.castShadow = true;
+    liveAxleAssembly.add(mesh);
+    return mesh;
+  }
+  function updateAxleLink(mesh, start, end) {
+    const direction = end.clone().sub(start);
+    const length = Math.max(0.001, direction.length());
+    mesh.position.copy(start).add(end).multiplyScalar(0.5);
+    mesh.quaternion.setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      direction.normalize()
+    );
+    mesh.scale.set(1, length, 1);
+  }
+
+  const liveAxleSwingArms = [];
+  const liveAxleShocks = [];
+  const liveAxleStraps = [];
+  for (const side of [-1, 1]) {
+    liveAxleSwingArms.push({
+      side,
+      lower: makeAxleLinkMesh(0.070, 0.046, red),
+      brace: makeAxleLinkMesh(0.028, 0.030, carbonEdge)
+    });
+
+    const shock = new THREE.Group();
+    liveAxleAssembly.add(shock);
+    const damperBody = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.022, 0.025, 0.62, 16),
+      blueDark
+    );
+    damperBody.castShadow = true;
+    shock.add(damperBody);
+    const damperShaft = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.007, 0.007, 0.52, 12),
+      alloy
+    );
+    damperShaft.position.y = 0.045;
+    shock.add(damperShaft);
+    const springSeatTop = new THREE.Mesh(
+      new THREE.TorusGeometry(0.034, 0.005, 8, 22),
+      alloy
+    );
+    springSeatTop.rotation.x = Math.PI / 2;
+    springSeatTop.position.y = 0.18;
+    shock.add(springSeatTop);
+    for (let coil = 0; coil < 7; coil++) {
+      const spring = new THREE.Mesh(
+        new THREE.TorusGeometry(0.031, 0.0045, 7, 20),
+        springSilver
+      );
+      spring.rotation.x = Math.PI / 2;
+      spring.position.y = -0.18 + coil * 0.055;
+      shock.add(spring);
+    }
+    liveAxleShocks.push({ side, group: shock });
+
+    const strapSegments = [];
+    for (let piece = 0; piece < 6; piece++) {
+      const strap = new THREE.Mesh(
+        new THREE.BoxGeometry(0.027, 1, 0.009),
+        blackPlastic
+      );
+      const stitch = new THREE.Mesh(
+        new THREE.BoxGeometry(0.003, 1, 0.011),
+        redBright
+      );
+      strap.add(stitch);
+      liveAxleAssembly.add(strap);
+      strapSegments.push(strap);
+    }
+    liveAxleStraps.push({ side, segments: strapSegments });
+  }
+
+  const standardChassisPosition = chassis.position.clone();
+  const standardChassisScale = chassis.scale.clone();
+  const electricalParts = [
+    battery, motor, gearing, esc, receiver, powerWiring, signalWiring
+  ];
+  const standardElectricalPositions = electricalParts.map((part) => part.position.clone());
+
+  function setChassisStyle(style) {
+    chassisStyle = style === "solid-axle" ? "solid-axle" : "standard";
+    const useSolidAxle = chassisStyle === "solid-axle";
+    for (const part of rearIndependentParts) part.visible = !useSolidAxle;
+    liveAxleAssembly.visible = useSolidAxle;
+
+    chassis.position.copy(standardChassisPosition);
+    chassis.scale.copy(standardChassisScale);
+    if (useSolidAxle) {
+      // A shorter skid plate sits forward under the relocated electronics.
+      chassis.position.z -= 0.12;
+      chassis.scale.z *= 0.84;
+    }
+    electricalParts.forEach((part, index) => {
+      part.position.copy(standardElectricalPositions[index]);
+      if (useSolidAxle) part.position.z -= 0.15;
+    });
+    return chassisStyle;
+  }
+
+  function updateChassisSuspensionVisuals(rearState = []) {
+    if (chassisStyle !== "solid-axle") return;
+    const leftHub = wheelPivots[2].position.clone();
+    const rightHub = wheelPivots[3].position.clone();
+    const axleDirection = rightHub.clone().sub(leftHub);
+    const axleSpan = Math.max(0.35, axleDirection.length());
+    const axleCenter = leftHub.clone().add(rightHub).multiplyScalar(0.5);
+    axleBeamGroup.position.copy(axleCenter);
+    axleBeamGroup.quaternion.setFromUnitVectors(
+      new THREE.Vector3(1, 0, 0),
+      axleDirection.normalize()
+    );
+    axleTube.scale.y = axleSpan + 0.11;
+
+    const axleHubs = [leftHub, rightHub];
+    for (let index = 0; index < 2; index++) {
+      const side = index === 0 ? -1 : 1;
+      const hub = axleHubs[index];
+      const framePivot = new THREE.Vector3(
+        side * 0.205,
+        -0.032,
+        (rearAxleZ - 0.31) * chassisLengthScale
+      );
+      const forwardBrace = new THREE.Vector3(
+        side * 0.17,
+        0.018,
+        (rearAxleZ - 0.24) * chassisLengthScale
+      );
+      const armEnd = hub.clone();
+      armEnd.x -= side * 0.045;
+      armEnd.y -= 0.025;
+      updateAxleLink(liveAxleSwingArms[index].lower, framePivot, armEnd);
+      updateAxleLink(liveAxleSwingArms[index].brace, forwardBrace, armEnd);
+
+      const shockTop = new THREE.Vector3(
+        side * 0.205,
+        0.19,
+        (rearAxleZ - 0.115) * chassisLengthScale
+      );
+      const shockBottom = hub.clone();
+      shockBottom.x -= side * 0.055;
+      shockBottom.y += 0.075;
+      const shockDirection = shockBottom.clone().sub(shockTop);
+      const shockLength = Math.max(0.08, shockDirection.length());
+      const shock = liveAxleShocks[index].group;
+      shock.position.copy(shockTop).add(shockBottom).multiplyScalar(0.5);
+      shock.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        shockDirection.normalize()
+      );
+      shock.scale.set(1, shockLength / 0.62, 1);
+
+      const strapTop = new THREE.Vector3(
+        side * 0.235,
+        0.16,
+        (rearAxleZ - 0.10) * chassisLengthScale
+      );
+      const strapBottom = hub.clone();
+      strapBottom.x -= side * 0.02;
+      strapBottom.y += 0.03;
+      const strapDirection = strapBottom.clone().sub(strapTop);
+      const strapLength = Math.max(0.001, strapDirection.length());
+      const state = rearState[index] || {};
+      const maxTravel = Math.max(0.01, state.maxTravel || 0.15);
+      const extension = THREE.MathUtils.clamp(
+        ((state.suspensionLength || state.restLength || 0) - (state.restLength || 0)) / maxTravel,
+        0,
+        1
+      );
+      const sagDirection = new THREE.Vector3(0, -1, 0);
+      sagDirection.addScaledVector(strapDirection, -sagDirection.dot(strapDirection));
+      if (sagDirection.lengthSq() < 0.0001) sagDirection.set(0, 0, 1);
+      sagDirection.normalize().multiplyScalar((1 - extension) * 0.038);
+
+      const pointOnStrap = (t) => strapTop.clone()
+        .lerp(strapBottom, t)
+        .addScaledVector(sagDirection, 4 * t * (1 - t));
+      const segments = liveAxleStraps[index].segments;
+      for (let piece = 0; piece < segments.length; piece++) {
+        const a = pointOnStrap(piece / segments.length);
+        const b = pointOnStrap((piece + 1) / segments.length);
+        updateAxleLink(segments[piece], a, b);
+      }
+      // At full droop the strap straightens and prevents travel beyond the
+      // RaycastVehicle's configured rear suspension extension limit.
+    }
+  }
+
   const rangerShellMaterial = new THREE.MeshStandardMaterial({
     color: 0xff581a,
     roughness: 0.58,
@@ -803,6 +1052,7 @@ function makeCarVisual(color, playerName = "") {
     }
   });
   setShellStyle(shellModel ? "prerunner" : "ranger");
+  setChassisStyle("standard");
 
   // Store the original hierarchy and transforms so every damaged component
   // can be restored by the existing vehicle reset command.
@@ -1197,6 +1447,7 @@ function makeCarVisual(color, playerName = "") {
       if (record.detached || record.health < record.maxHealth) restoreRecord(record);
     }
     totalled = false;
+    setChassisStyle(chassisStyle);
     return getDamageSummary();
   }
 
@@ -1444,6 +1695,9 @@ function makeCarVisual(color, playerName = "") {
     setShellVisible(visible) { shellGroup.visible = !!visible; },
     setShellStyle,
     get shellStyle() { return shellStyle; },
+    setChassisStyle,
+    get chassisStyle() { return chassisStyle; },
+    updateChassisSuspensionVisuals,
     setPlayerName,
     applyImpact,
     applyLaunchStress,
