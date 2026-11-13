@@ -398,6 +398,28 @@
       color: #fff;
       box-shadow: inset 0 0 0 1px rgba(89,180,255,.16);
     }
+    .camera-zoom-heading {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 10px; color: #a8bac9; font-size: 8px; font-weight: 900;
+      letter-spacing: .08em;
+    }
+    .camera-zoom-heading strong { color: #f3f8fc; font-variant-numeric: tabular-nums; }
+    .camera-zoom-row { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
+    .camera-zoom-step {
+      flex: 0 0 29px; width: 29px; height: 27px; border-radius: 6px;
+      border: 1px solid rgba(160,195,222,.25);
+      background: rgba(255,255,255,.08); color: #f3f8fc;
+      font: 900 16px/1 ui-sans-serif,sans-serif; pointer-events: auto;
+    }
+    .camera-zoom-step:hover { background: rgba(50,139,218,.35); }
+    #cameraZoomSlider {
+      flex: 1; min-width: 60px; height: 22px; margin: 0;
+      accent-color: #62b8ff; cursor: pointer; touch-action: pan-y;
+    }
+    .camera-zoom-hint {
+      margin-top: 4px; color: #8399aa; font-size: 7px;
+      font-weight: 800; letter-spacing: .055em; text-align: center;
+    }
     kbd {
       display: inline-grid; min-width: 19px; height: 19px; margin: 0 2px; padding: 0 4px;
       place-items: center; border: 1px solid rgba(255,255,255,.2); border-radius: 5px;
@@ -949,6 +971,16 @@
         <button class="camera-mode-button" type="button" data-camera-mode="interior" aria-pressed="false" title="Interior camera (C)">INTERIOR</button>
         <button class="camera-mode-button" type="button" data-camera-mode="stand" aria-pressed="false" title="Stand POV camera (C)">STAND POV</button>
       </div>
+      <div class="camera-zoom-heading">
+        <span>CHASE DISTANCE</span>
+        <strong><span id="cameraZoomValue">3.7</span></strong>
+      </div>
+      <div class="camera-zoom-row" aria-label="Adjust chase camera zoom">
+        <button id="cameraZoomOut" class="camera-zoom-step" type="button" aria-label="Zoom out" title="Zoom out">−</button>
+        <input id="cameraZoomSlider" type="range" min="1.65" max="10" step="0.05" value="3.7" aria-label="Chase camera distance">
+        <button id="cameraZoomIn" class="camera-zoom-step" type="button" aria-label="Zoom in" title="Zoom in">+</button>
+      </div>
+      <div class="camera-zoom-hint">SCROLL · DRAG SLIDER · + / − KEYS</div>
     </div>
     <div id="speedCard" class="hud-card">
       <div class="hud-label">GROUND SPEED</div>
