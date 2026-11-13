@@ -306,10 +306,6 @@ export function createPartsLabSystem(game) {
   batchStaticMeshes(servoParts.body, [servoParts.hornPivot]);
   batchStaticMeshes(servoParts.hornPivot, [], { castShadow: false, receiveShadow: false });
 
-  const servoParts = buildServo();
-  batchStaticMeshes(servoParts.body, [servoParts.hornPivot]);
-  batchStaticMeshes(servoParts.hornPivot, [], { castShadow: false, receiveShadow: false });
-
 
 
   const motorModel = new THREE.Group();
@@ -403,11 +399,6 @@ export function createPartsLabSystem(game) {
 
     return { body, shaftGroup };
   }
-
-  const motorParts = buildMotor();
-  const motorShaft = motorParts.shaftGroup;
-  batchStaticMeshes(motorParts.body, [motorShaft]);
-  batchStaticMeshes(motorShaft, [], { castShadow: false, receiveShadow: false });
 
   const motorParts = buildMotor();
   const motorShaft = motorParts.shaftGroup;
@@ -679,9 +670,6 @@ export function createPartsLabSystem(game) {
     }
     return { body };
   }
-  const gearboxParts = buildGearbox();
-  batchStaticMeshes(gearboxParts.body);
-
   const gearboxParts = buildGearbox();
   batchStaticMeshes(gearboxParts.body);
 
