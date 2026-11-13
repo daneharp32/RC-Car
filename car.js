@@ -957,7 +957,6 @@ function makeCarVisual(color, playerName = "") {
       strapBottom.x -= side * 0.02;
       strapBottom.y += 0.03;
       const strapDirection = strapBottom.clone().sub(strapTop);
-      const strapLength = Math.max(0.001, strapDirection.length());
       const state = rearState[index] || {};
       const maxTravel = Math.max(0.01, state.maxTravel || 0.15);
       const extension = THREE.MathUtils.clamp(
