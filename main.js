@@ -968,11 +968,19 @@ const makeCarVisual = createCarVisualFactory({
   VISUAL_CHASSIS_LENGTH_SCALE, vehicle, renderer, shellModel, rangerShellGeometry
 });
 const localCar = makeCarVisual(0xffa33d);
+let selectedChassisStyle = "standard";
+localCar.setChassisStyle(selectedChassisStyle);
 let selectedShellStyle = shellModel ? "prerunner" : "ranger";
 function setSelectedShellStyle(style) {
   selectedShellStyle = style === "ranger" ? "ranger" : "prerunner";
   selectedShellStyle = localCar.setShellStyle(selectedShellStyle);
   return selectedShellStyle;
+}
+function setSelectedChassisStyle(style) {
+  selectedChassisStyle = physicsSystem.setChassisStyle(style === "solid-axle" ? "solid-axle" : "standard");
+  localCar.setChassisStyle(selectedChassisStyle);
+  updateLocalVisual();
+  return selectedChassisStyle;
 }
 localCar.setShellStyle(selectedShellStyle);
 
@@ -1011,6 +1019,7 @@ function updateLocalVisual() {
     localCar.wheelPivots[i].position.copy(localPosition);
     localCar.wheelPivots[i].quaternion.copy(inverseRoot).multiply(worldWheelQuaternion);
   }
+  localCar.updateChassisSuspensionVisuals?.(physicsSystem.getRearSuspensionState?.());
 }
 
 
@@ -1057,6 +1066,8 @@ const game = {
   makeCarVisual,
   getShellStyle: () => selectedShellStyle,
   setShellStyle: setSelectedShellStyle,
+  getChassisStyle: () => selectedChassisStyle,
+  setChassisStyle: setSelectedChassisStyle,
   updateLocalVisual,
   showToast
 };
