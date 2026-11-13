@@ -261,6 +261,34 @@ function applyGarageShellPose(progress) {
   localCar.shellGroup.scale.lerpVectors(garageShellAttachedScale, garageShellRemovedScale, t);
 }
 
+function updateGarageChassisChoiceButtons() {
+  const style = game.getChassisStyle?.() === "solid-axle" ? "solid-axle" : "standard";
+  for (const [buttonId, buttonStyle] of [
+    ["chassisChoiceStandard", "standard"],
+    ["chassisChoiceSolidAxle", "solid-axle"]
+  ]) {
+    const button = $(buttonId);
+    if (!button) continue;
+    const active = style === buttonStyle;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  }
+}
+
+function chooseGarageChassis(style) {
+  clearGaragePartHover();
+  const selected = game.setChassisStyle?.(style);
+  updateGarageChassisChoiceButtons();
+  if (selected) game.showToast?.(
+    selected === "solid-axle"
+      ? "CHASSIS: COUPLED SOLID REAR AXLE"
+      : "CHASSIS: STANDARD INDEPENDENT"
+  );
+}
+
+$("chassisChoiceStandard").addEventListener("click", () => chooseGarageChassis("standard"));
+$("chassisChoiceSolidAxle").addEventListener("click", () => chooseGarageChassis("solid-axle"));
+
 function updateGarageShellChoiceButtons() {
   const style = game.getShellStyle?.() === "ranger" ? "ranger" : "prerunner";
   for (const [buttonId, buttonStyle] of [
@@ -292,6 +320,7 @@ function resetGarageShellState(visible = true) {
   const button = $("shellToggleButton");
   if (button) button.textContent = garageShellInstalled ? "REMOVE BODY SHELL" : "INSTALL BODY SHELL";
   updateGarageShellChoiceButtons();
+  updateGarageChassisChoiceButtons();
 }
 
 function updateGarageShellAnimation(now) {
@@ -452,6 +481,7 @@ function showGarage() {
   setArenaVisible(false);
   parkCarForShowroom();
   updateGarageShellChoiceButtons();
+  updateGarageChassisChoiceButtons();
 }
 function setGarageShellVisible(visible) {
   if (garageShellAnimation || visible === garageShellInstalled) return;
@@ -506,6 +536,8 @@ function showDriveScreen() {
     setGarageShellVisible,
     chooseGarageShell,
     updateGarageShellChoiceButtons,
+    chooseGarageChassis,
+    updateGarageChassisChoiceButtons,
     updateGarageShellAnimation,
     updateHoverBounds,
     get viewMode() { return viewMode; },

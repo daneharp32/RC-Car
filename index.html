@@ -90,7 +90,8 @@
     }
     #garagePanel {
       position: fixed; z-index: 4; left: 22px; top: 50%; transform: translateY(-50%);
-      width: min(340px, calc(100vw - 36px)); padding: 22px;
+      width: min(340px, calc(100vw - 36px)); max-height: calc(100vh - 32px);
+      padding: 22px; overflow-y: auto; overscroll-behavior: contain;
       border: 1px solid rgba(155,205,255,.2); border-radius: 18px;
       background: rgba(9,20,34,.88); backdrop-filter: blur(15px);
       box-shadow: 0 22px 75px rgba(0,0,0,.3);
@@ -683,10 +684,15 @@
   </section>
 
   <section id="garagePanel" style="display:none">
-    <div class="eyebrow">SHORT-COURSE TRUCK</div>
+    <div class="eyebrow">MODULAR SHORT-COURSE TRUCK</div>
     <h2 class="garage-title">BODY & CHASSIS GARAGE</h2>
-    <p class="garage-copy">Choose between your uploaded orange SCX30 Ranger shell and the blue Concept4 Desert Racer prerunner. Both are fitted to the same chassis. Drag to rotate the truck, hover over parts to identify them, or remove the shell to inspect the running gear.</p>
-    <p class="garage-hint">CHOOSE A BODY · DRAG TO ROTATE · HOVER TO IDENTIFY</p>
+    <p class="garage-copy">Choose a chassis layout independently from the Orange Ranger or Desert Prerunner shell. Both shells fit either layout. Drag to rotate the truck, hover over parts to identify them, or remove the shell to inspect the running gear.</p>
+    <p class="garage-hint">CHASSIS LAYOUT</p>
+    <div class="garage-shell-choices" role="group" aria-label="Choose chassis layout">
+      <button id="chassisChoiceStandard" class="menu-button secondary garage-shell-choice active" type="button" aria-pressed="true">STANDARD</button>
+      <button id="chassisChoiceSolidAxle" class="menu-button secondary garage-shell-choice" type="button" aria-pressed="false">COUPLED SOLID AXLE</button>
+    </div>
+    <p class="garage-hint">BODY SHELL</p>
     <div class="garage-shell-choices" role="group" aria-label="Choose truck body shell">
       <button id="shellChoiceRanger" class="menu-button secondary garage-shell-choice" type="button" aria-pressed="false">ORANGE RANGER</button>
       <button id="shellChoicePrerunner" class="menu-button secondary garage-shell-choice" type="button" aria-pressed="true">DESERT PRERUNNER</button>

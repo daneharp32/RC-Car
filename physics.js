@@ -275,9 +275,117 @@ const baseWheelSettings = vehicle.wheelInfos.map((wheel) => ({
   maxSuspensionForce: wheel.maxSuspensionForce,
   suspensionStiffness: wheel.suspensionStiffness,
   dampingCompression: wheel.dampingCompression,
-  dampingRelaxation: wheel.dampingRelaxation
+  dampingRelaxation: wheel.dampingRelaxation,
+  rollInfluence: wheel.rollInfluence
 }));
 let vehicleScale = 1;
+let chassisStyle = "standard";
+
+function applyCoupledRearSuspension() {
+  if (chassisStyle !== "solid-axle") return;
+
+  const left = vehicle.wheelInfos[2];
+  const right = vehicle.wheelInfos[3];
+  if (!left || !right || (!left.isInContact && !right.isInContact)) return;
+  // A smaller coupling remains when only one side has ground contact, avoiding
+  // a strong anti-roll kick during single-wheel landings.
+  const contactScale = left.isInContact && right.isInContact ? 1 : 0.35;
+
+  // The stock RaycastVehicle has already calculated both rear wheel contacts
+  // and applied their normal suspension/tire impulses in its earlier preStep
+  // listener. A modest equal-and-opposite chassis force now resists excessive
+  // left/right rear suspension separation without creating another rigid body,
+  // another contact solver, or a second set of tire forces.
+  const leftCompression = left.suspensionRestLength - left.suspensionLength;
+  const rightCompression = right.suspensionRestLength - right.suspensionLength;
+  const differentialTravel = leftCompression - rightCompression;
+  if (!Number.isFinite(differentialTravel)) return;
+
+  const antiRollRate = 110 * vehicleScale * vehicleScale;
+  const forceLimit = 14 * Math.pow(vehicleScale, 3);
+  const forceMagnitude = clamp(
+    differentialTravel * antiRollRate,
+    -forceLimit,
+    forceLimit
+  ) * contactScale;
+  if (Math.abs(forceMagnitude) < 0.01) return;
+
+  const up = chassisBody.vectorToWorldFrame(
+    new CANNON.Vec3(0, 1, 0),
+    new CANNON.Vec3()
+  );
+  const leftWorld = left.chassisConnectionPointWorld;
+  const rightWorld = right.chassisConnectionPointWorld;
+  const leftOffset = new CANNON.Vec3(
+    leftWorld.x - chassisBody.position.x,
+    leftWorld.y - chassisBody.position.y,
+    leftWorld.z - chassisBody.position.z
+  );
+  const rightOffset = new CANNON.Vec3(
+    rightWorld.x - chassisBody.position.x,
+    rightWorld.y - chassisBody.position.y,
+    rightWorld.z - chassisBody.position.z
+  );
+
+  // If the left tire is more compressed, push down on the left frame mount
+  // and up on the right one. The forces cancel vertically and only resist roll.
+  chassisBody.applyForce(scaled(up, -forceMagnitude), leftOffset);
+  chassisBody.applyForce(scaled(up, forceMagnitude), rightOffset);
+}
+
+// RaycastVehicle.addToWorld registers its wheel/contact update first. This
+// callback therefore sees the current wheel suspension lengths from that step.
+world.addEventListener("preStep", applyCoupledRearSuspension);
+
+function setChassisStyle(style) {
+  const requested = style === "solid-axle" ? "solid-axle" : "standard";
+  if (requested === chassisStyle) return chassisStyle;
+  chassisStyle = requested;
+
+  for (const index of [2, 3]) {
+    const base = baseWheelSettings[index];
+    const wheel = vehicle.wheelInfos[index];
+    wheel.chassisConnectionPointLocal.set(
+      base.connection.x * vehicleScale,
+      base.connection.y * vehicleScale,
+      base.connection.z * vehicleScale
+    );
+    wheel.radius = base.radius * vehicleScale;
+    wheel.suspensionRestLength = base.suspensionRestLength * vehicleScale;
+    wheel.suspensionLength = base.suspensionRestLength * vehicleScale;
+    wheel.maxSuspensionForce = base.maxSuspensionForce * Math.pow(vehicleScale, 3);
+    if (chassisStyle === "solid-axle") {
+      wheel.suspensionStiffness = base.suspensionStiffness * 0.91 * vehicleScale * vehicleScale;
+      wheel.dampingCompression = base.dampingCompression * 1.16 * vehicleScale * vehicleScale;
+      wheel.dampingRelaxation = base.dampingRelaxation * 1.14 * vehicleScale * vehicleScale;
+      wheel.maxSuspensionTravel = base.maxSuspensionTravel * 0.92 * vehicleScale;
+      wheel.rollInfluence = base.rollInfluence * 0.78;
+    } else {
+      wheel.suspensionStiffness = base.suspensionStiffness * vehicleScale * vehicleScale;
+      wheel.dampingCompression = base.dampingCompression * vehicleScale * vehicleScale;
+      wheel.dampingRelaxation = base.dampingRelaxation * vehicleScale * vehicleScale;
+      wheel.maxSuspensionTravel = base.maxSuspensionTravel * vehicleScale;
+      wheel.rollInfluence = base.rollInfluence;
+    }
+  }
+
+  chassisBody.wakeUp();
+  world.broadphase.dirty = true;
+  return chassisStyle;
+}
+
+function getRearSuspensionState() {
+  return [2, 3].map((index) => {
+    const wheel = vehicle.wheelInfos[index];
+    return {
+      suspensionLength: wheel.suspensionLength,
+      restLength: wheel.suspensionRestLength,
+      maxTravel: wheel.maxSuspensionTravel,
+      inContact: wheel.isInContact,
+      rotation: wheel.rotation
+    };
+  });
+}
 
 function setVehicleScale(value) {
   const requested = Number(value);
@@ -327,6 +435,17 @@ function setVehicleScale(value) {
   }
 
   chassisBody.mass = baseChassisMass * massScale;
+  if (chassisStyle === "solid-axle") {
+    for (const index of [2, 3]) {
+      const base = baseWheelSettings[index];
+      const wheel = vehicle.wheelInfos[index];
+      wheel.suspensionStiffness = base.suspensionStiffness * 0.91 * nextScale * nextScale;
+      wheel.dampingCompression = base.dampingCompression * 1.16 * nextScale * nextScale;
+      wheel.dampingRelaxation = base.dampingRelaxation * 1.14 * nextScale * nextScale;
+      wheel.maxSuspensionTravel = base.maxSuspensionTravel * 0.92 * nextScale;
+      wheel.rollInfluence = base.rollInfluence * 0.78;
+    }
+  }
   chassisBody.position.y += 0.24 * (nextScale - previousScale);
   chassisBody.updateMassProperties();
   chassisBody.updateBoundingRadius();
@@ -421,6 +540,9 @@ for (const [mapId, layout] of alternateMapLayouts) {
     chassisMaterial,
     chassisBody,
     vehicle,
+    setChassisStyle,
+    getChassisStyle() { return chassisStyle; },
+    getRearSuspensionState,
     wheelPositions,
     VISUAL_CHASSIS_LENGTH_SCALE,
     spawnX,

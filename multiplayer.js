@@ -46,6 +46,8 @@ export function createMultiplayerSystem(game) {
     return {
       name: driverName,
       shellStyle: game.getShellStyle?.() === "ranger" ? "ranger" : "prerunner",
+      chassisStyle: game.getChassisStyle?.() === "solid-axle" ? "solid-axle" : "standard",
+      rearSuspension: game.physicsSystem?.getRearSuspensionState?.() || [],
       x: chassisBody.position.x,
       y: chassisBody.position.y,
       z: chassisBody.position.z,
@@ -240,12 +242,15 @@ export function createMultiplayerSystem(game) {
       const name = cleanPlayerName(data.name) || "Driver";
       const visual = makeCarVisual(colorForPeer(peerId), name);
       visual.setShellStyle?.(data.shellStyle === "ranger" ? "ranger" : "prerunner");
+      visual.setChassisStyle?.(data.chassisStyle === "solid-axle" ? "solid-axle" : "standard");
       remote = {
         visual,
         target: null,
         lastSeen: performance.now(),
         wheelRotations: [0, 0, 0, 0],
         steering: 0,
+        chassisStyle: data.chassisStyle === "solid-axle" ? "solid-axle" : "standard",
+        rearSuspension: [],
         name
       };
       remotePlayers.set(peerId, remote);
@@ -269,6 +274,17 @@ export function createMultiplayerSystem(game) {
       const remoteShellStyle = data.shellStyle === "ranger" ? "ranger" : "prerunner";
       if (remote.visual.shellStyle !== remoteShellStyle) {
         remote.visual.setShellStyle?.(remoteShellStyle);
+      }
+      const remoteChassisStyle = data.chassisStyle === "solid-axle" ? "solid-axle" : "standard";
+      if (remote.chassisStyle !== remoteChassisStyle) {
+        remote.chassisStyle = remoteChassisStyle;
+        remote.visual.setChassisStyle?.(remoteChassisStyle);
+      }
+      if (Array.isArray(data.rearSuspension) && data.rearSuspension.length === 2 &&
+          data.rearSuspension.every((state) =>
+            state && Number.isFinite(state.suspensionLength) &&
+            Number.isFinite(state.restLength) && Number.isFinite(state.maxTravel))) {
+        remote.rearSuspension = data.rearSuspension;
       }
       if (Array.isArray(data.damage?.parts)) {
         remote.visual.applyDamageSnapshot?.(data.damage);
@@ -1009,7 +1025,11 @@ export function createMultiplayerSystem(game) {
         if (remote.visual.isPartDetached?.(wheelPartIds[i])) continue;
         const [x, , z] = wheelPositions[i];
         const pivot = remote.visual.wheelPivots[i];
-        pivot.position.set(x, -0.095, z * VISUAL_CHASSIS_LENGTH_SCALE);
+        const rearState = i >= 2 ? remote.rearSuspension[i - 2] : null;
+        const wheelY = rearState
+          ? -0.018 - rearState.suspensionLength
+          : -0.095;
+        pivot.position.set(x, wheelY, z * VISUAL_CHASSIS_LENGTH_SCALE);
         const steerQ = new THREE.Quaternion().setFromAxisAngle(
           new THREE.Vector3(0, 1, 0), i < 2 ? remote.steering : 0
         );
@@ -1018,6 +1038,7 @@ export function createMultiplayerSystem(game) {
         );
         pivot.quaternion.copy(steerQ).multiply(spinQ);
       }
+      remote.visual.updateChassisSuspensionVisuals?.(remote.rearSuspension);
       remote.visual.updateDebris?.(delta);
     }
     // Player count is refreshed on join/leave events or when a stale peer
