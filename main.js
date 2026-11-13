@@ -1593,14 +1593,18 @@ function animate(now) {
     carForward.normalize();
     const cameraDirection = carForward.clone().applyAxisAngle(worldUp, controls.cameraOrbitYaw);
     const cameraCarScale = Math.max(1, followedRoot.scale.x || 1);
+    // Bring the default chase view closer and slightly lower so the truck
+    // occupies more of the screen while retaining enough forward view of the
+    // track. A slightly narrower FOV increases vehicle detail without making
+    // steering/orbit behavior or the physics camera-dependent.
     const desiredCamera = followedRoot.position.clone()
-      .addScaledVector(cameraDirection, -5.8 * cameraCarScale)
-      .add(new THREE.Vector3(0, 2.8 * cameraCarScale, 0));
-    camera.position.lerp(desiredCamera, 1 - Math.exp(-2.8 * delta));
-    easeCameraFov(58, delta, 4.0);
+      .addScaledVector(cameraDirection, -4.35 * cameraCarScale)
+      .add(new THREE.Vector3(0, 2.25 * cameraCarScale, 0));
+    camera.position.lerp(desiredCamera, 1 - Math.exp(-3.4 * delta));
+    easeCameraFov(55, delta, 4.0);
     const lookTarget = followedRoot.position.clone()
-      .add(new THREE.Vector3(0, 0.28 * cameraCarScale, 0))
-      .addScaledVector(carForward, 0.85 * cameraCarScale);
+      .add(new THREE.Vector3(0, 0.32 * cameraCarScale, 0))
+      .addScaledVector(carForward, 0.72 * cameraCarScale);
     camera.up.copy(worldUp);
     camera.lookAt(lookTarget);
   }
