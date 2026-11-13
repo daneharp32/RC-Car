@@ -219,93 +219,87 @@ export function createPartsLabSystem(game) {
 
   function buildServo() {
     const body = new THREE.Group();
-    body.name = "Standard-size closed servo case";
+    body.name = "One-piece standard servo housing";
     servoModel.add(body);
 
-    // Conventional standard-servo proportions: elongated footprint, narrow
-    // width and a much taller closed case with a plain top cover.
-    addBox(body, [1.12, 0.50, 0.58], [0, 0.37, 0], materials.shell, 0.075);
-    addBox(body, [1.14, 0.035, 0.60], [0, 0.635, 0], materials.black, 0.02);
-    addBox(body, [1.10, 0.34, 0.58], [0, 0.82, 0], materials.shell, 0.065);
-    addBox(body, [1.035, 0.035, 0.52], [0, 0.99, 0], materials.shellLight, 0.025);
+    // Single molded body with a thin inset lid seam. The old stacked shells
+    // created a false gap through the middle of the servo.
+    addBox(body, [1.15, 0.74, 0.58], [0, 0.49, 0], materials.shell, 0.075);
+    addBox(body, [1.105, 0.035, 0.54], [0, 0.858, 0], materials.shellLight, 0.025);
+    addBox(body, [1.12, 0.012, 0.55], [0, 0.835, 0], materials.black, 0.006);
 
-    // Fine case seams; the transmission remains hidden inside the housing.
-    for (const z of [-0.296, 0.296]) {
-      addBox(body, [0.78, 0.018, 0.012], [0, 0.47, z], materials.darkAlloy, 0.004);
-      addBox(body, [0.65, 0.018, 0.012], [0, 0.72, z], materials.shellLight, 0.004);
-    }
-    for (const x of [-0.49, 0.49]) {
-      addScrew(body, [x, 1.012, 0], 0.027, materials.darkAlloy);
-    }
-
-    // Opposed mounting ears with reinforced eyelets and recessed fasteners.
+    // Integrated mounting ears; they overlap the housing instead of looking
+    // like separate floating plates.
     for (const side of [-1, 1]) {
-      addBox(body, [0.30, 0.105, 0.66], [side * 0.65, 0.70, 0], materials.shell, 0.035);
-      addCylinder(body, 0.079, 0.079, 0.032, materials.black,
-        [side * 0.68, 0.762, 0], [0, 0, 0], 28);
-      addTorus(body, 0.067, 0.014, materials.brightAlloy,
-        [side * 0.68, 0.782, 0], [Math.PI / 2, 0, 0], 28);
-      addCylinder(body, 0.041, 0.041, 0.022, materials.darkAlloy,
-        [side * 0.68, 0.787, 0], [0, 0, 0], 20);
+      addBox(body, [0.34, 0.095, 0.60], [side * 0.64, 0.73, 0], materials.shell, 0.035);
+      addCylinder(body, 0.052, 0.052, 0.018, materials.darkAlloy,
+        [side * 0.70, 0.785, 0], [0, 0, 0], 20);
     }
 
-    // Raised metal output bearing and spline, on top of the closed case.
-    const outputX = 0.28;
+    // A clean front identification strip, not a top decal intersecting
+    // the output shaft or floating above the rectangular case.
+    addBox(body, [0.62, 0.145, 0.012], [-0.18, 0.56, 0.292], materials.black, 0.012);
+    addSideLabel(body, "DIGITAL SERVO", "STANDARD / 25T", 0.55, 0.115, [-0.18, 0.56, 0.300]);
+
+    // The output bearing and spline are visibly seated on the upper lid.
+    const outputX = 0.25;
     const outputZ = 0.015;
-    addCylinder(body, 0.145, 0.145, 0.075, materials.darkAlloy,
-      [outputX, 1.025, outputZ], [0, 0, 0], 36);
-    addTorus(body, 0.124, 0.018, materials.brightAlloy,
-      [outputX, 1.069, outputZ], [Math.PI / 2, 0, 0], 32);
-    addCylinder(body, 0.061, 0.061, 0.145, materials.brightAlloy,
-      [outputX, 1.105, outputZ], [0, 0, 0], 28);
-    for (let i = 0; i < 12; i++) {
-      const angle = i / 12 * Math.PI * 2;
-      addBox(body, [0.012, 0.075, 0.018],
-        [outputX + Math.cos(angle) * 0.059, 1.116, outputZ + Math.sin(angle) * 0.059],
-        materials.darkAlloy, 0.003, [0, -angle, 0]);
-    }
+    addCylinder(body, 0.142, 0.142, 0.085, materials.darkAlloy,
+      [outputX, 0.885, outputZ], [0, 0, 0], 32);
+    addTorus(body, 0.12, 0.016, materials.brightAlloy,
+      [outputX, 0.932, outputZ], [0, 0, 0], 32);
+    addCylinder(body, 0.055, 0.055, 0.205, materials.brightAlloy,
+      [outputX, 1.015, outputZ], [0, 0, 0], 24);
+    addTorus(body, 0.055, 0.008, materials.darkAlloy,
+      [outputX, 1.095, outputZ], [0, 0, 0], 24);
 
-    // Single-arm aluminum steering horn with adjustment holes.
+    // The horn pivot starts directly at the top of the spline. Its hub,
+    // single arm and adjustment holes stay above the lid throughout motion.
     const hornPivot = new THREE.Group();
     hornPivot.name = "Animated servo output horn";
-    hornPivot.position.set(outputX, 1.185, outputZ);
+    hornPivot.position.set(outputX, 1.125, outputZ);
     body.add(hornPivot);
-    addBox(hornPivot, [0.79, 0.058, 0.115], [0.30, 0, 0], materials.darkAlloy, 0.035);
-    addBox(hornPivot, [0.22, 0.075, 0.19], [0, 0.012, 0], materials.shellLight, 0.035);
-    addCylinder(hornPivot, 0.073, 0.073, 0.045, materials.brightAlloy,
-      [0, 0.044, 0], [0, 0, 0], 24);
-    addCylinder(hornPivot, 0.027, 0.027, 0.055, materials.black,
-      [0, 0.079, 0], [0, 0, 0], 18);
-    addScrew(hornPivot, [0, 0.112, 0], 0.027, materials.brightAlloy);
-    for (const x of [0.19, 0.37, 0.55]) {
-      addTorus(hornPivot, 0.032, 0.008, materials.black,
-        [x, 0.032, 0], [Math.PI / 2, 0, 0], 16);
-      addCylinder(hornPivot, 0.014, 0.014, 0.018, materials.brightAlloy,
-        [x, 0.039, 0], [0, 0, 0], 12);
+    addCylinder(hornPivot, 0.078, 0.078, 0.072, materials.darkAlloy,
+      [0, 0.025, 0], [0, 0, 0], 24);
+    addCylinder(hornPivot, 0.042, 0.042, 0.045, materials.brightAlloy,
+      [0, 0.075, 0], [0, 0, 0], 20);
+    addCylinder(hornPivot, 0.022, 0.022, 0.03, materials.black,
+      [0, 0.11, 0], [0, 0, 0], 16);
+    addBox(hornPivot, [0.76, 0.052, 0.105], [0.31, 0.035, 0], materials.darkAlloy, 0.028);
+    addBox(hornPivot, [0.17, 0.065, 0.16], [0, 0.035, 0], materials.shellLight, 0.025);
+    addScrew(hornPivot, [0, 0.15, 0], 0.023, materials.brightAlloy);
+    for (const x of [0.18, 0.36, 0.54]) {
+      addTorus(hornPivot, 0.029, 0.007, materials.black,
+        [x, 0.065, 0], [0, 0, 0], 16);
+      addCylinder(hornPivot, 0.012, 0.012, 0.018, materials.brightAlloy,
+        [x, 0.067, 0], [0, 0, 0], 12);
     }
 
-    addTopLabel(body, "DIGITAL SERVO", "STANDARD SIZE / 25T", 0.43, 0.18, [-0.30, 1.012, -0.01]);
-
-    // Three-wire receiver lead exits from the lower rear of the case.
+    // Short, neat receiver lead exits one rear corner and terminates in a
+    // small three-pin plug; no loose connector blocks beneath the body.
     const wireColors = [materials.black, materials.red, materials.white];
     for (let i = 0; i < 3; i++) {
-      const x = -0.035 + (i - 1) * 0.045;
+      const x = 0.015 + (i - 1) * 0.035;
       addTube(body, [
-        [x, 0.27, -0.28],
-        [x, 0.21, -0.45],
-        [x + 0.025, 0.17, -0.62],
-        [x + 0.025, 0.17, -0.80]
-      ], 0.018, wireColors[i], 7);
+        [x, 0.36, -0.27],
+        [x, 0.29, -0.40],
+        [x + 0.015, 0.25, -0.54],
+        [x + 0.015, 0.25, -0.66]
+      ], 0.014, wireColors[i], 6);
     }
-    addBox(body, [0.20, 0.14, 0.17], [0.025, 0.17, -0.87], materials.black, 0.02);
-    addBox(body, [0.14, 0.035, 0.045], [0.025, 0.245, -0.87], materials.shellLight, 0.008);
+    addBox(body, [0.17, 0.105, 0.12], [0.015, 0.25, -0.70], materials.black, 0.018);
+    addBox(body, [0.125, 0.025, 0.035], [0.015, 0.31, -0.70], materials.shellLight, 0.006);
     for (let i = 0; i < 3; i++) {
-      addCylinder(body, 0.018, 0.018, 0.042, materials.gold,
-        [-0.02 + i * 0.045, 0.17, -0.976], [Math.PI / 2, 0, 0], 12);
+      addCylinder(body, 0.012, 0.012, 0.025, materials.gold,
+        [-0.02 + i * 0.035, 0.25, -0.772], [Math.PI / 2, 0, 0], 10);
     }
 
     return { body, hornPivot };
   }
+
+  const servoParts = buildServo();
+  batchStaticMeshes(servoParts.body, [servoParts.hornPivot]);
+  batchStaticMeshes(servoParts.hornPivot, [], { castShadow: false, receiveShadow: false });
 
   const servoParts = buildServo();
   batchStaticMeshes(servoParts.body, [servoParts.hornPivot]);
@@ -321,43 +315,42 @@ export function createPartsLabSystem(game) {
 
   function buildMotor() {
     const body = new THREE.Group();
+    body.name = "Aligned 540 brushless motor";
     motorModel.add(body);
     const axisZ = [Math.PI / 2, 0, 0];
 
-    // Motor can, machined end bells, bearing seats, and longitudinal cooling ports.
+    // Cylindrical can and two end bells share one centreline (the Z axis).
     addCylinder(body, 0.53, 0.53, 1.18, materials.shellLight, [0, 0.84, 0], axisZ, 56);
     addCylinder(body, 0.535, 0.535, 0.10, materials.darkAlloy, [0, 0.84, 0.60], axisZ, 56);
     addCylinder(body, 0.515, 0.515, 0.10, materials.shell, [0, 0.84, -0.60], axisZ, 56);
-    addTorus(body, 0.50, 0.028, materials.brightAlloy, [0, 0.84, 0.54], [0, 0, 0], 56);
-    addTorus(body, 0.49, 0.022, materials.black, [0, 0.84, -0.54], [0, 0, 0], 56);
-    addCylinder(body, 0.225, 0.225, 0.035, materials.black, [0, 0.84, 0.67], axisZ, 40);
+    // Retaining rims are placed on the actual end-bell faces, not partway
+    // along the curved can where they read as detached metal hoops.
+    addTorus(body, 0.505, 0.018, materials.brightAlloy, [0, 0.84, 0.652], [0, 0, 0], 56);
+    addTorus(body, 0.49, 0.016, materials.black, [0, 0.84, -0.652], [0, 0, 0], 56);
+    addCylinder(body, 0.225, 0.225, 0.035, materials.black, [0, 0.84, 0.665], axisZ, 40);
     addCylinder(body, 0.145, 0.145, 0.045, materials.brightAlloy, [0, 0.84, 0.705], axisZ, 40);
 
-    for (let i = 0; i < 14; i++) {
-      const angle = i / 14 * Math.PI * 2;
+    // Shallow cooling slots are embedded tangent to the curved can. Their
+    // small radial thickness prevents the old block-like floating appearance.
+    for (let i = 0; i < 12; i++) {
+      const angle = i / 12 * Math.PI * 2;
       const x = Math.cos(angle);
       const y = Math.sin(angle);
-      // Shallow dark cooling slots sit partly inside the can surface and
-      // follow its radius; no raised blue tabs or floating trim blocks.
-      addBox(body, [0.018, 0.135, 0.20],
-        [x * 0.523, 0.84 + y * 0.523, 0.02],
-        materials.black, 0.006, [0, 0, angle]);
+      addBox(body, [0.006, 0.13, 0.16],
+        [x * 0.526, 0.84 + y * 0.526, 0.02],
+        materials.black, 0.002, [0, 0, angle]);
     }
 
-    // End-bell screw circle and rear ventilation slots.
+    // Flush fasteners on the motor end bell.
     for (let i = 0; i < 8; i++) {
       const angle = i / 8 * Math.PI * 2;
       const x = Math.cos(angle) * 0.39;
       const y = 0.84 + Math.sin(angle) * 0.39;
-      addScrew(body, [x, y, 0.665], 0.033, materials.brightAlloy, "z");
-      addBox(body, [0.035, 0.13, 0.02],
-        [x * 0.8, 0.84 + (y - 0.84) * 0.8, -0.658],
-        materials.black, 0.008, [0, 0, angle]);
+      addScrew(body, [x, y, 0.666], 0.028, materials.brightAlloy, "z");
     }
-    addCylinder(body, 0.14, 0.14, 0.05, materials.darkAlloy, [0, 0.84, -0.67], axisZ, 32);
-    addTorus(body, 0.125, 0.02, materials.copper, [0, 0.84, -0.70], [0, 0, 0], 32);
 
-    // Billet motor mount with slotted side rails and fasteners.
+    // The display mount contacts the lower arc of the motor can and sits
+    // flat on the pedestal rather than floating under it.
     addBox(body, [0.88, 0.12, 0.90], [0, 0.18, -0.02], materials.darkAlloy, 0.045);
     addBox(body, [0.69, 0.10, 0.72], [0, 0.27, -0.02], materials.black, 0.025);
     for (const x of [-0.34, 0.34]) {
@@ -365,39 +358,51 @@ export function createPartsLabSystem(game) {
       for (const z of [-0.35, 0.31]) addScrew(body, [x, 0.47, z], 0.03);
     }
 
-    // The shaft and steel pinion are on a separate rotating group.
+    // Straight motor shaft exits the front end bell. The pinion is fitted
+    // close to the bearing face instead of floating at the extreme tip.
     const shaftGroup = new THREE.Group();
-    shaftGroup.position.set(0, 0.84, 0.68);
+    shaftGroup.name = "Aligned rotating motor shaft and pinion";
+    shaftGroup.position.set(0, 0.84, 0.65);
     body.add(shaftGroup);
-    addCylinder(shaftGroup, 0.055, 0.055, 0.66, materials.brightAlloy, [0, 0, 0.30], axisZ, 24);
-    addCylinder(shaftGroup, 0.09, 0.09, 0.17, materials.darkAlloy, [0, 0, 0.53], axisZ, 24);
+    addCylinder(shaftGroup, 0.052, 0.052, 0.62, materials.brightAlloy,
+      [0, 0, 0.31], axisZ, 24);
+    addCylinder(shaftGroup, 0.105, 0.105, 0.15, materials.darkAlloy,
+      [0, 0, 0.20], axisZ, 28);
     for (let i = 0; i < 12; i++) {
       const angle = i / 12 * Math.PI * 2;
-      addBox(shaftGroup, [0.025, 0.045, 0.13],
-        [Math.cos(angle) * 0.09, Math.sin(angle) * 0.09, 0.53],
-        materials.brightAlloy, 0.005, [0, 0, angle]);
+      addBox(shaftGroup, [0.028, 0.045, 0.14],
+        [Math.cos(angle) * 0.104, Math.sin(angle) * 0.104, 0.20],
+        materials.brightAlloy, 0.004, [0, 0, angle]);
     }
-    addCylinder(shaftGroup, 0.065, 0.065, 0.05, materials.gold, [0, 0, 0.64], axisZ, 24);
+    addCylinder(shaftGroup, 0.018, 0.018, 0.042, materials.black,
+      [0.105, 0, 0.20], [0, 0, Math.PI / 2], 12);
 
-    // Three phase leads, braided sleeves, and bullet connectors at the rear.
-    const phaseColors = [materials.orange, materials.red, materials.black];
-    for (let i = 0; i < 3; i++) {
-      const x = (i - 1) * 0.18;
+    // Three evenly spaced silicone phase leads leave the rear end bell via
+    // individual seated grommets, then run together as a tidy parallel bundle.
+    const phaseColors = [materials.blue, materials.orange, materials.gold];
+    const leadXs = [-0.13, 0, 0.13];
+    for (let i = 0; i < leadXs.length; i++) {
+      const x = leadXs[i];
+      addTorus(body, 0.043, 0.009, materials.black, [x, 0.97, -0.656], [0, 0, 0], 20);
       addTube(body, [
-        [x * 0.6, 0.84 + 0.07, -0.65],
-        [x, 0.92, -0.88],
-        [x * 1.3, 0.80, -1.08],
-        [x * 1.25, 0.73, -1.23]
-      ], 0.043, phaseColors[i]);
-      addCylinder(body, 0.065, 0.065, 0.19, materials.darkAlloy,
-        [x * 1.25, 0.73, -1.32], [Math.PI / 2, 0, 0], 20);
-      addTorus(body, 0.052, 0.012, materials.brightAlloy,
-        [x * 1.25, 0.73, -1.405], [Math.PI / 2, 0, 0], 20);
+        [x, 0.97, -0.66],
+        [x, 0.97, -0.83],
+        [x * 1.12, 0.93, -1.05],
+        [x * 1.18, 0.91, -1.24]
+      ], 0.027, phaseColors[i], 7);
+      addCylinder(body, 0.047, 0.047, 0.16, materials.black,
+        [x * 1.18, 0.91, -1.30], [Math.PI / 2, 0, 0], 18);
+      addCylinder(body, 0.031, 0.031, 0.035, materials.gold,
+        [x * 1.18, 0.91, -1.397], [Math.PI / 2, 0, 0], 18);
     }
 
-    addTopLabel(body, "540 BRUSHLESS", "SENSORLESS MOTOR / 4-POLE", 0.74, 0.28, [0, 1.365, -0.05]);
     return { body, shaftGroup };
   }
+
+  const motorParts = buildMotor();
+  const motorShaft = motorParts.shaftGroup;
+  batchStaticMeshes(motorParts.body, [motorShaft]);
+  batchStaticMeshes(motorShaft, [], { castShadow: false, receiveShadow: false });
 
   const motorParts = buildMotor();
   const motorShaft = motorParts.shaftGroup;
