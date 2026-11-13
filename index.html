@@ -100,7 +100,9 @@
     .garage-copy { color: #aebfce; font-size: 12px; line-height: 1.55; margin: 0 0 14px; }
     .garage-hint { color: #76bfff; font-size: 10px; line-height: 1.5; letter-spacing: .06em; margin: 0 0 13px; }
     .garage-shell-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0 14px; }
+    .garage-body-choices { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
     .garage-shell-choice { min-height: 40px; padding: 6px 7px; font-size: 9px; line-height: 1.25; white-space: normal; }
+    .garage-body-choices .garage-shell-choice { padding: 6px 4px; font-size: 8px; }
     .garage-shell-choice.active { border-color: rgba(112,195,255,.9); background: linear-gradient(145deg, rgba(39,139,220,.8), rgba(17,65,125,.9)); box-shadow: inset 0 0 0 1px rgba(180,225,255,.24), 0 0 15px rgba(45,151,245,.22); }
     .part-inspector {
       min-height: 112px; margin: 0 0 16px; padding: 13px 14px;
@@ -708,16 +710,17 @@
   <section id="garagePanel" style="display:none">
     <div class="eyebrow">MODULAR SHORT-COURSE TRUCK</div>
     <h2 class="garage-title">BODY & CHASSIS GARAGE</h2>
-    <p class="garage-copy">Choose a chassis layout independently from the Orange Ranger or Desert Prerunner shell. Both shells fit either layout. Drag to rotate the truck, hover over parts to identify them, or remove the shell to inspect the running gear.</p>
+    <p class="garage-copy">Choose a chassis layout and either body shell, or drive with no shell at all. Drag to rotate the truck and hover over parts to inspect the running gear.</p>
     <p class="garage-hint">CHASSIS LAYOUT</p>
     <div class="garage-shell-choices" role="group" aria-label="Choose chassis layout">
       <button id="chassisChoiceStandard" class="menu-button secondary garage-shell-choice active" type="button" aria-pressed="true">STANDARD</button>
       <button id="chassisChoiceSolidAxle" class="menu-button secondary garage-shell-choice" type="button" aria-pressed="false">COUPLED SOLID AXLE</button>
     </div>
     <p class="garage-hint">BODY SHELL</p>
-    <div class="garage-shell-choices" role="group" aria-label="Choose truck body shell">
+    <div class="garage-shell-choices garage-body-choices" role="group" aria-label="Choose truck body shell">
       <button id="shellChoiceRanger" class="menu-button secondary garage-shell-choice" type="button" aria-pressed="false">ORANGE RANGER</button>
       <button id="shellChoicePrerunner" class="menu-button secondary garage-shell-choice" type="button" aria-pressed="true">DESERT PRERUNNER</button>
+      <button id="shellChoiceNone" class="menu-button secondary garage-shell-choice" type="button" aria-pressed="false">NO SHELL</button>
     </div>
     <div class="part-inspector" aria-live="polite">
       <div class="part-inspector-kicker">PART IDENTIFICATION</div>
@@ -852,9 +855,8 @@
       </div>
 
       <div class="lobby-mode-heading">SESSION RULES</div>
-      <label class="sandbox-secret-toggle"><input id="lobbyAllowCheats" type="checkbox"><span>ALLOW SECRET-MENU CHEATS</span></label>
       <label class="sandbox-secret-toggle"><input id="lobbyDamageEnabled" type="checkbox" checked><span>VEHICLE DAMAGE ENABLED</span></label>
-      <p class="fine-print">These rules apply to everyone who joins this lobby.</p>
+      <p class="fine-print">Secret-menu cheats are available in every lobby. Vehicle-damage rules apply to everyone who joins.</p>
       <p id="lobbyMapModeNotice" class="fine-print" style="display:none">RACE AND TIME TRIAL ARE DISABLED ON GRAVEL BASIN. FREE DRIVE IS AVAILABLE.</p>
       <p id="lobbyModeHint" class="fine-print" style="display:none">Your fastest valid lap is compared with the other drivers after the selected number of laps.</p>
       <button id="joinButton" class="menu-button" type="button">CREATE RACE LOBBY</button>

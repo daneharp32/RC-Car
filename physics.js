@@ -237,13 +237,13 @@ for (let i = 0; i < 4; i++) {
     chassisConnectionPointLocal: new CANNON.Vec3(x, y, z),
     directionLocal: new CANNON.Vec3(0, -1, 0),
     axleLocal: new CANNON.Vec3(-1, 0, 0),
-    suspensionRestLength: 0.12,
+    suspensionRestLength: 0.14,
     suspensionStiffness: 52,
     // A touch more compression damping and a calmer rebound make weight
     // transfer visible without letting the truck pogo after a jump landing.
     dampingCompression: 6.1,
     dampingRelaxation: 4.5,
-    maxSuspensionTravel: 0.17,
+    maxSuspensionTravel: 0.25,
     maxSuspensionForce: 350,
     radius: 0.13,
     // Start with moderate grip. controls.js adjusts this per wheel as slip
@@ -367,7 +367,7 @@ function setChassisStyle(style) {
       wheel.suspensionStiffness = base.suspensionStiffness * 0.91 * vehicleScale * vehicleScale;
       wheel.dampingCompression = base.dampingCompression * 1.16 * vehicleScale * vehicleScale;
       wheel.dampingRelaxation = base.dampingRelaxation * 1.14 * vehicleScale * vehicleScale;
-      wheel.maxSuspensionTravel = base.maxSuspensionTravel * 0.92 * vehicleScale;
+      wheel.maxSuspensionTravel = base.maxSuspensionTravel * 0.98 * vehicleScale;
       wheel.rollInfluence = base.rollInfluence * 0.78;
     } else {
       wheel.suspensionStiffness = base.suspensionStiffness * vehicleScale * vehicleScale;
@@ -451,7 +451,7 @@ function setVehicleScale(value) {
       wheel.suspensionStiffness = base.suspensionStiffness * 0.91 * nextScale * nextScale;
       wheel.dampingCompression = base.dampingCompression * 1.16 * nextScale * nextScale;
       wheel.dampingRelaxation = base.dampingRelaxation * 1.14 * nextScale * nextScale;
-      wheel.maxSuspensionTravel = base.maxSuspensionTravel * 0.92 * nextScale;
+      wheel.maxSuspensionTravel = base.maxSuspensionTravel * 0.98 * nextScale;
       wheel.rollInfluence = base.rollInfluence * 0.78;
     }
   }

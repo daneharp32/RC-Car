@@ -26,7 +26,7 @@ export function createSandboxSystem(game) {
     gravityOrbPower: 1,
     jumpThrusterPower: 26,
     forwardThrusterPower: 48,
-    invincible: false, damageMultiplier: 1, flingResistance: 0, lobbyAllowsCheats: false
+    invincible: false, damageMultiplier: 1, flingResistance: 0, lobbyAllowsCheats: true
   };
   let lobbyDamageEnabled = true;
   const secretChordKeys = new Set();
@@ -818,8 +818,7 @@ export function createSandboxSystem(game) {
   }
 
   function setSecretMenuOpen(open) {
-    secretMenuOpen = Boolean(open) && active && !game.isPaused?.() &&
-      (game.multiplayer?.currentLobby?.allowCheats === true || game.multiplayer?.joined !== true);
+    secretMenuOpen = Boolean(open) && active && !game.isPaused?.();
     if (secretMenuPanel) {
       secretMenuPanel.style.display = secretMenuOpen ? "block" : "none";
       secretMenuPanel.classList.toggle("sandbox-secret-menu-in-game", inMap);
@@ -865,17 +864,18 @@ export function createSandboxSystem(game) {
   function setFlingResistance(value) { secretSettings.flingResistance = THREE.MathUtils.clamp(Number(value) || 0, 0, 100); renderSecretMenu(); }
   function setLobbyRules(rules = {}) {
     lobbyDamageEnabled = rules.damageEnabled !== false;
-    secretSettings.lobbyAllowsCheats = rules.allowCheats === true;
-    if (!secretSettings.lobbyAllowsCheats) {
-      secretSettings.invincible = false; secretSettings.damageMultiplier = 1; secretSettings.flingResistance = 0;
-      secretSettings.noCooldown = false; secretSettings.infiniteGadgets = false; setSecretMenuOpen(false);
-    }
+    // Secret-menu options are available in every session; lobby rules no
+    // longer disable or reset the player's selected cheat settings.
+    secretSettings.lobbyAllowsCheats = true;
     renderSecretMenu();
   }
   function getCheatModifiers() {
-    const allowed = secretSettings.lobbyAllowsCheats;
-    return { invincible: allowed && secretSettings.invincible, damageMultiplier: allowed ? secretSettings.damageMultiplier : 1,
-      flingResistance: allowed ? secretSettings.flingResistance / 100 : 0, damageEnabled: lobbyDamageEnabled };
+    return {
+      invincible: secretSettings.invincible,
+      damageMultiplier: secretSettings.damageMultiplier,
+      flingResistance: secretSettings.flingResistance / 100,
+      damageEnabled: lobbyDamageEnabled
+    };
   }
   function toggleInfiniteGadgets(enabled) {
     secretSettings.infiniteGadgets = enabled === true;

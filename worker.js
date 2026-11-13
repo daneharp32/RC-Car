@@ -152,7 +152,7 @@ export class LobbyDirectory {
       mode,
       mapId,
       laps,
-      allowCheats: message.allowCheats === true,
+      allowCheats: true,
       damageEnabled: message.damageEnabled !== false,
       phase: mode === "free-drive" ? "free-drive" : mode === "sandbox" ? "sandbox" : "waiting",
       playerCount,
