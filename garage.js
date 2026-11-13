@@ -290,10 +290,14 @@ $("chassisChoiceStandard").addEventListener("click", () => chooseGarageChassis("
 $("chassisChoiceSolidAxle").addEventListener("click", () => chooseGarageChassis("solid-axle"));
 
 function updateGarageShellChoiceButtons() {
-  const style = game.getShellStyle?.() === "ranger" ? "ranger" : "prerunner";
+  const currentStyle = game.getShellStyle?.();
+  const style = ["ranger", "prerunner", "none"].includes(currentStyle)
+    ? currentStyle
+    : "prerunner";
   for (const [buttonId, buttonStyle] of [
     ["shellChoiceRanger", "ranger"],
-    ["shellChoicePrerunner", "prerunner"]
+    ["shellChoicePrerunner", "prerunner"],
+    ["shellChoiceNone", "none"]
   ]) {
     const button = $(buttonId);
     if (!button) continue;
@@ -306,19 +310,37 @@ function updateGarageShellChoiceButtons() {
 function chooseGarageShell(style) {
   clearGaragePartHover();
   game.setShellStyle?.(style);
+  garageShellAnimation = null;
+  applyGarageShellPose(0);
+  garageShellInstalled = style !== "none";
+  localCar.setShellVisible(garageShellInstalled);
+  const toggle = $("shellToggleButton");
+  if (toggle) {
+    toggle.disabled = style === "none";
+    toggle.textContent = style === "none"
+      ? "NO BODY SHELL SELECTED"
+      : "REMOVE BODY SHELL";
+  }
   updateGarageShellChoiceButtons();
 }
 
 $("shellChoiceRanger").addEventListener("click", () => chooseGarageShell("ranger"));
 $("shellChoicePrerunner").addEventListener("click", () => chooseGarageShell("prerunner"));
+$("shellChoiceNone").addEventListener("click", () => chooseGarageShell("none"));
 
 function resetGarageShellState(visible = true) {
   garageShellAnimation = null;
-  garageShellInstalled = !!visible;
+  const hasShell = game.getShellStyle?.() !== "none";
+  garageShellInstalled = !!visible && hasShell;
   applyGarageShellPose(0);
   localCar.setShellVisible(garageShellInstalled);
   const button = $("shellToggleButton");
-  if (button) button.textContent = garageShellInstalled ? "REMOVE BODY SHELL" : "INSTALL BODY SHELL";
+  if (button) {
+    button.disabled = !hasShell;
+    button.textContent = !hasShell
+      ? "NO BODY SHELL SELECTED"
+      : garageShellInstalled ? "REMOVE BODY SHELL" : "INSTALL BODY SHELL";
+  }
   updateGarageShellChoiceButtons();
   updateGarageChassisChoiceButtons();
 }
@@ -484,7 +506,7 @@ function showGarage() {
   updateGarageChassisChoiceButtons();
 }
 function setGarageShellVisible(visible) {
-  if (garageShellAnimation || visible === garageShellInstalled) return;
+  if (game.getShellStyle?.() === "none" || garageShellAnimation || visible === garageShellInstalled) return;
 
   clearGaragePartHover();
   const installing = !!visible;
@@ -495,6 +517,7 @@ function setGarageShellVisible(visible) {
   localCar.setShellVisible(true);
   applyGarageShellPose(from);
   garageShellInstalled = installing;
+  $("shellToggleButton").disabled = false;
   $("shellToggleButton").textContent = installing ? "REMOVE BODY SHELL" : "INSTALL BODY SHELL";
   garageShellAnimation = {
     from,
