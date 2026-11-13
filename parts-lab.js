@@ -247,11 +247,11 @@ export function createPartsLabSystem(game) {
     addCylinder(body, 0.142, 0.142, 0.085, materials.darkAlloy,
       [outputX, 0.885, outputZ], [0, 0, 0], 32);
     addTorus(body, 0.12, 0.016, materials.brightAlloy,
-      [outputX, 0.932, outputZ], [0, 0, 0], 32);
+      [outputX, 0.932, outputZ], [Math.PI / 2, 0, 0], 32);
     addCylinder(body, 0.055, 0.055, 0.205, materials.brightAlloy,
       [outputX, 1.015, outputZ], [0, 0, 0], 24);
     addTorus(body, 0.055, 0.008, materials.darkAlloy,
-      [outputX, 1.095, outputZ], [0, 0, 0], 24);
+      [outputX, 1.095, outputZ], [Math.PI / 2, 0, 0], 24);
 
     // The horn pivot starts directly at the top of the spline. Its hub,
     // single arm and adjustment holes stay above the lid throughout motion.
@@ -267,10 +267,10 @@ export function createPartsLabSystem(game) {
       [0, 0.11, 0], [0, 0, 0], 16);
     addBox(hornPivot, [0.76, 0.052, 0.105], [0.31, 0.035, 0], materials.darkAlloy, 0.028);
     addBox(hornPivot, [0.17, 0.065, 0.16], [0, 0.035, 0], materials.shellLight, 0.025);
-    addScrew(hornPivot, [0, 0.15, 0], 0.023, materials.brightAlloy);
+    addScrew(hornPivot, [0, 0.13, 0], 0.023, materials.brightAlloy);
     for (const x of [0.18, 0.36, 0.54]) {
       addTorus(hornPivot, 0.029, 0.007, materials.black,
-        [x, 0.065, 0], [0, 0, 0], 16);
+        [x, 0.065, 0], [Math.PI / 2, 0, 0], 16);
       addCylinder(hornPivot, 0.012, 0.012, 0.018, materials.brightAlloy,
         [x, 0.067, 0], [0, 0, 0], 12);
     }
@@ -459,7 +459,7 @@ export function createPartsLabSystem(game) {
     for (const x of [-0.54, 0.54]) {
       addCylinder(body, 0.105, 0.105, 0.30, materials.alloy, [x, 0.98, -0.43], [0, 0, 0], 28);
       addCylinder(body, 0.097, 0.097, 0.035, materials.black, [x, 1.147, -0.43], [0, 0, 0], 28);
-      addTorus(body, 0.078, 0.010, materials.brightAlloy, [x, 1.168, -0.43], [0, 0, 0], 24);
+      addTorus(body, 0.078, 0.010, materials.brightAlloy, [x, 1.168, -0.43], [Math.PI / 2, 0, 0], 24);
       addBox(body, [0.026, 0.25, 0.07], [x, 0.98, -0.43], materials.darkAlloy, 0.008);
     }
 
@@ -544,7 +544,7 @@ export function createPartsLabSystem(game) {
       addCylinder(body, 0.067, 0.067, 0.17, materials.black,
         [x - 0.05, 0.30, -1.10], [Math.PI / 2, 0, 0], 20);
       addTorus(body, 0.052, 0.010, materials.gold,
-        [x - 0.05, 0.30, -1.19], [Math.PI / 2, 0, 0], 20);
+        [x - 0.05, 0.30, -1.19], [0, 0, 0], 20);
     }
     const phaseColors = [materials.orange, materials.gold, materials.blue];
     for (let i = 0; i < 3; i++) {
@@ -692,11 +692,11 @@ export function createPartsLabSystem(game) {
     // Lower threaded damper body, eyelet and lower spring seat.
     addCylinder(body,0.13,0.145,0.64,materials.darkAlloy,[0,0.53,0],[0,0,0],32);
     addCylinder(body,0.115,0.115,0.49,materials.alloy,[0,0.55,0],[0,0,0],32);
-    addTorus(body,0.13,0.018,materials.black,[0,0.84,0],[0,0,0],32);
+    addTorus(body,0.13,0.018,materials.black,[0,0.84,0],[Math.PI/2,0,0],32);
     addCylinder(body,0.18,0.18,0.075,materials.shellLight,[0,0.88,0],[0,0,0],32);
     for(let i=0;i<10;i++){
       const y=0.30+i*0.055;
-      addTorus(body,0.137,0.008,materials.black,[0,y,0],[0,0,0],28);
+      addTorus(body,0.137,0.008,materials.black,[0,y,0],[Math.PI/2,0,0],28);
     }
     // Piston rod and upper eyelet move with the compression cycle.
     const moving = new THREE.Group();
@@ -705,7 +705,7 @@ export function createPartsLabSystem(game) {
     addCylinder(moving,0.038,0.038,0.66,materials.brightAlloy,[0,0.48,0],[0,0,0],20);
     addBox(moving,[0.22,0.11,0.16],[0,0.86,0],materials.shell,0.04);
     addCylinder(moving,0.055,0.055,0.18,materials.black,[0,0.93,0],[0,0,Math.PI/2],20);
-    addTorus(moving,0.05,0.012,materials.brightAlloy,[0,1.025,0],[Math.PI/2,0,0],24);
+    addTorus(moving,0.05,0.012,materials.brightAlloy,[0,1.025,0],[0,Math.PI/2,0],24);
     // Helical coil spring is a separate group so its pitch contracts visibly.
     const springGroup = new THREE.Group();
     springGroup.name = "Compressing coil spring";
@@ -719,8 +719,8 @@ export function createPartsLabSystem(game) {
       springPoints.push([Math.cos(a)*0.17,t*0.88,Math.sin(a)*0.17]);
     }
     addTube(springGroup,springPoints,0.027,materials.orange,8);
-    addTorus(body,0.18,0.025,materials.darkAlloy,[0,0.47,0],[0,0,0],32);
-    addTorus(moving,0.18,0.025,materials.darkAlloy,[0,1.34,0],[0,0,0],32);
+    addTorus(body,0.18,0.025,materials.darkAlloy,[0,0.47,0],[Math.PI/2,0,0],32);
+    addTorus(moving,0.18,0.025,materials.darkAlloy,[0,1.34,0],[Math.PI/2,0,0],32);
     return {body,moving,springGroup};
   }
   const shockParts = buildShock();
@@ -736,7 +736,7 @@ export function createPartsLabSystem(game) {
   function buildStandaloneSpring(){
     const body=new THREE.Group();
     springModel.add(body);
-    addTorus(body,0.22,0.035,materials.darkAlloy,[0,0.36,0],[0,0,0],36);
+    addTorus(body,0.22,0.035,materials.darkAlloy,[0,0.36,0],[Math.PI/2,0,0],36);
     const springGroup=new THREE.Group();
     springGroup.position.y=0.36;
     body.add(springGroup);
@@ -746,7 +746,7 @@ export function createPartsLabSystem(game) {
       points.push([Math.cos(a)*0.20,t,Math.sin(a)*0.20]);
     }
     addTube(springGroup,points,0.032,materials.orange,8);
-    addTorus(springGroup,0.22,0.035,materials.darkAlloy,[0,1,0],[0,0,0],36);
+    addTorus(springGroup,0.22,0.035,materials.darkAlloy,[0,1,0],[Math.PI/2,0,0],36);
     return {body,springGroup};
   }
   const standaloneSpring=buildStandaloneSpring();
