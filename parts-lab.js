@@ -1,4 +1,5 @@
 import { RoundedBoxGeometry } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/geometries/RoundedBoxGeometry.js";
+import { mergeGeometries } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/utils/BufferGeometryUtils.js";
 
 // Standalone WIP component display. These models are deliberately not connected
 // to the vehicle, its physics body, or either selectable chassis.
@@ -40,7 +41,7 @@ export function createPartsLabSystem(game) {
   function addBox(parent, size, position, material, radius = 0.035, rotation = [0, 0, 0]) {
     const smallest = Math.min(size[0], size[1], size[2]);
     const geometry = radius > 0
-      ? new RoundedBoxGeometry(size[0], size[1], size[2], 3, Math.min(radius, smallest * 0.44))
+      ? new RoundedBoxGeometry(size[0], size[1], size[2], 2, Math.min(radius, smallest * 0.44))
       : new THREE.BoxGeometry(size[0], size[1], size[2]);
     const object = new THREE.Mesh(geometry, material);
     object.position.set(position[0], position[1], position[2]);
@@ -51,7 +52,7 @@ export function createPartsLabSystem(game) {
     return object;
   }
 
-  function addCylinder(parent, radiusTop, radiusBottom, length, material, position, rotation = [0, 0, 0], radialSegments = 32) {
+  function addCylinder(parent, radiusTop, radiusBottom, length, material, position, rotation = [0, 0, 0], radialSegments = 24) {
     const object = new THREE.Mesh(
       new THREE.CylinderGeometry(radiusTop, radiusBottom, length, radialSegments, 1),
       material
@@ -64,7 +65,7 @@ export function createPartsLabSystem(game) {
     return object;
   }
 
-  function addTorus(parent, radius, tube, material, position, rotation = [0, 0, 0], tubularSegments = 48) {
+  function addTorus(parent, radius, tube, material, position, rotation = [0, 0, 0], tubularSegments = 32) {
     const object = new THREE.Mesh(new THREE.TorusGeometry(radius, tube, 10, tubularSegments), material);
     object.position.set(position[0], position[1], position[2]);
     object.rotation.set(rotation[0], rotation[1], rotation[2]);
@@ -75,7 +76,7 @@ export function createPartsLabSystem(game) {
 
   function addTube(parent, points, radius, material, radialSegments = 8) {
     const curve = new THREE.CatmullRomCurve3(points.map((point) => new THREE.Vector3(point[0], point[1], point[2])));
-    const object = new THREE.Mesh(new THREE.TubeGeometry(curve, Math.max(16, points.length * 9), radius, radialSegments, false), material);
+    const object = new THREE.Mesh(new THREE.TubeGeometry(curve, Math.max(12, points.length * 6), radius, radialSegments, false), material);
     object.castShadow = true;
     parent.add(object);
     return object;
@@ -83,7 +84,7 @@ export function createPartsLabSystem(game) {
 
   function addScrew(parent, position, size = 0.045, material = materials.brightAlloy, axis = "y") {
     const rotation = axis === "z" ? [Math.PI / 2, 0, 0] : [0, 0, 0];
-    addCylinder(parent, size, size, 0.025, material, position, rotation, 16);
+    addCylinder(parent, size, size, 0.025, material, position, rotation, 12);
     const slot = addBox(parent,
       axis === "z" ? [size * 1.15, 0.012, 0.012] : [size * 1.15, 0.012, 0.012],
       [position[0], position[1] + (axis === "y" ? 0.014 : 0), position[2]],
@@ -145,6 +146,77 @@ export function createPartsLabSystem(game) {
     return object;
   }
 
+
+  // Merge static component details by material so hundreds of tiny separate
+  // meshes become a handful of draw calls. Dynamic pivots are passed as
+  // exclusions and batch their own contents separately.
+  function batchStaticMeshes(root, excludedObjects = [], shadowOptions = {}) {
+    const excluded = new Set(excludedObjects);
+    const rootInverse = new THREE.Matrix4();
+    root.updateMatrixWorld(true);
+    rootInverse.copy(root.matrixWorld).invert();
+    const buckets = new Map();
+
+    function collect(parent) {
+      for (const child of [...parent.children]) {
+        if (excluded.has(child)) continue;
+        if (child.isMesh && child.geometry && child.material && !Array.isArray(child.material)) {
+          child.updateWorldMatrix(true, false);
+          const geometry = child.geometry.clone();
+          geometry.clearGroups();
+          const relative = new THREE.Matrix4().multiplyMatrices(rootInverse, child.matrixWorld);
+          geometry.applyMatrix4(relative);
+          let bucket = buckets.get(child.material);
+          if (!bucket) {
+            bucket = { geometries: [], originals: [], castShadow: false, receiveShadow: false };
+            buckets.set(child.material, bucket);
+          }
+          bucket.geometries.push(geometry);
+          bucket.originals.push(child);
+          bucket.castShadow ||= child.castShadow;
+          bucket.receiveShadow ||= child.receiveShadow;
+        } else {
+          collect(child);
+        }
+      }
+    }
+    collect(root);
+
+    let batches = 0;
+    for (const [material, bucket] of buckets) {
+      const geometry = mergeGeometries(bucket.geometries, false);
+      for (const sourceGeometry of bucket.geometries) sourceGeometry.dispose();
+      if (!geometry) {
+        console.warn("Parts Lab geometry batch was skipped; keeping the original meshes.");
+        continue;
+      }
+      geometry.computeBoundingSphere();
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.name = (root.name || "component") + " static geometry batch";
+      mesh.castShadow = shadowOptions.castShadow ?? bucket.castShadow;
+      mesh.receiveShadow = shadowOptions.receiveShadow ?? bucket.receiveShadow;
+      root.add(mesh);
+      for (const original of bucket.originals) {
+        original.parent?.remove(original);
+        original.geometry.dispose();
+      }
+      batches++;
+    }
+    return batches;
+  }
+
+  function addSideLabel(parent, title, subtitle, width, height, position) {
+    const texture = makeLabelTexture(title, subtitle);
+    const object = new THREE.Mesh(
+      new THREE.PlaneGeometry(width, height),
+      new THREE.MeshStandardMaterial({ map: texture, roughness: 0.72, metalness: 0.08 })
+    );
+    object.position.set(position[0], position[1], position[2]);
+    object.castShadow = false;
+    parent.add(object);
+    return object;
+  }
+
   // A low-profile, machined display plinth anchors each isolated component.
   const plinthLower = addCylinder(showcase, 1.22, 1.32, 0.16, materials.black, [0, 0.08, 0], [0, 0, 0], 72);
   const plinthUpper = addCylinder(showcase, 1.2, 1.2, 0.085, materials.shellLight, [0, 0.19, 0], [0, 0, 0], 72);
@@ -163,104 +235,99 @@ export function createPartsLabSystem(game) {
 
   function buildServo() {
     const body = new THREE.Group();
+    body.name = "Standard-size closed servo case";
     servoModel.add(body);
 
-    addBox(body, [1.62, 0.56, 1.02], [0, 0.34, 0], materials.shell, 0.09);
-    addBox(body, [1.47, 0.12, 0.91], [0, 0.66, 0], materials.shellLight, 0.05);
-    addBox(body, [1.22, 0.035, 0.78], [0, 0.739, 0.04], materials.black, 0.025);
+    // Conventional standard-servo proportions: elongated footprint, narrow
+    // width and a much taller closed case with a plain top cover.
+    addBox(body, [1.12, 0.50, 0.58], [0, 0.37, 0], materials.shell, 0.075);
+    addBox(body, [1.14, 0.035, 0.60], [0, 0.635, 0], materials.black, 0.02);
+    addBox(body, [1.10, 0.34, 0.58], [0, 0.82, 0], materials.shell, 0.065);
+    addBox(body, [1.035, 0.035, 0.52], [0, 0.99, 0], materials.shellLight, 0.025);
 
-    // Four reinforced ears, rubber-isolated mounting bores, and case fasteners.
+    // Fine case seams; the transmission remains hidden inside the housing.
+    for (const z of [-0.296, 0.296]) {
+      addBox(body, [0.78, 0.018, 0.012], [0, 0.47, z], materials.darkAlloy, 0.004);
+      addBox(body, [0.65, 0.018, 0.012], [0, 0.72, z], materials.shellLight, 0.004);
+    }
+    for (const x of [-0.49, 0.49]) {
+      addScrew(body, [x, 1.012, 0], 0.027, materials.darkAlloy);
+    }
+
+    // Opposed mounting ears with reinforced eyelets and recessed fasteners.
     for (const side of [-1, 1]) {
-      addBox(body, [0.42, 0.13, 0.35], [side * 0.88, 0.29, 0], materials.shellLight, 0.045);
-      addTorus(body, 0.082, 0.018, materials.brass, [side * 0.94, 0.365, 0], [Math.PI / 2, 0, 0], 24);
-      addCylinder(body, 0.047, 0.047, 0.018, materials.black, [side * 0.94, 0.369, 0], [0, 0, 0], 20);
-      for (const z of [-0.38, 0.38]) {
-        addScrew(body, [side * 0.62, 0.73, z], 0.038);
-      }
+      addBox(body, [0.30, 0.105, 0.66], [side * 0.65, 0.70, 0], materials.shell, 0.035);
+      addCylinder(body, 0.079, 0.079, 0.032, materials.black,
+        [side * 0.68, 0.762, 0], [0, 0, 0], 28);
+      addTorus(body, 0.067, 0.014, materials.brightAlloy,
+        [side * 0.68, 0.782, 0], [Math.PI / 2, 0, 0], 28);
+      addCylinder(body, 0.041, 0.041, 0.022, materials.darkAlloy,
+        [side * 0.68, 0.787, 0], [0, 0, 0], 20);
     }
 
-    // Visible control PCB and motor below a smoked inspection window.
-    addBox(body, [0.76, 0.025, 0.58], [-0.19, 0.755, 0.12], materials.greenBoard, 0.018);
-    for (let i = 0; i < 7; i++) {
-      addBox(body, [0.055, 0.035, 0.07], [-0.47 + i * 0.095, 0.786, 0.24], i % 2 ? materials.gold : materials.darkAlloy, 0.008);
-    }
-    for (let i = 0; i < 4; i++) {
-      addCylinder(body, 0.025, 0.025, 0.035, materials.brightAlloy,
-        [-0.43 + i * 0.13, 0.79, -0.04], [0, 0, 0], 12);
-    }
-    addCylinder(body, 0.12, 0.12, 0.37, materials.darkAlloy, [-0.48, 0.48, -0.24], [Math.PI / 2, 0, 0], 32);
-    addTorus(body, 0.11, 0.018, materials.copper, [-0.48, 0.48, -0.24], [Math.PI / 2, 0, 0], 32);
-    for (let i = 0; i < 8; i++) {
-      const angle = i / 8 * Math.PI * 2;
-      addBox(body, [0.025, 0.12, 0.025],
-        [-0.48 + Math.cos(angle) * 0.11, 0.48 + Math.sin(angle) * 0.11, -0.24],
-        materials.copper, 0.004, [0, 0, angle]);
+    // Raised metal output bearing and spline, on top of the closed case.
+    const outputX = 0.28;
+    const outputZ = 0.015;
+    addCylinder(body, 0.145, 0.145, 0.075, materials.darkAlloy,
+      [outputX, 1.025, outputZ], [0, 0, 0], 36);
+    addTorus(body, 0.124, 0.018, materials.brightAlloy,
+      [outputX, 1.069, outputZ], [Math.PI / 2, 0, 0], 32);
+    addCylinder(body, 0.061, 0.061, 0.145, materials.brightAlloy,
+      [outputX, 1.105, outputZ], [0, 0, 0], 28);
+    for (let i = 0; i < 12; i++) {
+      const angle = i / 12 * Math.PI * 2;
+      addBox(body, [0.012, 0.075, 0.018],
+        [outputX + Math.cos(angle) * 0.059, 1.116, outputZ + Math.sin(angle) * 0.059],
+        materials.darkAlloy, 0.003, [0, -angle, 0]);
     }
 
-    // Three-stage brass and steel gear train, shown beneath the clear top window.
-    const gearOne = addGear(body, -0.16, 0.84, 0.13, 0.19, 14, materials.darkAlloy);
-    const gearTwo = addGear(body, 0.13, 0.84, -0.13, 0.16, 12, materials.brass);
-    const outputGear = addGear(body, 0.42, 0.84, 0.13, 0.205, 18, materials.gold);
-    gearOne.rotation.y = 0.2;
-    gearTwo.rotation.y = 0.4;
-    outputGear.rotation.y = 0.1;
-    const windowPane = addBox(body, [0.96, 0.024, 0.66], [0.11, 0.895, 0.02], materials.clear, 0.025);
-    windowPane.castShadow = false;
-    addBox(body, [0.98, 0.035, 0.045], [0.11, 0.89, -0.325], materials.darkAlloy, 0.01);
-    addBox(body, [0.98, 0.035, 0.045], [0.11, 0.89, 0.365], materials.darkAlloy, 0.01);
-    addBox(body, [0.045, 0.035, 0.69], [-0.38, 0.89, 0.02], materials.darkAlloy, 0.01);
-    addBox(body, [0.045, 0.035, 0.69], [0.60, 0.89, 0.02], materials.darkAlloy, 0.01);
-
-    // Spline, bearing collar, metal output shaft, and a double-sided steering horn.
-    addCylinder(body, 0.16, 0.16, 0.06, materials.darkAlloy, [0.42, 0.91, 0.13], [0, 0, 0], 32);
-    addTorus(body, 0.13, 0.025, materials.brightAlloy, [0.42, 0.955, 0.13], [0, 0, 0], 32);
-    addCylinder(body, 0.068, 0.068, 0.19, materials.brightAlloy, [0.42, 1.02, 0.13], [0, 0, 0], 24);
-    for (let i = 0; i < 16; i++) {
-      const angle = i / 16 * Math.PI * 2;
-      addCylinder(body, 0.012, 0.012, 0.10, materials.darkAlloy,
-        [0.42 + Math.cos(angle) * 0.067, 1.035, 0.13 + Math.sin(angle) * 0.067], [0, 0, 0], 8);
-    }
+    // Single-arm aluminum steering horn with adjustment holes.
     const hornPivot = new THREE.Group();
-    hornPivot.position.set(0.42, 1.105, 0.13);
+    hornPivot.name = "Animated servo output horn";
+    hornPivot.position.set(outputX, 1.185, outputZ);
     body.add(hornPivot);
-    addBox(hornPivot, [0.98, 0.075, 0.13], [0.30, 0, 0], materials.brightAlloy, 0.035);
-    addBox(hornPivot, [0.24, 0.095, 0.20], [0, 0.005, 0], materials.darkAlloy, 0.035);
-    addTorus(hornPivot, 0.07, 0.018, materials.darkAlloy, [0, 0.045, 0], [Math.PI / 2, 0, 0], 24);
-    for (const x of [0.62, -0.07]) {
-      addTorus(hornPivot, 0.052, 0.012, materials.darkAlloy, [x, 0.045, 0], [Math.PI / 2, 0, 0], 24);
-      addCylinder(hornPivot, 0.025, 0.025, 0.025, materials.black, [x, 0.05, 0], [0, 0, 0], 16);
+    addBox(hornPivot, [0.79, 0.058, 0.115], [0.30, 0, 0], materials.darkAlloy, 0.035);
+    addBox(hornPivot, [0.22, 0.075, 0.19], [0, 0.012, 0], materials.shellLight, 0.035);
+    addCylinder(hornPivot, 0.073, 0.073, 0.045, materials.brightAlloy,
+      [0, 0.044, 0], [0, 0, 0], 24);
+    addCylinder(hornPivot, 0.027, 0.027, 0.055, materials.black,
+      [0, 0.079, 0], [0, 0, 0], 18);
+    addScrew(hornPivot, [0, 0.112, 0], 0.027, materials.brightAlloy);
+    for (const x of [0.19, 0.37, 0.55]) {
+      addTorus(hornPivot, 0.032, 0.008, materials.black,
+        [x, 0.032, 0], [Math.PI / 2, 0, 0], 16);
+      addCylinder(hornPivot, 0.014, 0.014, 0.018, materials.brightAlloy,
+        [x, 0.039, 0], [0, 0, 0], 12);
     }
-    addScrew(hornPivot, [0, 0.055, 0], 0.035);
 
-    addTopLabel(body, "DIGITAL SERVO", "HIGH TORQUE / METAL GEAR", 0.60, 0.24, [-0.47, 0.755, -0.34]);
+    addTopLabel(body, "DIGITAL SERVO", "STANDARD SIZE / 25T", 0.43, 0.18, [-0.30, 1.012, -0.01]);
 
-    // Three-core signal harness with a molded connector and individual contacts.
-    const wireStart = [0.08, 0.38, 0.50];
-    const wireColors = [materials.red, materials.black, materials.white];
+    // Three-wire receiver lead exits from the lower rear of the case.
+    const wireColors = [materials.black, materials.red, materials.white];
     for (let i = 0; i < 3; i++) {
-      const offset = (i - 1) * 0.085;
+      const x = -0.035 + (i - 1) * 0.045;
       addTube(body, [
-        [wireStart[0] + offset, wireStart[1], wireStart[2]],
-        [wireStart[0] + offset, 0.30, 0.72],
-        [0.17 + offset, 0.34, 0.92],
-        [0.10 + offset, 0.38, 1.10]
-      ], 0.027, wireColors[i]);
+        [x, 0.27, -0.28],
+        [x, 0.21, -0.45],
+        [x + 0.025, 0.17, -0.62],
+        [x + 0.025, 0.17, -0.80]
+      ], 0.018, wireColors[i], 7);
     }
-    addBox(body, [0.31, 0.20, 0.20], [0.10, 0.38, 1.16], materials.black, 0.025);
+    addBox(body, [0.20, 0.14, 0.17], [0.025, 0.17, -0.87], materials.black, 0.02);
+    addBox(body, [0.14, 0.035, 0.045], [0.025, 0.245, -0.87], materials.shellLight, 0.008);
     for (let i = 0; i < 3; i++) {
-      addCylinder(body, 0.025, 0.025, 0.05, materials.gold,
-        [-0.0 + i * 0.095, 0.38, 1.267], [Math.PI / 2, 0, 0], 12);
+      addCylinder(body, 0.018, 0.018, 0.042, materials.gold,
+        [-0.02 + i * 0.045, 0.17, -0.976], [Math.PI / 2, 0, 0], 12);
     }
 
-    return {
-      hornPivot,
-      gearOne,
-      gearTwo,
-      outputGear
-    };
+    return { body, hornPivot };
   }
 
   const servoParts = buildServo();
+  batchStaticMeshes(servoParts.body, [servoParts.hornPivot]);
+  batchStaticMeshes(servoParts.hornPivot, [], { castShadow: false, receiveShadow: false });
+
+
 
   const motorModel = new THREE.Group();
   motorModel.name = "Detailed 540 brushless motor";
@@ -346,10 +413,13 @@ export function createPartsLabSystem(game) {
     }
 
     addTopLabel(body, "540 BRUSHLESS", "SENSORLESS MOTOR / 4-POLE", 0.74, 0.28, [0, 1.385, -0.05]);
-    return shaftGroup;
+    return { body, shaftGroup };
   }
 
-  const motorShaft = buildMotor();
+  const motorParts = buildMotor();
+  const motorShaft = motorParts.shaftGroup;
+  batchStaticMeshes(motorParts.body, [motorShaft]);
+  batchStaticMeshes(motorShaft, [], { castShadow: false, receiveShadow: false });
 
   const escModel = new THREE.Group();
   escModel.name = "Detailed brushless electronic speed controller";
