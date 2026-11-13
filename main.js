@@ -1137,6 +1137,69 @@ for (const button of document.querySelectorAll("[data-camera-mode]")) {
   button.addEventListener("click", () => setCameraMode(button.dataset.cameraMode));
 }
 
+
+const CHASE_CAMERA_MIN_DISTANCE = 1.65;
+const CHASE_CAMERA_MAX_DISTANCE = 10.0;
+const CHASE_CAMERA_ZOOM_STEP = 0.35;
+let chaseCameraDistance = 3.7;
+
+function updateChaseZoomControls() {
+  const slider = $("cameraZoomSlider");
+  const value = $("cameraZoomValue");
+  if (slider) slider.value = String(chaseCameraDistance);
+  if (value) value.textContent = chaseCameraDistance.toFixed(1);
+}
+
+function setChaseCameraDistance(value) {
+  const requested = Number(value);
+  if (!Number.isFinite(requested)) return;
+  chaseCameraDistance = Math.max(
+    CHASE_CAMERA_MIN_DISTANCE,
+    Math.min(CHASE_CAMERA_MAX_DISTANCE, requested)
+  );
+  updateChaseZoomControls();
+}
+
+$("cameraZoomSlider")?.addEventListener("input", (event) => {
+  setChaseCameraDistance(event.currentTarget.value);
+});
+$("cameraZoomOut")?.addEventListener("click", () => {
+  setChaseCameraDistance(chaseCameraDistance + CHASE_CAMERA_ZOOM_STEP);
+});
+$("cameraZoomIn")?.addEventListener("click", () => {
+  setChaseCameraDistance(chaseCameraDistance - CHASE_CAMERA_ZOOM_STEP);
+});
+updateChaseZoomControls();
+
+// Scroll over the game canvas to zoom the chase camera. Keep the event local
+// to the game canvas so HUD sliders and browser controls continue to work.
+canvas.addEventListener("wheel", (event) => {
+  if (cameraMode !== "chase" || !multiplayer?.joined) return;
+  event.preventDefault();
+  const wheelStep = Math.min(1.1, Math.max(0.15, Math.abs(event.deltaY) * 0.0055));
+  setChaseCameraDistance(
+    chaseCameraDistance + Math.sign(event.deltaY) * wheelStep
+  );
+}, { passive: false });
+
+// Keyboard alternatives: +/= zoom in, - zooms out.
+window.addEventListener("keydown", (event) => {
+  if (event.repeat || event.ctrlKey || event.metaKey || event.altKey ||
+      !multiplayer?.joined || cameraMode !== "chase") return;
+  const activeElement = document.activeElement;
+  if (activeElement && (
+    ["INPUT", "TEXTAREA", "SELECT"].includes(activeElement.tagName) ||
+    activeElement.isContentEditable
+  )) return;
+  if (event.key === "+" || event.key === "=") {
+    event.preventDefault();
+    setChaseCameraDistance(chaseCameraDistance - CHASE_CAMERA_ZOOM_STEP);
+  } else if (event.key === "-") {
+    event.preventDefault();
+    setChaseCameraDistance(chaseCameraDistance + CHASE_CAMERA_ZOOM_STEP);
+  }
+});
+
 // C cycles cameras while driving. Ignore text fields so the shortcut never
 // interferes with typing a driver name or lobby name.
 window.addEventListener("keydown", (event) => {
@@ -1593,18 +1656,17 @@ function animate(now) {
     carForward.normalize();
     const cameraDirection = carForward.clone().applyAxisAngle(worldUp, controls.cameraOrbitYaw);
     const cameraCarScale = Math.max(1, followedRoot.scale.x || 1);
-    // Bring the default chase view closer and slightly lower so the truck
-    // occupies more of the screen while retaining enough forward view of the
-    // track. A slightly narrower FOV increases vehicle detail without making
-    // steering/orbit behavior or the physics camera-dependent.
+    // chaseCameraDistance is user-adjustable, with a closer minimum for a
+    // more immersive view and enough range to pull back for high-speed driving.
+    const chaseHeight = chaseCameraDistance * 0.52;
     const desiredCamera = followedRoot.position.clone()
-      .addScaledVector(cameraDirection, -4.35 * cameraCarScale)
-      .add(new THREE.Vector3(0, 2.25 * cameraCarScale, 0));
-    camera.position.lerp(desiredCamera, 1 - Math.exp(-3.4 * delta));
+      .addScaledVector(cameraDirection, -chaseCameraDistance * cameraCarScale)
+      .add(new THREE.Vector3(0, chaseHeight * cameraCarScale, 0));
+    camera.position.lerp(desiredCamera, 1 - Math.exp(-3.8 * delta));
     easeCameraFov(55, delta, 4.0);
     const lookTarget = followedRoot.position.clone()
       .add(new THREE.Vector3(0, 0.32 * cameraCarScale, 0))
-      .addScaledVector(carForward, 0.72 * cameraCarScale);
+      .addScaledVector(carForward, chaseCameraDistance * 0.17 * cameraCarScale);
     camera.up.copy(worldUp);
     camera.lookAt(lookTarget);
   }
