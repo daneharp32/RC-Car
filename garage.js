@@ -316,6 +316,7 @@ function chooseGarageShell(style) {
   localCar.setShellVisible(garageShellInstalled);
   const toggle = $("shellToggleButton");
   if (toggle) {
+    toggle.hidden = style === "none";
     toggle.disabled = style === "none";
     toggle.textContent = style === "none"
       ? "NO BODY SHELL SELECTED"
@@ -336,6 +337,7 @@ function resetGarageShellState(visible = true) {
   localCar.setShellVisible(garageShellInstalled);
   const button = $("shellToggleButton");
   if (button) {
+    button.hidden = !hasShell;
     button.disabled = !hasShell;
     button.textContent = !hasShell
       ? "NO BODY SHELL SELECTED"
