@@ -763,7 +763,7 @@ export function createPartsLabSystem(game) {
     // A compact central pan rather than a long, narrow plank.
     // X is vehicle width; Z is vehicle length. The ends taper inward so the
     // front bulkhead and rear axle/link areas remain visually clear.
-    // Estimated envelope: approximately 235 x 300 x 5 mm at 1/7 scale.
+    // Estimated envelope: approximately 225 x 170 x 5 mm using the 135 mm tire as a scale reference.
     const outline = new THREE.Shape();
     outline.moveTo(-0.46, -0.92);
     outline.lineTo(0.46, -0.92);
@@ -1554,7 +1554,7 @@ export function createPartsLabSystem(game) {
     skidPlate: {
       name: "MAIN METAL SKID PLATE",
       description: "A shortened, wider central aluminum pan inspired by the DF7, Desert King and FMS 1/7 chassis underside photographs. It has tapered ends, a broad central footprint and mounting rows that stay clear of the front and rear suspension zones.",
-      specs: "REFERENCE   ·  425 mm wheelbase class\nPAN         ·  Approx. 300 × 235 × 5 mm (estimated)\nSHAPE       ·  Broad centre, tapered ends\nFASTENERS   ·  Recessed perimeter + inner rows"
+      specs: "REFERENCE   ·  425 mm wheelbase class\nPAN         ·  Approx. 225 × 170 × 5 mm (estimated)\nSHAPE       ·  Broad centre, tapered ends\nFASTENERS   ·  Recessed perimeter + inner rows"
     },
     frontAArms: {
       name: "FRONT LOWER A-ARMS",
