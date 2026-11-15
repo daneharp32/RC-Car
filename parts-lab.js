@@ -1098,13 +1098,18 @@ export function createPartsLabSystem(game) {
   }
 
   function updateSuspensionDemo(time, animate) {
-    const travel = animate ? Math.sin(time * 2.4) * 0.105 : 0;
+    // The inner hinge line runs along Z, so rotating around Z lifts and lowers
+    // each outboard arm tip. Opposite signs keep both sides moving vertically.
+    const travel = animate ? Math.sin(time * 2.1) * 0.35 : 0;
     const compression = animate
-      ? 0.72 + 0.28 * (0.5 + 0.5 * Math.sin(time * 2.4 + 0.35))
+      ? 0.62 + 0.38 * (0.5 + 0.5 * Math.sin(time * 2.1 + 0.30))
       : 1;
 
     for (const item of suspensionArmSet.pivots) {
-      item.pivot.rotation.x = travel;
+      item.pivot.rotation.z = item.side * travel;
+    }
+    for (const item of upperArmSet.pivots) {
+      item.pivot.rotation.z = item.side * travel * 0.72;
     }
 
     frontSuspensionModel.updateMatrixWorld(true);
@@ -1141,8 +1146,9 @@ export function createPartsLabSystem(game) {
       shockParts.moving.position.y = 0;
       shockParts.springGroup.scale.y = 1;
       standaloneSpring.springGroup.scale.y = 1;
-      for (const item of frontArmSet.pivots) item.pivot.rotation.x = 0;
-      for (const item of suspensionArmSet.pivots) item.pivot.rotation.x = 0;
+      for (const item of frontArmSet.pivots) item.pivot.rotation.z = 0;
+      for (const item of upperArmSet.pivots) item.pivot.rotation.z = 0;
+      for (const item of suspensionArmSet.pivots) item.pivot.rotation.z = 0;
       updateSuspensionDemo(0, false);
     }
   }
@@ -1180,8 +1186,9 @@ export function createPartsLabSystem(game) {
       shockParts.springGroup.scale.y = activePart === "shock" ? compression : 1;
       standaloneSpring.springGroup.scale.y = activePart === "spring" ? compression : 1;
     } else if (activePart === "frontAArms") {
-      const armTravel = Math.sin(time * 2.4) * 0.105;
-      for (const item of frontArmSet.pivots) item.pivot.rotation.x = armTravel;
+      const armTravel = Math.sin(time * 2.1) * 0.35;
+      for (const item of frontArmSet.pivots) item.pivot.rotation.z = item.side * armTravel;
+      for (const item of upperArmSet.pivots) item.pivot.rotation.z = item.side * armTravel * 0.72;
     } else if (activePart === "frontSuspension") {
       updateSuspensionDemo(time, true);
     }
@@ -1205,8 +1212,9 @@ export function createPartsLabSystem(game) {
     resetView,
     getFocusPosition() {
       if (activePart === "skidPlate") return new THREE.Vector3(0, 0.70, 0);
-      if (activePart === "frontAArms" || activePart === "rearAxle") return new THREE.Vector3(0, 0.50, 0);
+      if (activePart === "frontAArms" || activePart === "rearAxle" || activePart === "rearLinks") return new THREE.Vector3(0, 0.52, 0);
       if (activePart === "frontSuspension") return new THREE.Vector3(0, 0.85, 0);
+      if (activePart === "chassisFrame" || activePart === "rollCage") return new THREE.Vector3(0, 0.88, 0);
       return new THREE.Vector3(0, 0.92, 0);
     },
     get activePart() { return activePart; },
