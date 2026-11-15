@@ -1525,11 +1525,10 @@ export function createPartsLabSystem(game) {
   }
   const bumperParts = buildBumpers();
 
-  // COMPLETE MECHANICAL ROLLING CHASSIS
+  // COMPLETE 1/7 ROLLING CHASSIS
   // Scaled around the shared 425 mm wheelbase / 135-146 mm tire envelope.
-  // The servo, motor, ESC and battery are intentionally left out; the motor
-  // mount remains as an empty mechanical bracket. Previously removed frame
-  // rails and the roll cage remain excluded from this prototype.
+  // Electronics are installed on individual trays; the removed full-length
+  // side rails and roll cage remain excluded from this prototype.
   function cloneAssemblyPart(source, name, parent, position = [0, 0, 0], scale = [1, 1, 1]) {
     const copy = source.clone(true);
     copy.name = name;
@@ -1771,34 +1770,56 @@ export function createPartsLabSystem(game) {
       }
     }
 
-    // Neat high-current and motor phase-wire runs join the battery, ESC and
-    // motor without crossing the steering linkage or rear axle opening.
+    // Battery power leads run from the left-side hardcase to the ESC input
+    // connectors. Routes stay low against the tray and clear of the servo.
     addTube(root, [
-      [-1.18, 0.72, 0.58], [-1.02, 0.70, 0.45], [-0.70, 0.69, 0.29], [-0.34, 0.72, 0.25]
+      [-1.032, 0.79, -0.151],
+      [-0.90, 0.78, -0.06],
+      [-0.62, 0.77, 0.10],
+      [-0.35, 0.76, 0.22],
+      [-0.156, 0.746, 0.274]
     ], 0.024, materials.red, 7);
     addTube(root, [
-      [-1.18, 0.68, 0.62], [-1.02, 0.66, 0.49], [-0.70, 0.65, 0.33], [-0.34, 0.68, 0.29]
+      [-1.032, 0.79, -0.290],
+      [-0.90, 0.78, -0.22],
+      [-0.62, 0.77, -0.02],
+      [-0.34, 0.76, 0.16],
+      [-0.088, 0.746, 0.274]
     ], 0.024, materials.black, 7);
-    const phaseWireColors = [materials.blue, materials.orange, materials.gold];
-    for (let i = 0; i < 3; i++) {
-      const z = 0.92 + i * 0.045;
-      addTube(root, [
-        [0.42, 0.82 + i * 0.025, z],
-        [0.48, 0.94 + i * 0.025, z + 0.08],
-        [0.55, 1.08 + i * 0.025, z + 0.12],
-        [0.55, 1.20 + i * 0.025, z + 0.17]
-      ], 0.018, phaseWireColors[i], 7);
-    }
+
+    // Three phase leads connect the ESC output bank to their matching motor
+    // terminals. Each tube terminates at the visible grommet on the 4274 can.
+    addTube(root, [
+      [0.412, 0.758, 0.922],
+      [0.48, 0.81, 1.12],
+      [0.55, 0.87, 1.38],
+      [0.64, 0.91, 1.64],
+      [0.70, 0.917, 1.858]
+    ], 0.018, materials.orange, 7);
+    addTube(root, [
+      [0.412, 0.758, 0.970],
+      [0.47, 0.81, 1.15],
+      [0.53, 0.87, 1.40],
+      [0.59, 0.91, 1.66],
+      [0.643, 0.917, 1.858]
+    ], 0.018, materials.gold, 7);
+    addTube(root, [
+      [0.412, 0.758, 1.018],
+      [0.49, 0.82, 1.18],
+      [0.57, 0.88, 1.42],
+      [0.67, 0.91, 1.66],
+      [0.757, 0.917, 1.858]
+    ], 0.018, materials.blue, 7);
 
     // Centre-to-front and centre-to-rear prop shafts, with yokes at each end.
     const propShaftGroup = new THREE.Group();
     propShaftGroup.name = "Front and rear propeller shafts";
     root.add(propShaftGroup);
-    addPrototypeRod(propShaftGroup, [0, 0.84, -1.02], [0, 0.84, -1.29],
+    addPrototypeRod(propShaftGroup, [0, 0.84, -0.92], [0, 0.84, -1.18],
       0.050, materials.brightAlloy, 0.082);
-    addPrototypeRod(propShaftGroup, [0, 0.84, 0.12], [0, 0.63, 2.27],
+    addPrototypeRod(propShaftGroup, [0, 0.84, 0.02], [0, 0.69, 2.27],
       0.052, materials.brightAlloy, 0.086);
-    for (const [z, y] of [[-1.02, 0.84], [-1.29, 0.84], [0.12, 0.84], [2.27, 0.63]]) {
+    for (const [z, y] of [[-0.92, 0.84], [-1.18, 0.84], [0.02, 0.84], [2.27, 0.69]]) {
       addCylinder(propShaftGroup, 0.076, 0.076, 0.15, materials.darkAlloy,
         [0, y, z], [Math.PI / 2, 0, 0], 22);
       addBox(propShaftGroup, [0.18, 0.14, 0.11], [0, y, z], materials.shellLight, 0.022);
@@ -1891,7 +1912,7 @@ export function createPartsLabSystem(game) {
     }
 
     // Front and rear bumpers are retained; no roll cage or longitudinal side rails.
-    cloneAssemblyPart(bumpersModel, "Front and rear bumper pair", root, [0, 0.62, 0], [2.2, 0.90, 2.25]);
+    cloneAssemblyPart(bumpersModel, "Front and rear bumper pair", root, [0, 0.62, 0], [2.2, 0.90, 2.15]);
 
     return root;
   }
