@@ -803,7 +803,7 @@ export function createPartsLabSystem(game) {
       addTorus(body, 0.024, 0.0055, materials.black,
         [0.394, y, z], [0, Math.PI / 2, 0], 20);
       addBox(body, [0.004, 0.0045, 0.025],
-        [0.407, y, z], materials.brightAlloy, 0.001);
+        [0.399, y, z], materials.brightAlloy, 0.001);
     }
 
     for (const z of [-0.12, 0.12]) {
