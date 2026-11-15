@@ -1986,6 +1986,9 @@ export function createPartsLabSystem(game) {
     if (!componentModels[id]) return;
     activePart = id;
     if (game.controls) game.controls.cameraOrbitYaw = 0;
+    // Full chassis views should sit directly in the showroom, not on the
+    // circular component display plinth used for individual parts.
+    plinthGroup.visible = id !== "rollingChassis" && id !== "suspensionWorking";
     for (const [key, model] of Object.entries(componentModels)) {
       model.visible = key === id;
     }
