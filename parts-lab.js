@@ -1527,7 +1527,7 @@ export function createPartsLabSystem(game) {
     const panGroup = new THREE.Group();
     panGroup.name = "Assembled skid plate";
     root.add(panGroup);
-    cloneAssemblyPart(skidPlateModel, "Skid plate component", panGroup, [0, 0.26, 0], [1.42, 1, 1.42]);
+    cloneAssemblyPart(skidPlateModel, "Skid plate component", panGroup, [0, 0.26, -0.38], [1.42, 1, 1.10]);
 
     // Structural crossmembers and front/rear mounting shelves replace the
     // full side rails that were intentionally removed from the prototype.
@@ -1535,10 +1535,10 @@ export function createPartsLabSystem(game) {
     mountStructure.name = "Chassis crossmembers and component mounting shelves";
     root.add(mountStructure);
     addBox(mountStructure, [1.92, 0.12, 0.18], [0, 0.62, -1.05], materials.darkAlloy, 0.035);
-    addBox(mountStructure, [1.80, 0.12, 0.18], [0, 0.62, 0.94], materials.darkAlloy, 0.035);
+    addBox(mountStructure, [1.80, 0.12, 0.18], [0, 0.62, 0.45], materials.darkAlloy, 0.035);
     addBox(mountStructure, [1.16, 0.10, 0.22], [0, 0.72, -0.36], materials.shellLight, 0.025);
     for (const side of [-1, 1]) {
-      for (const z of [-1.05, 0.94]) {
+      for (const z of [-1.05, 0.45]) {
         addBox(mountStructure, [0.20, 0.12, 0.28], [side * 0.74, 0.62, z], materials.alloy, 0.025);
         addScrew(mountStructure, [side * 0.74, 0.69, z], 0.026, materials.brightAlloy);
       }
@@ -1558,10 +1558,21 @@ export function createPartsLabSystem(game) {
     // rear skid crossmember without adding full-length side frame rails.
     for (const side of [-1, 1]) {
       addPrototypeRod(mountStructure,
-        [side * 0.54, 0.68, 0.94],
-        [side * 0.54, 1.28, 1.48],
+        [side * 0.54, 0.68, 0.45],
+        [side * 0.54, 1.58, 1.48],
         0.048, materials.shellLight, 0.068);
     }
+    // Local equipment trays bolt onto the crossmembers and forward skid-pan area.
+    addBox(mountStructure, [0.78, 0.10, 0.70], [-0.58, 0.62, -1.52], materials.darkAlloy, 0.035);
+    for (const x of [-0.87, -0.29]) {
+      for (const z of [-1.76, -1.28]) addScrew(mountStructure, [x, 0.68, z], 0.025, materials.brightAlloy);
+    }
+    addBox(mountStructure, [0.78, 0.10, 1.18], [-0.56, 0.62, 0.23], materials.darkAlloy, 0.03);
+    for (const x of [-0.84, -0.28]) {
+      addBox(mountStructure, [0.06, 0.12, 1.06], [x, 0.72, 0.23], materials.shellLight, 0.012);
+    }
+    addBox(mountStructure, [0.92, 0.10, 0.82], [-0.10, 0.62, 0.76], materials.darkAlloy, 0.03);
+
     batchStaticMeshes(mountStructure);
 
     // Front independent suspension: lower/upper A-arms and shock towers are
@@ -1586,8 +1597,8 @@ export function createPartsLabSystem(game) {
       pivot.add(wheel);
     }
 
-    cloneAssemblyPart(frontKnucklesModel, "Front steering knuckles", root, [0, 0.06, -1.97]);
-    cloneAssemblyPart(steeringLinkageModel, "Front steering linkage", root, [0, -0.06, -1.97]);
+    const frontKnuckles = cloneAssemblyPart(frontKnucklesModel, "Front steering knuckles", root, [0, 0.06, -1.97]);
+    const steering = cloneAssemblyPart(steeringLinkageModel, "Front steering linkage", root, [0, -0.06, -1.97]);
     cloneAssemblyPart(frontDifferentialModel, "Front differential unit", root, [0, 0.32, -1.50]);
 
     // Front CVDs articulate between the fixed differential outputs and
@@ -1641,7 +1652,7 @@ export function createPartsLabSystem(game) {
     // central mechanical powertrain. No motor or electrical equipment is fitted.
     cloneAssemblyPart(centerDifferentialModel, "Centre differential unit", root, [0, 0.32, -0.45]);
     cloneAssemblyPart(gearboxModel, "Central gearbox housing", root, [0.55, 0.425, 0.35], [0.65, 0.75, 0.75]);
-    cloneAssemblyPart(motorMountModel, "Empty adjustable motor mount", root, [0.55, 0.90, 0.42], [0.75, 0.75, 0.75]);
+    cloneAssemblyPart(motorMountModel, "Adjustable motor mount", root, [0.55, 0.90, 1.03], [0.75, 0.75, 0.75]);
 
     // Centre-to-front and centre-to-rear prop shafts, with yokes at each end.
     const propShaftGroup = new THREE.Group();
@@ -1683,10 +1694,10 @@ export function createPartsLabSystem(game) {
     const rearShockMounts = new THREE.Group();
     rearShockMounts.name = "Rear shock upper mounting brackets";
     root.add(rearShockMounts);
-    addBox(rearShockMounts, [1.45, 0.12, 0.18], [0, 1.32, 1.48], materials.darkAlloy, 0.03);
+    addBox(rearShockMounts, [1.45, 0.12, 0.18], [0, 1.62, 1.48], materials.darkAlloy, 0.03);
     for (const side of [-1, 1]) {
-      addBox(rearShockMounts, [0.18, 0.16, 0.36], [side * 0.54, 1.28, 1.48], materials.alloy, 0.025);
-      addScrew(rearShockMounts, [side * 0.54, 1.37, 1.48], 0.026, materials.brightAlloy);
+      addBox(rearShockMounts, [0.18, 0.16, 0.36], [side * 0.54, 1.58, 1.48], materials.alloy, 0.025);
+      addScrew(rearShockMounts, [side * 0.54, 1.67, 1.48], 0.026, materials.brightAlloy);
     }
 
     function buildRearDamper(side, offset, label) {
@@ -1733,7 +1744,7 @@ export function createPartsLabSystem(game) {
         [0, 1.04, 0], [0, Math.PI / 2, 0], 20);
 
       const lower = new THREE.Vector3(side * 0.46, 0.90, 1.97 + offset);
-      const upper = new THREE.Vector3(side * 0.54, 1.35, 1.48 + offset);
+      const upper = new THREE.Vector3(side * 0.54, 1.65, 1.48 + offset);
       return { name: label, root: shockRoot, springGroup: spring, rodGroup: rod, side, offset, lower, upper };
     }
 
@@ -1752,7 +1763,7 @@ export function createPartsLabSystem(game) {
   function alignAssemblyDamper(shock, lower, upper, compression) {
     const up = new THREE.Vector3(0, 1, 0);
     const direction = upper.clone().sub(lower);
-    const length = Math.max(0.55, direction.length());
+    const length = Math.max(0.32, direction.length());
     const axis = direction.normalize();
     shock.root.position.copy(lower).addScaledVector(axis, -0.04 * length);
     shock.root.quaternion.setFromUnitVectors(up, axis);
@@ -1869,8 +1880,8 @@ export function createPartsLabSystem(game) {
       alignAssemblyDamper(shock, lower, upper, compression);
     }
 
-    const rearTravel = animate ? Math.sin(time * 2.05 + 1.05) * 0.13 : 0;
-    const rearPitch = animate ? Math.sin(time * 2.05 + 1.05) * 0.025 : 0;
+    const rearTravel = animate ? Math.sin(time * 2.05 + 1.05) * 0.34 : 0;
+    const rearPitch = animate ? Math.sin(time * 2.05 + 1.05) * 0.045 : 0;
     motion.rearCarrier.position.y = 0.13 + rearTravel;
     motion.rearCarrier.rotation.x = rearPitch;
     motion.rearLinks.position.y = 0.13 + rearTravel * 0.48;
@@ -1878,7 +1889,7 @@ export function createPartsLabSystem(game) {
 
     for (const shock of motion.rearShocks) {
       const lower = new THREE.Vector3(shock.side * 0.46, 0.90 + rearTravel, 1.97 + shock.offset);
-      const upper = new THREE.Vector3(shock.side * 0.54, 1.35, 1.48 + shock.offset);
+      const upper = new THREE.Vector3(shock.side * 0.54, 1.65, 1.48 + shock.offset);
       alignAssemblyDamper(shock, lower, upper, compression);
     }
   }
