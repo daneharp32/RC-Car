@@ -1383,40 +1383,40 @@ export function createPartsLabSystem(game) {
   function buildWheelTire() {
     const body = new THREE.Group();
     wheelTireModel.add(body);
-    addCylinder(body, 0.68, 0.68, 0.42, materials.rubber,
-      [0, 0.72, 0], [0, 0, Math.PI / 2], 48);
+    addCylinder(body, 0.58, 0.58, 0.42, materials.rubber,
+      [0, 0.84, 0], [0, 0, Math.PI / 2], 48);
     for (const x of [-0.205, 0.205]) {
-      addTorus(body, 0.62, 0.065, materials.rubber, [x, 0.72, 0], [0, Math.PI / 2, 0], 48);
+      addTorus(body, 0.52, 0.055, materials.rubber, [x, 0.84, 0], [0, Math.PI / 2, 0], 48);
     }
-    addCylinder(body, 0.46, 0.46, 0.36, materials.darkAlloy,
-      [0, 0.72, 0], [0, 0, Math.PI / 2], 40);
-    addCylinder(body, 0.42, 0.42, 0.025, materials.shellLight,
-      [0.195, 0.72, 0], [0, 0, Math.PI / 2], 40);
-    addTorus(body, 0.435, 0.022, materials.brightAlloy,
-      [0.222, 0.72, 0], [0, Math.PI / 2, 0], 40);
+    addCylinder(body, 0.39, 0.39, 0.36, materials.darkAlloy,
+      [0, 0.84, 0], [0, 0, Math.PI / 2], 40);
+    addCylinder(body, 0.36, 0.36, 0.025, materials.shellLight,
+      [0.195, 0.84, 0], [0, 0, Math.PI / 2], 40);
+    addTorus(body, 0.375, 0.020, materials.brightAlloy,
+      [0.222, 0.84, 0], [0, Math.PI / 2, 0], 40);
 
     for (let i = 0; i < 6; i++) {
       const angle = i / 6 * Math.PI * 2;
       addBox(body, [0.035, 0.31, 0.085],
-        [0.218, 0.72 + Math.cos(angle) * 0.20, Math.sin(angle) * 0.20],
+        [0.218, 0.84 + Math.cos(angle) * 0.17, Math.sin(angle) * 0.17],
         materials.alloy, 0.018, [angle, 0, 0]);
     }
-    addCylinder(body, 0.12, 0.12, 0.10, materials.black,
-      [0.25, 0.72, 0], [0, 0, Math.PI / 2], 28);
-    addCylinder(body, 0.075, 0.075, 0.13, materials.brightAlloy,
-      [0.31, 0.72, 0], [0, 0, Math.PI / 2], 24);
+    addCylinder(body, 0.105, 0.105, 0.10, materials.black,
+      [0.25, 0.84, 0], [0, 0, Math.PI / 2], 28);
+    addCylinder(body, 0.065, 0.065, 0.13, materials.brightAlloy,
+      [0.31, 0.84, 0], [0, 0, Math.PI / 2], 24);
 
     for (let i = 0; i < 28; i++) {
       const angle = i / 28 * Math.PI * 2;
-      const y = 0.72 + Math.cos(angle) * 0.665;
-      const z = Math.sin(angle) * 0.665;
+      const y = 0.84 + Math.cos(angle) * 0.565;
+      const z = Math.sin(angle) * 0.565;
       addBox(body, [0.32, 0.13, 0.075], [0, y, z], materials.rubber, 0.018,
         [angle - Math.PI / 2, 0, 0]);
     }
     for (let i = 0; i < 16; i++) {
       const angle = i / 16 * Math.PI * 2;
       addCylinder(body, 0.018, 0.018, 0.025, materials.brightAlloy,
-        [0.248, 0.72 + Math.cos(angle) * 0.405, Math.sin(angle) * 0.405],
+        [0.248, 0.84 + Math.cos(angle) * 0.345, Math.sin(angle) * 0.345],
         [0, 0, Math.PI / 2], 10);
     }
     batchStaticMeshes(body);
