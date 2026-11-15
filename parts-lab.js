@@ -2075,6 +2075,9 @@ export function createPartsLabSystem(game) {
     }
 
     const rearTravel = animate ? Math.sin(time * 2.05 + 1.05) * 0.34 : 0;
+    const rearCompression = animate
+      ? THREE.MathUtils.clamp(1 - ((rearTravel + 0.34) / 0.68) * 0.34, 0.66, 1)
+      : 1;
     const rearPitch = animate ? Math.sin(time * 2.05 + 1.05) * 0.045 : 0;
     motion.rearCarrier.position.y = 0.13 + rearTravel;
     motion.rearCarrier.rotation.x = rearPitch;
@@ -2084,7 +2087,7 @@ export function createPartsLabSystem(game) {
     for (const shock of motion.rearShocks) {
       const lower = new THREE.Vector3(shock.side * 0.46, 0.90 + rearTravel, 1.97 + shock.offset);
       const upper = new THREE.Vector3(shock.side * 0.54, 1.65, 1.48 + shock.offset);
-      alignAssemblyDamper(shock, lower, upper, compression);
+      alignAssemblyDamper(shock, lower, upper, rearCompression);
     }
 
     updateDynamicServoPushrod(motion);
