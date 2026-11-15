@@ -1523,13 +1523,13 @@ export function createPartsLabSystem(game) {
     const mountStructure = new THREE.Group();
     mountStructure.name = "Chassis crossmembers and component mounting shelves";
     root.add(mountStructure);
-    addBox(mountStructure, [1.92, 0.12, 0.18], [0, 0.68, -1.05], materials.darkAlloy, 0.035);
-    addBox(mountStructure, [1.80, 0.12, 0.18], [0, 0.70, 0.94], materials.darkAlloy, 0.035);
-    addBox(mountStructure, [1.16, 0.10, 0.22], [0, 0.76, -0.36], materials.shellLight, 0.025);
+    addBox(mountStructure, [1.92, 0.12, 0.18], [0, 0.62, -1.05], materials.darkAlloy, 0.035);
+    addBox(mountStructure, [1.80, 0.12, 0.18], [0, 0.62, 0.94], materials.darkAlloy, 0.035);
+    addBox(mountStructure, [1.16, 0.10, 0.22], [0, 0.72, -0.36], materials.shellLight, 0.025);
     for (const side of [-1, 1]) {
       for (const z of [-1.05, 0.94]) {
-        addBox(mountStructure, [0.20, 0.12, 0.28], [side * 0.74, 0.70, z], materials.alloy, 0.025);
-        addScrew(mountStructure, [side * 0.74, 0.77, z], 0.026, materials.brightAlloy);
+        addBox(mountStructure, [0.20, 0.12, 0.28], [side * 0.74, 0.62, z], materials.alloy, 0.025);
+        addScrew(mountStructure, [side * 0.74, 0.69, z], 0.026, materials.brightAlloy);
       }
     }
     batchStaticMeshes(mountStructure);
@@ -1766,7 +1766,7 @@ export function createPartsLabSystem(game) {
 
     // Hub carriers, steering arms and front CVD outers follow the lower
     // wishbones' vertical arc so they do not hover above the moving wheels.
-    const frontHubTravel = 0.99 * Math.sin(travel) + 0.42 * (Math.cos(travel) - 1);
+    const frontHubTravel = 1.01 * Math.sin(travel) + 0.42 * (Math.cos(travel) - 1);
     motion.frontKnuckles.position.y = 0.06 + frontHubTravel;
     motion.frontCvd.position.y = frontHubTravel;
     motion.steering.position.y = -0.06 + frontHubTravel;
