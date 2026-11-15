@@ -751,96 +751,134 @@ export function createPartsLabSystem(game) {
   // These prototypes use the user's 425 mm wheelbase reference as a scale anchor.
   // They are independent display pieces and are not installed on either car.
   const skidPlateModel = new THREE.Group();
-  skidPlateModel.name = "Main flat metal chassis skid plate";
+  skidPlateModel.name = "Formed aluminum chassis side plate";
   skidPlateModel.visible = false;
   showcase.add(skidPlateModel);
 
   function buildSkidPlate() {
     const body = new THREE.Group();
-    body.name = "3 mm aluminum chassis plate";
+    body.name = "Profiled chassis side plate with countersunk fasteners";
     skidPlateModel.add(body);
 
-    // Approx. 310 x 100 x 3.5 mm in the 425 mm wheelbase scale reference.
-    addBox(body, [0.80, 0.028, 2.48], [0, 0.285, 0], materials.alloy, 0.012);
+    // The reference is a tall side chassis plate, not a thin horizontal floor:
+    // long lower rail, raised centre, tapered front transition and a stepped
+    // rear notch. Envelope is approximately 320 x 115 x 5 mm at this scale.
+    const profile = new THREE.Shape();
+    profile.moveTo(-1.27, 0.30);
+    profile.lineTo(1.27, 0.30);
+    profile.lineTo(1.27, 0.56);
+    profile.lineTo(0.99, 0.58);
+    profile.lineTo(1.06, 0.78);
+    profile.lineTo(1.15, 1.12);
+    profile.lineTo(-0.63, 1.12);
+    profile.lineTo(-0.82, 0.98);
+    profile.lineTo(-1.04, 0.65);
+    profile.lineTo(-1.27, 0.56);
+    profile.close();
 
-    // Practical edge mounting points and central drivetrain crossmember holes.
-    for (const z of [-1.02, -0.62, 0.62, 1.02]) {
-      for (const x of [-0.29, 0.29]) {
-        addTorus(body, 0.034, 0.006, materials.darkAlloy,
-          [x, 0.302, z], [Math.PI / 2, 0, 0], 20);
-        addScrew(body, [x, 0.303, z], 0.022, materials.brightAlloy);
-      }
+    const plateGeometry = new THREE.ExtrudeGeometry(profile, {
+      depth: 0.045, bevelEnabled: true, bevelSegments: 2, steps: 1,
+      bevelSize: 0.012, bevelThickness: 0.008, curveSegments: 4
+    });
+    // The broad face is vertical and faces the +X viewing direction.
+    plateGeometry.rotateY(Math.PI / 2);
+    const plate = new THREE.Mesh(plateGeometry, materials.alloy);
+    plate.position.set(0.33, 0, 0);
+    plate.name = "Stepped formed aluminum side chassis plate";
+    plate.castShadow = true;
+    plate.receiveShadow = true;
+    body.add(plate);
+
+    // Countersunk fasteners follow the actual profile on the outward face.
+    const holes = [
+      [-1.14,0.47],[-0.98,0.67],[-0.80,0.95],[-0.55,1.055],[-0.16,1.055],
+      [0.22,1.055],[0.60,1.055],[0.96,0.91],
+      [-1.05,0.36],[-0.75,0.42],[-0.40,0.43],[-0.04,0.43],[0.33,0.43],[0.70,0.43],
+      [-0.82,0.78],[-0.50,0.72],[-0.15,0.70],[0.22,0.70],[0.60,0.70]
+    ];
+    for (const [u, y] of holes) {
+      const z = -u;
+      addCylinder(body, 0.028, 0.028, 0.018, materials.darkAlloy,
+        [0.382, y, z], [0, 0, Math.PI / 2], 20);
+      addTorus(body, 0.024, 0.0055, materials.black,
+        [0.394, y, z], [0, Math.PI / 2, 0], 20);
+      addBox(body, [0.004, 0.0045, 0.025],
+        [0.399, y, z], materials.brightAlloy, 0.001);
     }
-    for (const z of [-0.26, 0.26]) {
-      addTorus(body, 0.043, 0.007, materials.darkAlloy,
-        [0, 0.302, z], [Math.PI / 2, 0, 0], 20);
-      addScrew(body, [0, 0.303, z], 0.025, materials.brightAlloy);
+
+    for (const z of [-0.12, 0.12]) {
+      addBox(body, [0.012, 0.055, 0.018], [0.404, 0.39, z], materials.black, 0.006);
     }
-    return { body };
+    return { body, plate };
   }
   const skidPlateParts = buildSkidPlate();
-  batchStaticMeshes(skidPlateParts.body);
+  batchStaticMeshes(skidPlateParts.body, [skidPlateParts.plate]);
 
   const frontAArmsModel = new THREE.Group();
-  frontAArmsModel.name = "Pair of front double wishbone A arms";
+  frontAArmsModel.name = "Pair of animated front lower A arms";
   frontAArmsModel.visible = false;
   showcase.add(frontAArmsModel);
 
-  function buildFrontAArms() {
-    const body = new THREE.Group();
-    body.name = "Mirrored front lower A arms";
-    frontAArmsModel.add(body);
+  function buildAnimatedFrontArmPair(parent) {
+    const frame = new THREE.Group();
+    parent.add(frame);
+    const pivots = [];
 
     for (const side of [-1, 1]) {
-      // Broad triangular lower arm, connecting two inner pivots to one
-      // outboard ball-joint carrier.
+      const pivot = new THREE.Group();
+      pivot.name = side < 0 ? "Animated front A-arm pivot left" : "Animated front A-arm pivot right";
+      pivot.position.set(side * 0.36, 0.35, 0);
+      frame.add(pivot);
+      pivots.push({ side, pivot });
+
+      // Each triangular arm is authored around its inner pivot, so the whole
+      // wishbone rotates as one rigid part instead of sliding through space.
       const outline = new THREE.Shape();
-      outline.moveTo(side * 0.36, -0.34);
-      outline.lineTo(side * 0.36, 0.34);
-      outline.lineTo(side * 1.10, 0.015);
-      outline.lineTo(side * 0.36, -0.34);
-      const armGeometry = new THREE.ExtrudeGeometry(outline, {
-        depth: 0.075,
-        bevelEnabled: true,
-        bevelSegments: 1,
-        steps: 1,
-        bevelSize: 0.018,
-        bevelThickness: 0.012,
-        curveSegments: 4
+      outline.moveTo(0, -0.34);
+      outline.lineTo(0, 0.34);
+      outline.lineTo(side * 0.74, 0.015);
+      outline.lineTo(0, -0.34);
+      const geometry = new THREE.ExtrudeGeometry(outline, {
+        depth: 0.075, bevelEnabled: true, bevelSegments: 1, steps: 1,
+        bevelSize: 0.018, bevelThickness: 0.012, curveSegments: 4
       });
-      armGeometry.rotateX(Math.PI / 2);
-      armGeometry.translate(0, 0.355, 0);
-      const arm = new THREE.Mesh(armGeometry, materials.darkAlloy);
-      arm.name = side < 0 ? "Left front lower A arm" : "Right front lower A arm";
+      geometry.rotateX(Math.PI / 2);
+      geometry.translate(0, -0.0375, 0);
+      const arm = new THREE.Mesh(geometry, materials.darkAlloy);
+      arm.name = side < 0 ? "Left lower wishbone" : "Right lower wishbone";
       arm.castShadow = true;
       arm.receiveShadow = true;
-      body.add(arm);
+      pivot.add(arm);
 
-      // Inner hinge barrels run across the pivot axis.
+      // The outer ball joint is part of the arm pivot and moves with it.
+      addCylinder(pivot, 0.105, 0.105, 0.11, materials.black,
+        [side * 0.72, 0.045, -0.015], [0, 0, 0], 28);
+      addCylinder(pivot, 0.072, 0.072, 0.13, materials.brightAlloy,
+        [side * 0.72, 0.105, -0.015], [0, 0, 0], 24);
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.075, 20, 14), materials.darkAlloy);
+      ball.position.set(side * 0.72, 0.18, -0.015);
+      ball.castShadow = true;
+      pivot.add(ball);
+
+      // Fixed inner pivot bushings are attached to the chassis-side bracket.
       for (const z of [-0.34, 0.34]) {
-        addCylinder(body, 0.066, 0.066, 0.17, materials.black,
+        addCylinder(frame, 0.066, 0.066, 0.17, materials.black,
           [side * 0.36, 0.35, z], [0, 0, Math.PI / 2], 24);
-        addCylinder(body, 0.045, 0.045, 0.19, materials.brightAlloy,
+        addCylinder(frame, 0.045, 0.045, 0.19, materials.brightAlloy,
           [side * 0.36, 0.35, z], [0, 0, Math.PI / 2], 20);
       }
-
-      // Outboard ball-joint cup is centred over the tapered arm tip.
-      addCylinder(body, 0.105, 0.105, 0.11, materials.black,
-        [side * 1.08, 0.34, 0.015], [0, 0, 0], 28);
-      addCylinder(body, 0.072, 0.072, 0.13, materials.brightAlloy,
-        [side * 1.08, 0.405, 0.015], [0, 0, 0], 24);
-      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.075, 20, 14), materials.darkAlloy);
-      ball.position.set(side * 1.08, 0.48, 0.015);
-      ball.castShadow = true;
-      body.add(ball);
     }
 
-    // Simple crossmember represents the front inner-pivot mounting area.
-    addBox(body, [0.90, 0.10, 0.16], [0, 0.32, -0.42], materials.shellLight, 0.025);
-    return { body };
+    // Inner mounting bridge is kept below the wishbones and clear of travel.
+    addBox(frame, [0.90, 0.10, 0.16], [0, 0.25, -0.47], materials.shellLight, 0.025);
+    batchStaticMeshes(frame, pivots.map(item => item.pivot));
+    for (const item of pivots) {
+      batchStaticMeshes(item.pivot, [], { castShadow: false, receiveShadow: false });
+    }
+    return { frame, pivots };
   }
-  const frontAArmsParts = buildFrontAArms();
-  batchStaticMeshes(frontAArmsParts.body);
+
+  const frontArmSet = buildAnimatedFrontArmPair(frontAArmsModel);
 
   const rearAxleModel = new THREE.Group();
   rearAxleModel.name = "Full width solid rear axle assembly";
@@ -888,6 +926,78 @@ export function createPartsLabSystem(game) {
   const rearAxleParts = buildRearAxle();
   batchStaticMeshes(rearAxleParts.body);
 
+  const frontSuspensionModel = new THREE.Group();
+  frontSuspensionModel.name = "Animated front suspension assembly demonstration";
+  frontSuspensionModel.visible = false;
+  showcase.add(frontSuspensionModel);
+
+  // A short upper rail and twin shock towers make the suspension endpoints
+  // visible without pretending the prototype is already fitted to a chassis.
+  addBox(frontSuspensionModel, [1.35, 0.12, 0.48], [0, 1.34, -0.06], materials.shell, 0.055);
+  const suspensionArmSet = buildAnimatedFrontArmPair(frontSuspensionModel);
+  for (const side of [-1, 1]) {
+    addBox(frontSuspensionModel, [0.15, 0.78, 0.18], [side * 0.61, 0.91, 0.04], materials.darkAlloy, 0.03);
+    addBox(frontSuspensionModel, [0.27, 0.12, 0.24], [side * 0.61, 1.31, 0.04], materials.shellLight, 0.025);
+    addCylinder(frontSuspensionModel, 0.06, 0.06, 0.19, materials.brightAlloy,
+      [side * 0.61, 1.36, 0.04], [0, 0, Math.PI / 2], 20);
+  }
+
+  function buildAnimatedDemoShock(parent, side) {
+    const root = new THREE.Group();
+    root.name = side < 0 ? "Left moving front shock" : "Right moving front shock";
+    parent.add(root);
+
+    // Local +Y runs from the lower A-arm attachment to the upper tower.
+    addCylinder(root, 0.095, 0.112, 0.54, materials.darkAlloy,
+      [0, 0.29, 0], [0, 0, 0], 28);
+    addCylinder(root, 0.082, 0.082, 0.42, materials.shellLight,
+      [0, 0.29, 0], [0, 0, 0], 28);
+    addTorus(root, 0.115, 0.016, materials.black,
+      [0, 0.56, 0], [Math.PI / 2, 0, 0], 24);
+
+    const springGroup = new THREE.Group();
+    springGroup.position.y = 0.25;
+    root.add(springGroup);
+    const springPoints = [];
+    const turns = 6.5, samples = turns * 18;
+    for (let i = 0; i <= samples; i++) {
+      const t = i / samples;
+      const angle = t * turns * Math.PI * 2;
+      springPoints.push([Math.cos(angle) * 0.135, t * 0.58, Math.sin(angle) * 0.135]);
+    }
+    addTube(springGroup, springPoints, 0.022, materials.orange, 7);
+    addTorus(springGroup, 0.14, 0.018, materials.darkAlloy,
+      [0, 0.58, 0], [Math.PI / 2, 0, 0], 24);
+
+    const rodGroup = new THREE.Group();
+    rodGroup.position.y = 0.48;
+    root.add(rodGroup);
+    addCylinder(rodGroup, 0.026, 0.026, 0.55, materials.brightAlloy,
+      [0, 0.22, 0], [0, 0, 0], 18);
+    addCylinder(rodGroup, 0.078, 0.078, 0.10, materials.darkAlloy,
+      [0, 0.50, 0], [0, 0, 0], 24);
+    addCylinder(rodGroup, 0.055, 0.055, 0.12, materials.black,
+      [0, 0.56, 0], [Math.PI / 2, 0, 0], 20);
+    addTorus(rodGroup, 0.055, 0.012, materials.brightAlloy,
+      [0, 0.62, 0], [0, Math.PI / 2, 0], 20);
+
+    // Eyelets are aligned across the truck (X axis), at the ends of the
+    // shock assembly rather than appearing as loose decorative rings.
+    addBox(root, [0.19, 0.10, 0.15], [0, 0.02, 0], materials.shellLight, 0.025);
+    addTorus(root, 0.055, 0.015, materials.darkAlloy,
+      [0, 0.04, 0], [0, Math.PI / 2, 0], 24);
+    addBox(root, [0.19, 0.10, 0.15], [0, 1.02, 0], materials.shellLight, 0.025);
+    addTorus(root, 0.055, 0.015, materials.darkAlloy,
+      [0, 1.04, 0], [0, Math.PI / 2, 0], 24);
+
+    batchStaticMeshes(root, [springGroup, rodGroup]);
+    batchStaticMeshes(springGroup, [], { castShadow: false, receiveShadow: false });
+    batchStaticMeshes(rodGroup, [], { castShadow: false, receiveShadow: false });
+    return { root, springGroup, rodGroup, side };
+  }
+
+  const suspensionShocks = [-1, 1].map(side => buildAnimatedDemoShock(frontSuspensionModel, side));
+
   const componentModels = {
     servo: servoModel,
     motor: motorModel,
@@ -898,7 +1008,8 @@ export function createPartsLabSystem(game) {
     spring: springModel,
     skidPlate: skidPlateModel,
     frontAArms: frontAArmsModel,
-    rearAxle: rearAxleModel
+    rearAxle: rearAxleModel,
+    frontSuspension: frontSuspensionModel
   };
 
   const partDetails = {
@@ -939,18 +1050,23 @@ export function createPartsLabSystem(game) {
     },
     skidPlate: {
       name: "MAIN METAL SKID PLATE",
-      description: "A flat central aluminum chassis plate with rounded edges and practical mounting points. Sized as the centre section of a truck using a 425 mm target wheelbase.",
-      specs: "REFERENCE   ·  425 mm target wheelbase\nPLATE       ·  Approx. 310 × 100 × 3.5 mm\nMATERIAL    ·  Brushed aluminum appearance\nSTATUS      ·  Standalone prototype"
+      description: "A formed vertical chassis side plate matching the reference profile, with a long lower rail, raised centre section, tapered transition, stepped rear notch and countersunk fastener rows.",
+      specs: "REFERENCE   ·  425 mm target wheelbase\nPROFILE     ·  Approx. 320 × 115 × 5 mm\nFEATURES    ·  Raised centre + stepped cutout\nFASTENERS   ·  Countersunk mounting pattern"
     },
     frontAArms: {
       name: "FRONT LOWER A-ARMS",
-      description: "A mirrored pair of broad front lower wishbones. Each arm joins two inner chassis pivots to an outboard ball-joint carrier. These are geometry studies and are not connected to steering or wheels.",
-      specs: "LAYOUT      ·  Left and right pair\nTYPE        ·  Double-wishbone lower arms\nJOINTS      ·  Two inner pivots per side\nSTATUS      ·  Standalone prototype"
+      description: "A mirrored pair of front lower wishbones on real pivot groups. Both arms sweep through a small suspension travel cycle, with outboard ball-joint carriers moving with each arm.",
+      specs: "LAYOUT      ·  Left and right pair\nTYPE        ·  Double-wishbone lower arms\nJOINTS      ·  Two inner pivots per side\nMOTION      ·  Animated vertical travel"
     },
     rearAxle: {
       name: "SOLID REAR AXLE BAR",
       description: "A full-width straight rear axle housing with a central differential pumpkin, axle tubes, wheel-end hubs and simple upper mounting saddles. It is not connected to the chassis or suspension.",
       specs: "LAYOUT      ·  Full-width solid axle\nHOUSING     ·  Central differential + tubes\nENDS        ·  Left and right hub stubs\nSTATUS      ·  Standalone prototype"
+    },
+    frontSuspension: {
+      name: "FRONT SUSPENSION DEMONSTRATOR",
+      description: "A standalone pair of front lower A-arms connected visually to two coil-over shocks. The arms pivot up and down while the shock rods and coil springs compress and extend together.",
+      specs: "LAYOUT      ·  Mirrored front lower A-arms\nDAMPERS     ·  Twin coil-over shocks\nMOVEMENT    ·  Arm travel + spring compression\nSTATUS      ·  Standalone animated assembly"
     }
   };
 
@@ -962,6 +1078,7 @@ export function createPartsLabSystem(game) {
   function selectPart(id) {
     if (!componentModels[id]) return;
     activePart = id;
+    if (game.controls) game.controls.cameraOrbitYaw = id === "skidPlate" ? Math.PI / 2 : 0;
     for (const [key, model] of Object.entries(componentModels)) {
       model.visible = key === id;
     }
@@ -979,6 +1096,36 @@ export function createPartsLabSystem(game) {
     if (specs) specs.textContent = details.specs;
   }
 
+  function updateSuspensionDemo(time, animate) {
+    const travel = animate ? Math.sin(time * 2.4) * 0.105 : 0;
+    const compression = animate
+      ? 0.72 + 0.28 * (0.5 + 0.5 * Math.sin(time * 2.4 + 0.35))
+      : 1;
+
+    for (const item of suspensionArmSet.pivots) {
+      item.pivot.rotation.x = travel;
+    }
+
+    frontSuspensionModel.updateMatrixWorld(true);
+    const up = new THREE.Vector3(0, 1, 0);
+    for (const shock of suspensionShocks) {
+      const arm = suspensionArmSet.pivots.find(item => item.side === shock.side);
+      if (!arm) continue;
+      const lowerWorld = arm.pivot.localToWorld(new THREE.Vector3(shock.side * 0.72, 0.12, -0.015));
+      const upperWorld = new THREE.Vector3(shock.side * 0.61, 1.36, 0.04);
+      const lower = frontSuspensionModel.worldToLocal(lowerWorld.clone());
+      const upper = frontSuspensionModel.worldToLocal(upperWorld);
+      const direction = upper.sub(lower);
+      const length = Math.max(0.65, direction.length());
+
+      shock.root.position.copy(lower);
+      shock.root.quaternion.setFromUnitVectors(up, direction.normalize());
+      shock.root.scale.set(1, length, 1);
+      shock.springGroup.scale.y = compression;
+      shock.rodGroup.position.y = 0.48 - (1 - compression) * 0.30;
+    }
+  }
+
   function setMotionEnabled(enabled) {
     motionEnabled = !!enabled;
     const button = $("partsLabMotionToggle");
@@ -993,6 +1140,9 @@ export function createPartsLabSystem(game) {
       shockParts.moving.position.y = 0;
       shockParts.springGroup.scale.y = 1;
       standaloneSpring.springGroup.scale.y = 1;
+      for (const item of frontArmSet.pivots) item.pivot.rotation.x = 0;
+      for (const item of suspensionArmSet.pivots) item.pivot.rotation.x = 0;
+      updateSuspensionDemo(0, false);
     }
   }
 
@@ -1011,7 +1161,7 @@ export function createPartsLabSystem(game) {
   }
 
   function resetView() {
-    if (game.controls) game.controls.cameraOrbitYaw = 0;
+    if (game.controls) game.controls.cameraOrbitYaw = activePart === "skidPlate" ? Math.PI / 2 : 0;
   }
 
   function update(delta, now, isActive) {
@@ -1028,6 +1178,11 @@ export function createPartsLabSystem(game) {
       shockParts.moving.position.y = activePart === "shock" ? -(1 - compression) * 0.82 : 0;
       shockParts.springGroup.scale.y = activePart === "shock" ? compression : 1;
       standaloneSpring.springGroup.scale.y = activePart === "spring" ? compression : 1;
+    } else if (activePart === "frontAArms") {
+      const armTravel = Math.sin(time * 2.4) * 0.105;
+      for (const item of frontArmSet.pivots) item.pivot.rotation.x = armTravel;
+    } else if (activePart === "frontSuspension") {
+      updateSuspensionDemo(time, true);
     }
   }
 
@@ -1048,8 +1203,10 @@ export function createPartsLabSystem(game) {
     update,
     resetView,
     getFocusPosition() {
-      const chassisPart = activePart === "skidPlate" || activePart === "frontAArms" || activePart === "rearAxle";
-      return new THREE.Vector3(0, chassisPart ? 0.52 : 0.92, 0);
+      if (activePart === "skidPlate") return new THREE.Vector3(0, 0.70, 0);
+      if (activePart === "frontAArms" || activePart === "rearAxle") return new THREE.Vector3(0, 0.50, 0);
+      if (activePart === "frontSuspension") return new THREE.Vector3(0, 0.85, 0);
+      return new THREE.Vector3(0, 0.92, 0);
     },
     get activePart() { return activePart; },
     get motionEnabled() { return motionEnabled; },
