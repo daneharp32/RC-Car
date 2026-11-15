@@ -751,35 +751,68 @@ export function createPartsLabSystem(game) {
   // These prototypes use the user's 425 mm wheelbase reference as a scale anchor.
   // They are independent display pieces and are not installed on either car.
   const skidPlateModel = new THREE.Group();
-  skidPlateModel.name = "Main flat metal chassis skid plate";
+  skidPlateModel.name = "Formed aluminum chassis side plate";
   skidPlateModel.visible = false;
   showcase.add(skidPlateModel);
 
   function buildSkidPlate() {
     const body = new THREE.Group();
-    body.name = "3 mm aluminum chassis plate";
+    body.name = "Profiled chassis side plate with countersunk fasteners";
     skidPlateModel.add(body);
 
-    // Approx. 310 x 100 x 3.5 mm in the 425 mm wheelbase scale reference.
-    addBox(body, [0.80, 0.028, 2.48], [0, 0.285, 0], materials.alloy, 0.012);
+    // The reference is a tall side chassis plate, not a thin horizontal floor:
+    // long lower rail, raised centre, tapered front transition and a stepped
+    // rear notch. Envelope is approximately 320 x 115 x 5 mm at this scale.
+    const profile = new THREE.Shape();
+    profile.moveTo(-1.27, 0.30);
+    profile.lineTo(1.27, 0.30);
+    profile.lineTo(1.27, 0.56);
+    profile.lineTo(0.99, 0.58);
+    profile.lineTo(1.06, 0.78);
+    profile.lineTo(1.15, 1.12);
+    profile.lineTo(-0.63, 1.12);
+    profile.lineTo(-0.82, 0.98);
+    profile.lineTo(-1.04, 0.65);
+    profile.lineTo(-1.27, 0.56);
+    profile.close();
 
-    // Practical edge mounting points and central drivetrain crossmember holes.
-    for (const z of [-1.02, -0.62, 0.62, 1.02]) {
-      for (const x of [-0.29, 0.29]) {
-        addTorus(body, 0.034, 0.006, materials.darkAlloy,
-          [x, 0.302, z], [Math.PI / 2, 0, 0], 20);
-        addScrew(body, [x, 0.303, z], 0.022, materials.brightAlloy);
-      }
+    const plateGeometry = new THREE.ExtrudeGeometry(profile, {
+      depth: 0.045, bevelEnabled: true, bevelSegments: 2, steps: 1,
+      bevelSize: 0.012, bevelThickness: 0.008, curveSegments: 4
+    });
+    // The broad face is vertical and faces the +X viewing direction.
+    plateGeometry.rotateY(Math.PI / 2);
+    const plate = new THREE.Mesh(plateGeometry, materials.alloy);
+    plate.position.set(0.33, 0, 0);
+    plate.name = "Stepped formed aluminum side chassis plate";
+    plate.castShadow = true;
+    plate.receiveShadow = true;
+    body.add(plate);
+
+    // Countersunk fasteners follow the actual profile on the outward face.
+    const holes = [
+      [-1.14,0.47],[-0.98,0.67],[-0.80,0.95],[-0.55,1.055],[-0.16,1.055],
+      [0.22,1.055],[0.60,1.055],[0.96,0.91],
+      [-1.05,0.36],[-0.75,0.42],[-0.40,0.43],[-0.04,0.43],[0.33,0.43],[0.70,0.43],
+      [-0.82,0.78],[-0.50,0.72],[-0.15,0.70],[0.22,0.70],[0.60,0.70]
+    ];
+    for (const [u, y] of holes) {
+      const z = -u;
+      addCylinder(body, 0.028, 0.028, 0.018, materials.darkAlloy,
+        [0.382, y, z], [0, 0, Math.PI / 2], 20);
+      addTorus(body, 0.024, 0.0055, materials.black,
+        [0.394, y, z], [0, Math.PI / 2, 0], 20);
+      addBox(body, [0.004, 0.0045, 0.025],
+        [0.407, y, z], materials.brightAlloy, 0.001);
     }
-    for (const z of [-0.26, 0.26]) {
-      addTorus(body, 0.043, 0.007, materials.darkAlloy,
-        [0, 0.302, z], [Math.PI / 2, 0, 0], 20);
-      addScrew(body, [0, 0.303, z], 0.025, materials.brightAlloy);
+
+    for (const z of [-0.12, 0.12]) {
+      addBox(body, [0.012, 0.055, 0.018], [0.404, 0.39, z], materials.black, 0.006);
     }
-    return { body };
+    return { body, plate };
   }
   const skidPlateParts = buildSkidPlate();
-  batchStaticMeshes(skidPlateParts.body);
+  batchStaticMeshes(skidPlateParts.body, [skidPlateParts.plate]);
 
   const frontAArmsModel = new THREE.Group();
   frontAArmsModel.name = "Pair of front double wishbone A arms";
