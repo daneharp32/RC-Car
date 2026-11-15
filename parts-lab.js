@@ -757,21 +757,27 @@ export function createPartsLabSystem(game) {
 
   function buildSkidPlate() {
     const body = new THREE.Group();
-    body.name = "Flat under-chassis aluminum skid plate";
+    body.name = "Reference-proportioned central aluminum skid pan";
     skidPlateModel.add(body);
 
-    // Horizontal pan: X is width, Z is vehicle length, and the plate
-    // thickness runs vertically along Y.
+    // A compact central pan rather than a long, narrow plank.
+    // X is vehicle width; Z is vehicle length. The ends taper inward so the
+    // front bulkhead and rear axle/link areas remain visually clear.
+    // Estimated envelope: approximately 225 x 170 x 5 mm using the 135 mm tire as a scale reference.
     const outline = new THREE.Shape();
-    outline.moveTo(-0.38, -1.27);
-    outline.lineTo(0.38, -1.27);
-    outline.lineTo(0.45, -1.12);
-    outline.lineTo(0.45, 0.88);
-    outline.lineTo(0.34, 1.22);
-    outline.lineTo(-0.34, 1.22);
-    outline.lineTo(-0.45, 0.88);
-    outline.lineTo(-0.45, -1.12);
-    outline.lineTo(-0.38, -1.27);
+    outline.moveTo(-0.46, -0.92);
+    outline.lineTo(0.46, -0.92);
+    outline.lineTo(0.64, -0.72);
+    outline.lineTo(0.72, -0.52);
+    outline.lineTo(0.72, 0.52);
+    outline.lineTo(0.61, 0.75);
+    outline.lineTo(0.42, 1.00);
+    outline.lineTo(-0.42, 1.00);
+    outline.lineTo(-0.61, 0.75);
+    outline.lineTo(-0.72, 0.52);
+    outline.lineTo(-0.72, -0.52);
+    outline.lineTo(-0.64, -0.72);
+    outline.lineTo(-0.46, -0.92);
 
     const plateGeometry = new THREE.ExtrudeGeometry(outline, {
       depth: 0.045,
@@ -780,33 +786,41 @@ export function createPartsLabSystem(game) {
       steps: 1,
       bevelSize: 0.012,
       bevelThickness: 0.008,
-      curveSegments: 4
+      curveSegments: 5
     });
-    // Map the shape's XY plane onto the horizontal XZ plane.
+    // Keep the plate horizontal: broad face lies in X-Z, thickness along Y.
     plateGeometry.rotateX(Math.PI / 2);
     const plate = new THREE.Mesh(plateGeometry, materials.alloy);
-    plate.position.set(0, 0.30, 0);
-    plate.name = "Horizontal flat aluminum chassis skid plate";
+    plate.position.set(0, 0.30, 0.02);
+    plate.name = "Shortened broad central aluminum skid plate";
     plate.castShadow = true;
     plate.receiveShadow = true;
     body.add(plate);
 
-    // Countersunk fasteners sit on the upward-facing side of the pan.
+    // Fastener rows follow the wider midsection while keeping both end zones
+    // open for the front differential bulkhead and rear drivetrain mounts.
     const fasteners = [
-      [-0.34,-1.02], [0.34,-1.02], [-0.34,-0.66], [0.34,-0.66],
-      [-0.34,-0.28], [0.34,-0.28], [-0.34,0.22], [0.34,0.22],
-      [-0.34,0.62], [0.34,0.62], [-0.27,1.02], [0.27,1.02],
-      [-0.16,-0.82], [0.16,-0.82], [-0.16,0.84], [0.16,0.84]
+      [-0.56,-0.55], [0.56,-0.55],
+      [-0.56,-0.18], [0.56,-0.18],
+      [-0.56,0.20], [0.56,0.20],
+      [-0.54,0.52], [0.54,0.52],
+      [-0.31,-0.77], [0.31,-0.77],
+      [-0.29,0.78], [0.29,0.78],
+      [-0.20,-0.36], [0.20,-0.36],
+      [-0.20,0.40], [0.20,0.40]
     ];
     for (const [x, z] of fasteners) {
-      addTorus(body, 0.027, 0.0055, materials.darkAlloy,
-        [x, 0.306, z], [Math.PI / 2, 0, 0], 18);
-      addScrew(body, [x, 0.3125, z], 0.024, materials.brightAlloy);
+      addTorus(body, 0.026, 0.005, materials.darkAlloy,
+        [x, 0.306, z + 0.02], [Math.PI / 2, 0, 0], 18);
+      addScrew(body, [x, 0.3125, z + 0.02], 0.023, materials.brightAlloy);
     }
 
-    for (const z of [-0.12, 0.12]) {
-      addBox(body, [0.018, 0.006, 0.062], [0, 0.315, z], materials.black, 0.006);
+    // Small paired service / access slots along the centreline.
+    for (const z of [-0.12, 0.16]) {
+      addBox(body, [0.060, 0.006, 0.025],
+        [0, 0.315, z + 0.02], materials.black, 0.006);
     }
+
     return { body, plate };
   }
   const skidPlateParts = buildSkidPlate();
@@ -1539,8 +1553,8 @@ export function createPartsLabSystem(game) {
     },
     skidPlate: {
       name: "MAIN METAL SKID PLATE",
-      description: "A horizontal under-chassis aluminum pan with a broad flat face, tapered ends, rounded perimeter and countersunk mounting points on its upper surface.",
-      specs: "REFERENCE   ·  425 mm target wheelbase\nPAN         ·  Approx. 320 × 110 × 5 mm\nORIENTATION ·  Flat in chassis X-Z plane\nFASTENERS   ·  Countersunk top-side pattern"
+      description: "A shortened, wider central aluminum pan inspired by the DF7, Desert King and FMS 1/7 chassis underside photographs. It has tapered ends, a broad central footprint and mounting rows that stay clear of the front and rear suspension zones.",
+      specs: "REFERENCE   ·  425 mm wheelbase class\nPAN         ·  Approx. 225 × 170 × 5 mm (estimated)\nSHAPE       ·  Broad centre, tapered ends\nFASTENERS   ·  Recessed perimeter + inner rows"
     },
     frontAArms: {
       name: "FRONT LOWER A-ARMS",
