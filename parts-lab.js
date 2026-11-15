@@ -800,12 +800,12 @@ export function createPartsLabSystem(game) {
     ];
     for (const [x, z] of fasteners) {
       addTorus(body, 0.027, 0.0055, materials.darkAlloy,
-        [x, 0.326, z], [Math.PI / 2, 0, 0], 18);
-      addScrew(body, [x, 0.326, z], 0.024, materials.brightAlloy);
+        [x, 0.306, z], [Math.PI / 2, 0, 0], 18);
+      addScrew(body, [x, 0.3125, z], 0.024, materials.brightAlloy);
     }
 
     for (const z of [-0.12, 0.12]) {
-      addBox(body, [0.018, 0.006, 0.062], [0, 0.326, z], materials.black, 0.006);
+      addBox(body, [0.018, 0.006, 0.062], [0, 0.315, z], materials.black, 0.006);
     }
     return { body, plate };
   }
@@ -1622,7 +1622,7 @@ export function createPartsLabSystem(game) {
   function selectPart(id) {
     if (!componentModels[id]) return;
     activePart = id;
-    if (game.controls) game.controls.cameraOrbitYaw = id === "skidPlate" ? Math.PI / 2 : 0;
+    if (game.controls) game.controls.cameraOrbitYaw = 0;
     for (const [key, model] of Object.entries(componentModels)) {
       model.visible = key === id;
     }
@@ -1667,8 +1667,12 @@ export function createPartsLabSystem(game) {
       const direction = upper.sub(lower);
       const length = Math.max(0.65, direction.length());
 
-      shock.root.position.copy(lower);
-      shock.root.quaternion.setFromUnitVectors(up, direction.normalize());
+      const shockAxis = direction.normalize();
+      // The shock eyelet centres are at local Y=.04 and Y=1.04.
+      // Offset the root so those centres land exactly on the moving arm and
+      // fixed tower bolts instead of hovering a few millimetres beyond them.
+      shock.root.position.copy(lower).addScaledVector(shockAxis, -0.04 * length);
+      shock.root.quaternion.setFromUnitVectors(up, shockAxis);
       shock.root.scale.set(1, length, 1);
       shock.springGroup.scale.y = compression;
       shock.rodGroup.position.y = 0.48 - (1 - compression) * 0.30;
@@ -1712,7 +1716,7 @@ export function createPartsLabSystem(game) {
   }
 
   function resetView() {
-    if (game.controls) game.controls.cameraOrbitYaw = activePart === "skidPlate" ? Math.PI / 2 : 0;
+    if (game.controls) game.controls.cameraOrbitYaw = 0;
   }
 
   function update(delta, now, isActive) {
@@ -1760,7 +1764,7 @@ export function createPartsLabSystem(game) {
     getFocusPosition() {
       if (activePart === "skidPlate") return new THREE.Vector3(0, 0.30, 0);
       if (activePart === "frontAArms" || activePart === "rearAxle" || activePart === "rearLinks") return new THREE.Vector3(0, 0.52, 0);
-      if (activePart === "frontSuspension") return new THREE.Vector3(0, 0.85, 0);
+      if (activePart === "frontSuspension") return new THREE.Vector3(0, 1.00, 0);
       if (activePart === "frontKnuckles" || activePart === "steeringLinkage" || activePart === "frontDifferential") return new THREE.Vector3(0, 0.62, 0);
       if (activePart === "rearLinks" || activePart === "driveShafts" || activePart === "centerDifferential") return new THREE.Vector3(0, 0.58, 0);
       return new THREE.Vector3(0, 0.92, 0);
