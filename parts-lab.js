@@ -757,58 +757,55 @@ export function createPartsLabSystem(game) {
 
   function buildSkidPlate() {
     const body = new THREE.Group();
-    body.name = "Profiled chassis side plate with countersunk fasteners";
+    body.name = "Flat under-chassis aluminum skid plate";
     skidPlateModel.add(body);
 
-    // The reference is a tall side chassis plate, not a thin horizontal floor:
-    // long lower rail, raised centre, tapered front transition and a stepped
-    // rear notch. Envelope is approximately 320 x 115 x 5 mm at this scale.
-    const profile = new THREE.Shape();
-    profile.moveTo(-1.27, 0.30);
-    profile.lineTo(1.27, 0.30);
-    profile.lineTo(1.27, 0.56);
-    profile.lineTo(0.99, 0.58);
-    profile.lineTo(1.06, 0.78);
-    profile.lineTo(1.15, 1.12);
-    profile.lineTo(-0.63, 1.12);
-    profile.lineTo(-0.82, 0.98);
-    profile.lineTo(-1.04, 0.65);
-    profile.lineTo(-1.27, 0.56);
-    // Close the polygon explicitly with the supported path line operation.
-    profile.lineTo(-1.27, 0.30);
+    // Horizontal pan: X is width, Z is vehicle length, and the plate
+    // thickness runs vertically along Y.
+    const outline = new THREE.Shape();
+    outline.moveTo(-0.38, -1.27);
+    outline.lineTo(0.38, -1.27);
+    outline.lineTo(0.45, -1.12);
+    outline.lineTo(0.45, 0.88);
+    outline.lineTo(0.34, 1.22);
+    outline.lineTo(-0.34, 1.22);
+    outline.lineTo(-0.45, 0.88);
+    outline.lineTo(-0.45, -1.12);
+    outline.lineTo(-0.38, -1.27);
 
-    const plateGeometry = new THREE.ExtrudeGeometry(profile, {
-      depth: 0.045, bevelEnabled: true, bevelSegments: 2, steps: 1,
-      bevelSize: 0.012, bevelThickness: 0.008, curveSegments: 4
+    const plateGeometry = new THREE.ExtrudeGeometry(outline, {
+      depth: 0.045,
+      bevelEnabled: true,
+      bevelSegments: 2,
+      steps: 1,
+      bevelSize: 0.012,
+      bevelThickness: 0.008,
+      curveSegments: 4
     });
-    // The broad face is vertical and faces the +X viewing direction.
-    plateGeometry.rotateY(Math.PI / 2);
+    // Map the shape's XY plane onto the horizontal XZ plane.
+    plateGeometry.rotateX(Math.PI / 2);
     const plate = new THREE.Mesh(plateGeometry, materials.alloy);
-    plate.position.set(0.33, 0, 0);
-    plate.name = "Stepped formed aluminum side chassis plate";
+    plate.position.set(0, 0.30, 0);
+    plate.name = "Horizontal flat aluminum chassis skid plate";
     plate.castShadow = true;
     plate.receiveShadow = true;
     body.add(plate);
 
-    // Countersunk fasteners follow the actual profile on the outward face.
-    const holes = [
-      [-1.14,0.47],[-0.98,0.67],[-0.80,0.95],[-0.55,1.055],[-0.16,1.055],
-      [0.22,1.055],[0.60,1.055],[0.96,0.91],
-      [-1.05,0.36],[-0.75,0.42],[-0.40,0.43],[-0.04,0.43],[0.33,0.43],[0.70,0.43],
-      [-0.82,0.78],[-0.50,0.72],[-0.15,0.70],[0.22,0.70],[0.60,0.70]
+    // Countersunk fasteners sit on the upward-facing side of the pan.
+    const fasteners = [
+      [-0.34,-1.02], [0.34,-1.02], [-0.34,-0.66], [0.34,-0.66],
+      [-0.34,-0.28], [0.34,-0.28], [-0.34,0.22], [0.34,0.22],
+      [-0.34,0.62], [0.34,0.62], [-0.27,1.02], [0.27,1.02],
+      [-0.16,-0.82], [0.16,-0.82], [-0.16,0.84], [0.16,0.84]
     ];
-    for (const [u, y] of holes) {
-      const z = -u;
-      addCylinder(body, 0.028, 0.028, 0.018, materials.darkAlloy,
-        [0.382, y, z], [0, 0, Math.PI / 2], 20);
-      addTorus(body, 0.024, 0.0055, materials.black,
-        [0.394, y, z], [0, Math.PI / 2, 0], 20);
-      addBox(body, [0.004, 0.0045, 0.025],
-        [0.399, y, z], materials.brightAlloy, 0.001);
+    for (const [x, z] of fasteners) {
+      addTorus(body, 0.027, 0.0055, materials.darkAlloy,
+        [x, 0.326, z], [Math.PI / 2, 0, 0], 18);
+      addScrew(body, [x, 0.326, z], 0.024, materials.brightAlloy);
     }
 
     for (const z of [-0.12, 0.12]) {
-      addBox(body, [0.012, 0.055, 0.018], [0.404, 0.39, z], materials.black, 0.006);
+      addBox(body, [0.018, 0.006, 0.062], [0, 0.326, z], materials.black, 0.006);
     }
     return { body, plate };
   }
