@@ -936,6 +936,7 @@ export function createPartsLabSystem(game) {
   // visible without pretending the prototype is already fitted to a chassis.
   addBox(frontSuspensionModel, [1.35, 0.12, 0.48], [0, 1.34, -0.06], materials.shell, 0.055);
   const suspensionArmSet = buildAnimatedFrontArmPair(frontSuspensionModel);
+  const suspensionUpperArmSet = buildFrontUpperArms(frontSuspensionModel);
   for (const side of [-1, 1]) {
     addBox(frontSuspensionModel, [0.15, 0.78, 0.18], [side * 0.61, 0.91, 0.04], materials.darkAlloy, 0.03);
     addBox(frontSuspensionModel, [0.27, 0.12, 0.24], [side * 0.61, 1.31, 0.04], materials.shellLight, 0.025);
@@ -1600,7 +1601,7 @@ export function createPartsLabSystem(game) {
     for (const item of suspensionArmSet.pivots) {
       item.pivot.rotation.z = item.side * travel;
     }
-    for (const item of upperArmSet.pivots) {
+    for (const item of suspensionUpperArmSet.pivots) {
       item.pivot.rotation.z = item.side * travel * 0.72;
     }
 
@@ -1641,6 +1642,7 @@ export function createPartsLabSystem(game) {
       for (const item of frontArmSet.pivots) item.pivot.rotation.z = 0;
       for (const item of upperArmSet.pivots) item.pivot.rotation.z = 0;
       for (const item of suspensionArmSet.pivots) item.pivot.rotation.z = 0;
+      for (const item of suspensionUpperArmSet.pivots) item.pivot.rotation.z = 0;
       updateSuspensionDemo(0, false);
     }
   }
@@ -1681,6 +1683,9 @@ export function createPartsLabSystem(game) {
       const armTravel = Math.sin(time * 2.1) * 0.35;
       for (const item of frontArmSet.pivots) item.pivot.rotation.z = item.side * armTravel;
       for (const item of upperArmSet.pivots) item.pivot.rotation.z = item.side * armTravel * 0.72;
+    } else if (activePart === "frontUpperArms") {
+      const upperTravel = Math.sin(time * 2.1) * 0.35;
+      for (const item of upperArmSet.pivots) item.pivot.rotation.z = item.side * upperTravel;
     } else if (activePart === "frontSuspension") {
       updateSuspensionDemo(time, true);
     }
@@ -1707,6 +1712,8 @@ export function createPartsLabSystem(game) {
       if (activePart === "frontAArms" || activePart === "rearAxle" || activePart === "rearLinks") return new THREE.Vector3(0, 0.52, 0);
       if (activePart === "frontSuspension") return new THREE.Vector3(0, 0.85, 0);
       if (activePart === "chassisFrame" || activePart === "rollCage") return new THREE.Vector3(0, 0.88, 0);
+      if (activePart === "frontKnuckles" || activePart === "steeringLinkage" || activePart === "frontDifferential") return new THREE.Vector3(0, 0.62, 0);
+      if (activePart === "rearLinks" || activePart === "driveShafts" || activePart === "centerDifferential") return new THREE.Vector3(0, 0.58, 0);
       return new THREE.Vector3(0, 0.92, 0);
     },
     get activePart() { return activePart; },
