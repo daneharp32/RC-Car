@@ -1567,11 +1567,11 @@ export function createPartsLabSystem(game) {
     for (const x of [-0.87, -0.29]) {
       for (const z of [-1.76, -1.28]) addScrew(mountStructure, [x, 0.68, z], 0.025, materials.brightAlloy);
     }
-    addBox(mountStructure, [0.78, 0.10, 1.18], [-0.56, 0.62, 0.23], materials.darkAlloy, 0.03);
+    addBox(mountStructure, [0.78, 0.10, 1.58], [-0.56, 0.62, 0.23], materials.darkAlloy, 0.03);
     for (const x of [-0.84, -0.28]) {
       addBox(mountStructure, [0.06, 0.12, 1.06], [x, 0.72, 0.23], materials.shellLight, 0.012);
     }
-    addBox(mountStructure, [0.92, 0.10, 0.82], [-0.10, 0.62, 0.76], materials.darkAlloy, 0.03);
+    addBox(mountStructure, [0.92, 0.10, 0.82], [0.10, 0.62, 0.76], materials.darkAlloy, 0.03);
 
     batchStaticMeshes(mountStructure);
 
@@ -1581,24 +1581,25 @@ export function createPartsLabSystem(game) {
       frontSuspensionModel, "Front suspension unit", root, [0, -0.14, -1.97]
     );
 
-    // Front wheels are children of the lower-arm pivots. That makes the hub
-    // assemblies follow the A-arm travel rather than floating beside it.
+    // Steerable knuckles carry the front wheels. This keeps the hubs on the
+    // upright centreline while the lower A-arms provide vertical travel.
+    const frontKnuckles = cloneAssemblyPart(frontKnucklesModel, "Front steering knuckles", root, [0, 0.06, -1.97]);
+    const steering = cloneAssemblyPart(steeringLinkageModel, "Front steering linkage", root, [0, -0.06, -1.97]);
+    const frontSteeringPivots = [];
     for (const side of [-1, 1]) {
-      const pivotName = side < 0 ? "Animated front A-arm pivot left" : "Animated front A-arm pivot right";
-      const pivot = frontUnit.getObjectByName(pivotName);
-      if (!pivot) throw new Error("Missing front A-arm pivot: " + pivotName);
+      const pivotName = side < 0 ? "Left steering knuckle pivot" : "Right steering knuckle pivot";
+      const pivot = frontKnuckles.getObjectByName(pivotName);
+      if (!pivot) throw new Error("Missing front steering knuckle pivot: " + pivotName);
+      frontSteeringPivots.push({ side, pivot });
+
       const wheel = wheelTireModel.clone(true);
-      wheel.name = side < 0 ? "Front left wheel and tire" : "Front right wheel and tire";
+      wheel.name = side < 0 ? "Front left steerable wheel and tire" : "Front right steerable wheel and tire";
       wheel.visible = true;
       wheel.scale.set(1.20, 1.08, 1.08);
-      wheel.position.set(side * 1.01, -0.4872, 0);
-      // The detailed wheel face points outward on each side.
+      wheel.position.set(side * 0.35, -0.9072, 0);
       wheel.rotation.y = side < 0 ? Math.PI : 0;
       pivot.add(wheel);
     }
-
-    const frontKnuckles = cloneAssemblyPart(frontKnucklesModel, "Front steering knuckles", root, [0, 0.06, -1.97]);
-    const steering = cloneAssemblyPart(steeringLinkageModel, "Front steering linkage", root, [0, -0.06, -1.97]);
     cloneAssemblyPart(frontDifferentialModel, "Front differential unit", root, [0, 0.32, -1.50]);
 
     // Front CVDs articulate between the fixed differential outputs and
@@ -1653,6 +1654,73 @@ export function createPartsLabSystem(game) {
     cloneAssemblyPart(centerDifferentialModel, "Centre differential unit", root, [0, 0.32, -0.45]);
     cloneAssemblyPart(gearboxModel, "Central gearbox housing", root, [0.55, 0.425, 0.35], [0.65, 0.75, 0.75]);
     cloneAssemblyPart(motorMountModel, "Adjustable motor mount", root, [0.55, 0.90, 1.03], [0.75, 0.75, 0.75]);
+
+    // Full electrical package is now installed on its own trays: a steering
+    // servo up front, hardcase battery on the left tray, ESC beside the motor,
+    // and a 4274-size motor in the empty mechanical cradle.
+    const servoInstall = cloneAssemblyPart(
+      servoModel, "Steering servo installation", root, [-0.58, 0.58, -1.52], [0.52, 0.52, 0.52]
+    );
+    const servoHorn = servoInstall.getObjectByName("Animated servo output horn");
+    if (!servoHorn) throw new Error("Steering servo horn was not found in the assembled model.");
+
+    const batteryInstall = cloneAssemblyPart(
+      batteryModel, "Hardcase battery installation", root, [-0.56, 0.50, 0.23], [1.02, 0.82, 0.82]
+    );
+    batteryInstall.rotation.y = Math.PI / 2;
+
+    const escInstall = cloneAssemblyPart(
+      escModel, "Brushless ESC installation", root, [0.10, 0.60, 0.75], [0.46, 0.46, 0.46]
+    );
+    const escRotor = escInstall.getObjectByName("Animated seven blade ESC fan");
+    if (!escRotor) throw new Error("ESC cooling fan rotor was not found in the assembled model.");
+
+    const motorInstall = cloneAssemblyPart(
+      motorModel, "4274 brushless motor installation", root, [0.55, 1.02, 1.02], [0.60, 0.60, 0.60]
+    );
+    motorInstall.rotation.y = Math.PI;
+    const installedMotorShaft = motorInstall.getObjectByName("Aligned rotating motor shaft and pinion");
+    if (!installedMotorShaft) throw new Error("Motor output shaft was not found in the assembled model.");
+
+    // Servo-to-bellcrank pushrod: the lower ball follows the rotating horn
+    // and the opposite eye follows the steering rack.
+    const servoDragLink = new THREE.Group();
+    servoDragLink.name = "Servo-to-steering bellcrank pushrod";
+    root.add(servoDragLink);
+    const servoDragRod = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.022, 0.022, 1, 14, 1),
+      materials.brightAlloy
+    );
+    servoDragRod.name = "Servo drag-link shaft";
+    servoDragRod.castShadow = true;
+    servoDragLink.add(servoDragRod);
+    const servoDragBalls = [];
+    for (let i = 0; i < 2; i++) {
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.046, 16, 12), materials.darkAlloy);
+      ball.name = i === 0 ? "Servo horn ball joint" : "Steering bellcrank ball joint";
+      ball.castShadow = true;
+      servoDragLink.add(ball);
+      servoDragBalls.push(ball);
+    }
+
+    // Neat high-current and motor phase-wire runs join the battery, ESC and
+    // motor without crossing the steering linkage or rear axle opening.
+    addTube(root, [
+      [-1.18, 0.72, 0.58], [-1.02, 0.70, 0.45], [-0.70, 0.69, 0.29], [-0.34, 0.72, 0.25]
+    ], 0.024, materials.red, 7);
+    addTube(root, [
+      [-1.18, 0.68, 0.62], [-1.02, 0.66, 0.49], [-0.70, 0.65, 0.33], [-0.34, 0.68, 0.29]
+    ], 0.024, materials.black, 7);
+    const phaseWireColors = [materials.blue, materials.orange, materials.gold];
+    for (let i = 0; i < 3; i++) {
+      const z = 0.92 + i * 0.045;
+      addTube(root, [
+        [0.42, 0.82 + i * 0.025, z],
+        [0.48, 0.94 + i * 0.025, z + 0.08],
+        [0.55, 1.08 + i * 0.025, z + 0.12],
+        [0.55, 1.20 + i * 0.025, z + 0.17]
+      ], 0.018, phaseWireColors[i], 7);
+    }
 
     // Centre-to-front and centre-to-rear prop shafts, with yokes at each end.
     const propShaftGroup = new THREE.Group();
