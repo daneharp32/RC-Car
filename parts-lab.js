@@ -1661,7 +1661,7 @@ export function createPartsLabSystem(game) {
       const arm = suspensionArmSet.pivots.find(item => item.side === shock.side);
       if (!arm) continue;
       const lowerWorld = arm.pivot.localToWorld(new THREE.Vector3(shock.side * 0.72, 0.12, -0.015));
-      const upperWorld = new THREE.Vector3(shock.side * 0.61, 1.36, 0.04);
+      const upperWorld = new THREE.Vector3(shock.side * 0.61, 1.49, 0.10);
       const lower = frontSuspensionModel.worldToLocal(lowerWorld.clone());
       const upper = frontSuspensionModel.worldToLocal(upperWorld);
       const direction = upper.sub(lower);
