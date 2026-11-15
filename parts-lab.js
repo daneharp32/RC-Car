@@ -1050,18 +1050,23 @@ export function createPartsLabSystem(game) {
     },
     skidPlate: {
       name: "MAIN METAL SKID PLATE",
-      description: "A flat central aluminum chassis plate with rounded edges and practical mounting points. Sized as the centre section of a truck using a 425 mm target wheelbase.",
-      specs: "REFERENCE   ·  425 mm target wheelbase\nPLATE       ·  Approx. 310 × 100 × 3.5 mm\nMATERIAL    ·  Brushed aluminum appearance\nSTATUS      ·  Standalone prototype"
+      description: "A formed vertical chassis side plate matching the reference profile, with a long lower rail, raised centre section, tapered transition, stepped rear notch and countersunk fastener rows.",
+      specs: "REFERENCE   ·  425 mm target wheelbase\nPROFILE     ·  Approx. 320 × 115 × 5 mm\nFEATURES    ·  Raised centre + stepped cutout\nFASTENERS   ·  Countersunk mounting pattern"
     },
     frontAArms: {
       name: "FRONT LOWER A-ARMS",
-      description: "A mirrored pair of broad front lower wishbones. Each arm joins two inner chassis pivots to an outboard ball-joint carrier. These are geometry studies and are not connected to steering or wheels.",
-      specs: "LAYOUT      ·  Left and right pair\nTYPE        ·  Double-wishbone lower arms\nJOINTS      ·  Two inner pivots per side\nSTATUS      ·  Standalone prototype"
+      description: "A mirrored pair of front lower wishbones on real pivot groups. Both arms sweep through a small suspension travel cycle, with outboard ball-joint carriers moving with each arm.",
+      specs: "LAYOUT      ·  Left and right pair\nTYPE        ·  Double-wishbone lower arms\nJOINTS      ·  Two inner pivots per side\nMOTION      ·  Animated vertical travel"
     },
     rearAxle: {
       name: "SOLID REAR AXLE BAR",
       description: "A full-width straight rear axle housing with a central differential pumpkin, axle tubes, wheel-end hubs and simple upper mounting saddles. It is not connected to the chassis or suspension.",
       specs: "LAYOUT      ·  Full-width solid axle\nHOUSING     ·  Central differential + tubes\nENDS        ·  Left and right hub stubs\nSTATUS      ·  Standalone prototype"
+    },
+    frontSuspension: {
+      name: "FRONT SUSPENSION DEMONSTRATOR",
+      description: "A standalone pair of front lower A-arms connected visually to two coil-over shocks. The arms pivot up and down while the shock rods and coil springs compress and extend together.",
+      specs: "LAYOUT      ·  Mirrored front lower A-arms\nDAMPERS     ·  Twin coil-over shocks\nMOVEMENT    ·  Arm travel + spring compression\nSTATUS      ·  Standalone animated assembly"
     }
   };
 
@@ -1073,6 +1078,7 @@ export function createPartsLabSystem(game) {
   function selectPart(id) {
     if (!componentModels[id]) return;
     activePart = id;
+    if (game.controls) game.controls.cameraOrbitYaw = id === "skidPlate" ? Math.PI / 2 : 0;
     for (const [key, model] of Object.entries(componentModels)) {
       model.visible = key === id;
     }
@@ -1090,6 +1096,36 @@ export function createPartsLabSystem(game) {
     if (specs) specs.textContent = details.specs;
   }
 
+  function updateSuspensionDemo(time, animate) {
+    const travel = animate ? Math.sin(time * 2.4) * 0.105 : 0;
+    const compression = animate
+      ? 0.72 + 0.28 * (0.5 + 0.5 * Math.sin(time * 2.4 + 0.35))
+      : 1;
+
+    for (const item of suspensionArmSet.pivots) {
+      item.pivot.rotation.x = travel;
+    }
+
+    frontSuspensionModel.updateMatrixWorld(true);
+    const up = new THREE.Vector3(0, 1, 0);
+    for (const shock of suspensionShocks) {
+      const arm = suspensionArmSet.pivots.find(item => item.side === shock.side);
+      if (!arm) continue;
+      const lowerWorld = arm.pivot.localToWorld(new THREE.Vector3(shock.side * 0.72, 0.12, -0.015));
+      const upperWorld = new THREE.Vector3(shock.side * 0.61, 1.36, 0.04);
+      const lower = frontSuspensionModel.worldToLocal(lowerWorld.clone());
+      const upper = frontSuspensionModel.worldToLocal(upperWorld);
+      const direction = upper.sub(lower);
+      const length = Math.max(0.65, direction.length());
+
+      shock.root.position.copy(lower);
+      shock.root.quaternion.setFromUnitVectors(up, direction.normalize());
+      shock.root.scale.set(1, length, 1);
+      shock.springGroup.scale.y = compression;
+      shock.rodGroup.position.y = 0.48 - (1 - compression) * 0.30;
+    }
+  }
+
   function setMotionEnabled(enabled) {
     motionEnabled = !!enabled;
     const button = $("partsLabMotionToggle");
@@ -1104,6 +1140,9 @@ export function createPartsLabSystem(game) {
       shockParts.moving.position.y = 0;
       shockParts.springGroup.scale.y = 1;
       standaloneSpring.springGroup.scale.y = 1;
+      for (const item of frontArmSet.pivots) item.pivot.rotation.x = 0;
+      for (const item of suspensionArmSet.pivots) item.pivot.rotation.x = 0;
+      updateSuspensionDemo(0, false);
     }
   }
 
@@ -1122,7 +1161,7 @@ export function createPartsLabSystem(game) {
   }
 
   function resetView() {
-    if (game.controls) game.controls.cameraOrbitYaw = 0;
+    if (game.controls) game.controls.cameraOrbitYaw = activePart === "skidPlate" ? Math.PI / 2 : 0;
   }
 
   function update(delta, now, isActive) {
@@ -1139,6 +1178,11 @@ export function createPartsLabSystem(game) {
       shockParts.moving.position.y = activePart === "shock" ? -(1 - compression) * 0.82 : 0;
       shockParts.springGroup.scale.y = activePart === "shock" ? compression : 1;
       standaloneSpring.springGroup.scale.y = activePart === "spring" ? compression : 1;
+    } else if (activePart === "frontAArms") {
+      const armTravel = Math.sin(time * 2.4) * 0.105;
+      for (const item of frontArmSet.pivots) item.pivot.rotation.x = armTravel;
+    } else if (activePart === "frontSuspension") {
+      updateSuspensionDemo(time, true);
     }
   }
 
@@ -1159,8 +1203,10 @@ export function createPartsLabSystem(game) {
     update,
     resetView,
     getFocusPosition() {
-      const chassisPart = activePart === "skidPlate" || activePart === "frontAArms" || activePart === "rearAxle";
-      return new THREE.Vector3(0, chassisPart ? 0.52 : 0.92, 0);
+      if (activePart === "skidPlate") return new THREE.Vector3(0, 0.70, 0);
+      if (activePart === "frontAArms" || activePart === "rearAxle") return new THREE.Vector3(0, 0.50, 0);
+      if (activePart === "frontSuspension") return new THREE.Vector3(0, 0.85, 0);
+      return new THREE.Vector3(0, 0.92, 0);
     },
     get activePart() { return activePart; },
     get motionEnabled() { return motionEnabled; },
