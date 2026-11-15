@@ -1865,11 +1865,34 @@ export function createPartsLabSystem(game) {
       springGroup: front.getObjectByName(side < 0 ? "Front shock spring left" : "Front shock spring right"),
       rodGroup: front.getObjectByName(side < 0 ? "Front shock piston left" : "Front shock piston right")
     }));
+    const steeringPivots = [-1, 1].map(side => ({
+      side,
+      pivot: frontKnuckles.getObjectByName(side < 0 ? "Left steering knuckle pivot" : "Right steering knuckle pivot")
+    }));
+    const servoInstall = root.getObjectByName("Steering servo installation");
+    const servoHorn = servoInstall?.getObjectByName("Animated servo output horn");
+    const escInstall = root.getObjectByName("Brushless ESC installation");
+    const escRotor = escInstall?.getObjectByName("Animated seven blade ESC fan");
+    const motorInstall = root.getObjectByName("4274 brushless motor installation");
+    const motorShaft = motorInstall?.getObjectByName("Aligned rotating motor shaft and pinion");
+    const servoDragLink = root.getObjectByName("Servo-to-steering bellcrank pushrod");
+    const servoDragRod = servoDragLink?.getObjectByName("Servo drag-link shaft");
+    const servoDragBalls = [
+      servoDragLink?.getObjectByName("Servo horn ball joint"),
+      servoDragLink?.getObjectByName("Steering bellcrank ball joint")
+    ];
+
+    if (!servoHorn || !escRotor || !motorShaft || !servoDragRod || steeringPivots.some(item => !item.pivot)) {
+      throw new Error("Rolling chassis is missing a steering or electrical component.");
+    }
+
     const frontCvdAssemblies = [-1, 1].map(side => {
       const group = frontCvd.getObjectByName(side < 0 ? "Left front CVD moving assembly" : "Right front CVD moving assembly");
+      const knucklePivot = steeringPivots.find(item => item.side === side)?.pivot;
       return {
         side,
         group,
+        knucklePivot,
         shaft: group?.getObjectByName(side < 0 ? "Left front CVD shaft" : "Right front CVD shaft"),
         innerCup: group?.getObjectByName(side < 0 ? "Left inner CV cup" : "Right inner CV cup"),
         outerCup: group?.getObjectByName(side < 0 ? "Left outer CV cup" : "Right outer CV cup"),
@@ -1893,11 +1916,33 @@ export function createPartsLabSystem(game) {
       }
     });
 
-    return { root, front, lowerPivots, upperPivots, frontShocks, frontKnuckles, frontCvd, frontCvdAssemblies, steering, rearCarrier, rearLinks, rearShocks };
+    return {
+      root, front, lowerPivots, upperPivots, frontShocks, frontKnuckles,
+      steeringPivots, frontCvd, frontCvdAssemblies, steering,
+      servoHorn, servoDragRod, servoDragBalls, escRotor, motorShaft,
+      rearCarrier, rearLinks, rearShocks
+    };
   }
 
-  function updateRollingChassisSuspension(motion, time, animate) {
+  function updateDynamicServoPushrod(motion) {
+    motion.root.updateMatrixWorld(true);
+    const hornWorld = motion.servoHorn.localToWorld(new THREE.Vector3(0.54, 0.067, 0));
+    const bellcrankWorld = motion.steering.localToWorld(new THREE.Vector3(0, 1.04, 0.24));
+    const start = motion.root.worldToLocal(hornWorld.clone());
+    const end = motion.root.worldToLocal(bellcrankWorld.clone());
+    const direction = end.clone().sub(start);
+    const length = Math.max(0.06, direction.length());
+    motion.servoDragRod.position.copy(start).add(end).multiplyScalar(0.5);
+    motion.servoDragRod.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+    motion.servoDragRod.scale.set(1, length, 1);
+    motion.servoDragBalls[0].position.copy(start);
+    motion.servoDragBalls[1].position.copy(end);
+  }
+
+  function updateRollingChassisSuspension(motion, time, animate, steeringInput = 0) {
     const travel = animate ? Math.sin(time * 2.05) * 0.35 : 0;
+    const steering = THREE.MathUtils.clamp(steeringInput, -1, 1);
+    const wheelSteerAngle = -steering * 0.45;
     const compression = animate
       ? 0.64 + 0.36 * (0.5 + 0.5 * Math.sin(time * 2.05 + 0.28))
       : 1;
@@ -1914,13 +1959,22 @@ export function createPartsLabSystem(game) {
     const frontHubTravel = 1.01 * Math.sin(travel) + 0.42 * (Math.cos(travel) - 1);
     motion.frontKnuckles.position.y = 0.06 + frontHubTravel;
     motion.steering.position.y = -0.06 + frontHubTravel;
+    motion.steering.rotation.y = wheelSteerAngle * 0.34;
+    motion.servoHorn.rotation.y = wheelSteerAngle * 1.18;
+    for (const item of motion.steeringPivots) {
+      const ackermann = 1 + item.side * steering * 0.065;
+      item.pivot.rotation.y = wheelSteerAngle * ackermann;
+    }
 
-    // Keep each half-shaft between the fixed differential and the moving hub.
+    // Keep each half-shaft between the fixed differential outputs and the
+    // moving/steering hub carriers.
+    motion.frontKnuckles.updateMatrixWorld(true);
     const shaftUp = new THREE.Vector3(0, 1, 0);
     const shaftNormal = new THREE.Vector3(0, 0, 1);
     for (const cvd of motion.frontCvdAssemblies) {
       const inner = new THREE.Vector3(cvd.side * 0.58, 0.84, -1.52);
-      const outer = new THREE.Vector3(cvd.side * 1.18, 0.63 + frontHubTravel, -1.97);
+      const outerWorld = cvd.knucklePivot.localToWorld(new THREE.Vector3(cvd.side * 0.16, 0, 0));
+      const outer = motion.root.worldToLocal(outerWorld.clone());
       const direction = outer.clone().sub(inner);
       const length = Math.max(0.1, direction.length());
       const axis = direction.normalize();
@@ -1960,6 +2014,10 @@ export function createPartsLabSystem(game) {
       const upper = new THREE.Vector3(shock.side * 0.54, 1.65, 1.48 + shock.offset);
       alignAssemblyDamper(shock, lower, upper, compression);
     }
+
+    updateDynamicServoPushrod(motion);
+    motion.escRotor.rotation.y = animate ? time * 31 : 0;
+    motion.motorShaft.rotation.z = animate ? time * 22 : 0;
   }
 
   const rollingChassisModel = buildRollingChassisAssembly();
