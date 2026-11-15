@@ -1557,7 +1557,7 @@ export function createPartsLabSystem(game) {
 
     cloneAssemblyPart(frontKnucklesModel, "Front steering knuckles", root, [0, 0.06, -1.97]);
     cloneAssemblyPart(steeringLinkageModel, "Front steering linkage", root, [0, -0.06, -1.97]);
-    cloneAssemblyPart(frontDifferentialModel, "Front differential unit", root, [0, 0.32, -1.32]);
+    cloneAssemblyPart(frontDifferentialModel, "Front differential unit", root, [0, 0.32, -1.50]);
 
     // Front CVDs connect the differential outputs to the moving front hubs.
     const frontCvdGroup = new THREE.Group();
@@ -1565,7 +1565,7 @@ export function createPartsLabSystem(game) {
     root.add(frontCvdGroup);
     for (const side of [-1, 1]) {
       addPrototypeRod(frontCvdGroup,
-        [side * 0.58, 0.84, -1.34],
+        [side * 0.58, 0.84, -1.52],
         [side * 1.18, 0.63, -1.97],
         0.045, materials.brightAlloy, 0.073);
       const boot = new THREE.Group();
@@ -1576,7 +1576,7 @@ export function createPartsLabSystem(game) {
           new THREE.TorusGeometry(0.068 - i * 0.004, 0.012, 7, 18),
           materials.rubber
         );
-        ring.position.set(side * (0.62 + i * 0.018), 0.826 - i * 0.007, -1.38 - i * 0.035);
+        ring.position.set(side * (0.62 + i * 0.018), 0.826 - i * 0.007, -1.56 - i * 0.035);
         ring.rotation.y = Math.PI / 2;
         boot.add(ring);
       }
@@ -1586,18 +1586,18 @@ export function createPartsLabSystem(game) {
     // The centre differential, gearbox case and empty motor cradle form the
     // central mechanical powertrain. No motor or electrical equipment is fitted.
     cloneAssemblyPart(centerDifferentialModel, "Centre differential unit", root, [0, 0.32, -0.45]);
-    cloneAssemblyPart(gearboxModel, "Central gearbox housing", root, [0, 0.425, 0.35], [0.75, 0.75, 0.75]);
-    cloneAssemblyPart(motorMountModel, "Empty adjustable motor mount", root, [0, 0.90, 0.42], [0.75, 0.75, 0.75]);
+    cloneAssemblyPart(gearboxModel, "Central gearbox housing", root, [0.55, 0.425, 0.35], [0.65, 0.75, 0.75]);
+    cloneAssemblyPart(motorMountModel, "Empty adjustable motor mount", root, [0.55, 0.90, 0.42], [0.75, 0.75, 0.75]);
 
     // Centre-to-front and centre-to-rear prop shafts, with yokes at each end.
     const propShaftGroup = new THREE.Group();
     propShaftGroup.name = "Front and rear propeller shafts";
     root.add(propShaftGroup);
-    addPrototypeRod(propShaftGroup, [0, 0.84, -1.02], [0, 0.84, -1.62],
+    addPrototypeRod(propShaftGroup, [0, 0.84, -1.02], [0, 0.84, -1.29],
       0.050, materials.brightAlloy, 0.082);
     addPrototypeRod(propShaftGroup, [0, 0.84, 0.12], [0, 0.63, 2.27],
       0.052, materials.brightAlloy, 0.086);
-    for (const [z, y] of [[-1.02, 0.84], [-1.62, 0.84], [0.12, 0.84], [2.27, 0.63]]) {
+    for (const [z, y] of [[-1.02, 0.84], [-1.29, 0.84], [0.12, 0.84], [2.27, 0.63]]) {
       addCylinder(propShaftGroup, 0.076, 0.076, 0.15, materials.darkAlloy,
         [0, y, z], [Math.PI / 2, 0, 0], 22);
       addBox(propShaftGroup, [0.18, 0.14, 0.11], [0, y, z], materials.shellLight, 0.022);
