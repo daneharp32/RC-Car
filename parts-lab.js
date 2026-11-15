@@ -815,65 +815,70 @@ export function createPartsLabSystem(game) {
   batchStaticMeshes(skidPlateParts.body, [skidPlateParts.plate]);
 
   const frontAArmsModel = new THREE.Group();
-  frontAArmsModel.name = "Pair of front double wishbone A arms";
+  frontAArmsModel.name = "Pair of animated front lower A arms";
   frontAArmsModel.visible = false;
   showcase.add(frontAArmsModel);
 
-  function buildFrontAArms() {
-    const body = new THREE.Group();
-    body.name = "Mirrored front lower A arms";
-    frontAArmsModel.add(body);
+  function buildAnimatedFrontArmPair(parent) {
+    const frame = new THREE.Group();
+    parent.add(frame);
+    const pivots = [];
 
     for (const side of [-1, 1]) {
-      // Broad triangular lower arm, connecting two inner pivots to one
-      // outboard ball-joint carrier.
+      const pivot = new THREE.Group();
+      pivot.name = side < 0 ? "Animated front A-arm pivot left" : "Animated front A-arm pivot right";
+      pivot.position.set(side * 0.36, 0.35, 0);
+      frame.add(pivot);
+      pivots.push({ side, pivot });
+
+      // Each triangular arm is authored around its inner pivot, so the whole
+      // wishbone rotates as one rigid part instead of sliding through space.
       const outline = new THREE.Shape();
-      outline.moveTo(side * 0.36, -0.34);
-      outline.lineTo(side * 0.36, 0.34);
-      outline.lineTo(side * 1.10, 0.015);
-      outline.lineTo(side * 0.36, -0.34);
-      const armGeometry = new THREE.ExtrudeGeometry(outline, {
-        depth: 0.075,
-        bevelEnabled: true,
-        bevelSegments: 1,
-        steps: 1,
-        bevelSize: 0.018,
-        bevelThickness: 0.012,
-        curveSegments: 4
+      outline.moveTo(0, -0.34);
+      outline.lineTo(0, 0.34);
+      outline.lineTo(side * 0.74, 0.015);
+      outline.lineTo(0, -0.34);
+      const geometry = new THREE.ExtrudeGeometry(outline, {
+        depth: 0.075, bevelEnabled: true, bevelSegments: 1, steps: 1,
+        bevelSize: 0.018, bevelThickness: 0.012, curveSegments: 4
       });
-      armGeometry.rotateX(Math.PI / 2);
-      armGeometry.translate(0, 0.355, 0);
-      const arm = new THREE.Mesh(armGeometry, materials.darkAlloy);
-      arm.name = side < 0 ? "Left front lower A arm" : "Right front lower A arm";
+      geometry.rotateX(Math.PI / 2);
+      geometry.translate(0, -0.0375, 0);
+      const arm = new THREE.Mesh(geometry, materials.darkAlloy);
+      arm.name = side < 0 ? "Left lower wishbone" : "Right lower wishbone";
       arm.castShadow = true;
       arm.receiveShadow = true;
-      body.add(arm);
+      pivot.add(arm);
 
-      // Inner hinge barrels run across the pivot axis.
+      // The outer ball joint is part of the arm pivot and moves with it.
+      addCylinder(pivot, 0.105, 0.105, 0.11, materials.black,
+        [side * 0.72, 0.045, -0.015], [0, 0, 0], 28);
+      addCylinder(pivot, 0.072, 0.072, 0.13, materials.brightAlloy,
+        [side * 0.72, 0.105, -0.015], [0, 0, 0], 24);
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.075, 20, 14), materials.darkAlloy);
+      ball.position.set(side * 0.72, 0.18, -0.015);
+      ball.castShadow = true;
+      pivot.add(ball);
+
+      // Fixed inner pivot bushings are attached to the chassis-side bracket.
       for (const z of [-0.34, 0.34]) {
-        addCylinder(body, 0.066, 0.066, 0.17, materials.black,
+        addCylinder(frame, 0.066, 0.066, 0.17, materials.black,
           [side * 0.36, 0.35, z], [0, 0, Math.PI / 2], 24);
-        addCylinder(body, 0.045, 0.045, 0.19, materials.brightAlloy,
+        addCylinder(frame, 0.045, 0.045, 0.19, materials.brightAlloy,
           [side * 0.36, 0.35, z], [0, 0, Math.PI / 2], 20);
       }
-
-      // Outboard ball-joint cup is centred over the tapered arm tip.
-      addCylinder(body, 0.105, 0.105, 0.11, materials.black,
-        [side * 1.08, 0.34, 0.015], [0, 0, 0], 28);
-      addCylinder(body, 0.072, 0.072, 0.13, materials.brightAlloy,
-        [side * 1.08, 0.405, 0.015], [0, 0, 0], 24);
-      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.075, 20, 14), materials.darkAlloy);
-      ball.position.set(side * 1.08, 0.48, 0.015);
-      ball.castShadow = true;
-      body.add(ball);
     }
 
-    // Simple crossmember represents the front inner-pivot mounting area.
-    addBox(body, [0.90, 0.10, 0.16], [0, 0.32, -0.42], materials.shellLight, 0.025);
-    return { body };
+    // Inner mounting bridge is kept below the wishbones and clear of travel.
+    addBox(frame, [0.90, 0.10, 0.16], [0, 0.25, -0.47], materials.shellLight, 0.025);
+    batchStaticMeshes(frame, pivots.map(item => item.pivot));
+    for (const item of pivots) {
+      batchStaticMeshes(item.pivot, [], { castShadow: false, receiveShadow: false });
+    }
+    return { frame, pivots };
   }
-  const frontAArmsParts = buildFrontAArms();
-  batchStaticMeshes(frontAArmsParts.body);
+
+  const frontArmSet = buildAnimatedFrontArmPair(frontAArmsModel);
 
   const rearAxleModel = new THREE.Group();
   rearAxleModel.name = "Full width solid rear axle assembly";
