@@ -1169,29 +1169,42 @@ export function createPartsLabSystem(game) {
 
   function buildFrontKnuckles() {
     const body = new THREE.Group();
+    body.name = "Paired steerable front hub carriers";
     frontKnucklesModel.add(body);
+    const steeringPivots = [];
+
     for (const side of [-1, 1]) {
-      const x = side * 1.02;
-      addBox(body, [0.17, 0.43, 0.27], [x, 0.57, 0], materials.darkAlloy, 0.045);
-      addBox(body, [0.20, 0.13, 0.22], [x, 0.34, 0], materials.shellLight, 0.025);
-      addBox(body, [0.20, 0.12, 0.22], [x, 0.80, 0], materials.shellLight, 0.025);
+      const pivot = new THREE.Group();
+      pivot.name = side < 0 ? "Left steering knuckle pivot" : "Right steering knuckle pivot";
+      pivot.position.set(side * 1.02, 0.57, 0);
+      body.add(pivot);
+      steeringPivots.push({ side, pivot });
 
-      // Stub axle, bearing seat and 17 mm-style wheel mounting face.
-      addCylinder(body, 0.11, 0.11, 0.22, materials.brightAlloy,
-        [side * 1.18, 0.57, 0], [0, 0, Math.PI / 2], 28);
-      addCylinder(body, 0.18, 0.18, 0.065, materials.darkAlloy,
-        [side * 1.31, 0.57, 0], [0, 0, Math.PI / 2], 28);
-      addCylinder(body, 0.12, 0.12, 0.075, materials.alloy,
-        [side * 1.37, 0.57, 0], [0, 0, Math.PI / 2], 24);
+      // Main upright with upper and lower ball-joint ears.
+      addBox(pivot, [0.17, 0.43, 0.27], [0, 0, 0], materials.darkAlloy, 0.045);
+      addBox(pivot, [0.20, 0.13, 0.22], [0, -0.23, 0], materials.shellLight, 0.025);
+      addBox(pivot, [0.20, 0.12, 0.22], [0, 0.23, 0], materials.shellLight, 0.025);
 
-      // Steering arm and vertical hinge pins.
-      addPrototypeRod(body, [x, 0.77, 0.07], [side * 0.91, 0.88, 0.38], 0.045, materials.shellLight, 0.06);
-      addCylinder(body, 0.04, 0.04, 0.11, materials.black,
-        [x, 0.57, -0.13], [0, 0, 0], 18);
+      // Stepped stub axle, bearing seat and outer 17 mm-style hex hub.
+      addCylinder(pivot, 0.11, 0.11, 0.22, materials.brightAlloy,
+        [side * 0.16, 0, 0], [0, 0, Math.PI / 2], 28);
+      addCylinder(pivot, 0.18, 0.18, 0.065, materials.darkAlloy,
+        [side * 0.29, 0, 0], [0, 0, Math.PI / 2], 28);
+      addCylinder(pivot, 0.12, 0.12, 0.075, materials.alloy,
+        [side * 0.35, 0, 0], [0, 0, Math.PI / 2], 24);
+
+      // Steering arm and kingpin detail stay on the same steerable upright.
+      addPrototypeRod(pivot, [0, 0.20, 0.07], [-side * 0.11, 0.31, 0.38],
+        0.045, materials.shellLight, 0.06);
+      addCylinder(pivot, 0.04, 0.04, 0.11, materials.black,
+        [0, 0, -0.13], [0, 0, 0], 18);
+
+      batchStaticMeshes(pivot);
     }
-    batchStaticMeshes(body);
-    return body;
+    return { body, steeringPivots };
   }
+  const frontKnuckleParts = buildFrontKnuckles();
+
   const frontKnuckleParts = buildFrontKnuckles();
 
   const steeringLinkageModel = new THREE.Group();
