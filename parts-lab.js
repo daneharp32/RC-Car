@@ -1779,14 +1779,14 @@ export function createPartsLabSystem(game) {
       [-0.90, 0.78, -0.06],
       [-0.62, 0.77, 0.10],
       [-0.35, 0.76, 0.22],
-      [-0.156, 0.746, 0.274]
+      [-0.176, 0.746, 0.342]
     ], 0.024, materials.red, 7);
     addTube(root, [
       [-1.032, 0.79, -0.290],
       [-0.90, 0.78, -0.22],
       [-0.62, 0.77, -0.02],
       [-0.34, 0.76, 0.16],
-      [-0.088, 0.746, 0.274]
+      [-0.108, 0.746, 0.342]
     ], 0.024, materials.black, 7);
 
     // Three phase leads connect the ESC output bank to their matching motor
