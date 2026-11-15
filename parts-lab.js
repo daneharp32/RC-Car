@@ -1034,6 +1034,7 @@ export function createPartsLabSystem(game) {
       [0, 0.56, 0], [Math.PI / 2, 0, 0], 24);
 
     const springGroup = new THREE.Group();
+    springGroup.name = side < 0 ? "Front shock spring left" : "Front shock spring right";
     springGroup.position.y = 0.25;
     root.add(springGroup);
     const springPoints = [];
@@ -1048,6 +1049,7 @@ export function createPartsLabSystem(game) {
       [0, 0.59, 0], [Math.PI / 2, 0, 0], 24);
 
     const rodGroup = new THREE.Group();
+    rodGroup.name = side < 0 ? "Front shock piston left" : "Front shock piston right";
     rodGroup.position.y = 0.48;
     root.add(rodGroup);
     addCylinder(rodGroup, 0.024, 0.024, 0.58, materials.brightAlloy,
@@ -1489,6 +1491,329 @@ export function createPartsLabSystem(game) {
     return body;
   }
   const bumperParts = buildBumpers();
+
+  // COMPLETE MECHANICAL ROLLING CHASSIS
+  // Scaled around the shared 425 mm wheelbase / 135-146 mm tire envelope.
+  // The servo, motor, ESC and battery are intentionally left out; the motor
+  // mount remains as an empty mechanical bracket. Previously removed frame
+  // rails and the roll cage remain excluded from this prototype.
+  function cloneAssemblyPart(source, name, parent, position = [0, 0, 0], scale = [1, 1, 1]) {
+    const copy = source.clone(true);
+    copy.name = name;
+    copy.visible = true;
+    copy.position.set(position[0], position[1], position[2]);
+    copy.scale.set(scale[0], scale[1], scale[2]);
+    parent.add(copy);
+    return copy;
+  }
+
+  function buildRollingChassisAssembly() {
+    const root = new THREE.Group();
+    root.name = "Assembled 1/7 mechanical rolling chassis";
+
+    // Central underbody plate. Its existing outline is enlarged uniformly
+    // to a roughly 300 x 225 mm pan, based on the reference trucks.
+    const panGroup = new THREE.Group();
+    panGroup.name = "Assembled skid plate";
+    root.add(panGroup);
+    cloneAssemblyPart(skidPlateModel, "Skid plate component", panGroup, [0, 0.15, 0], [1.42, 1, 1.42]);
+
+    // Structural crossmembers and front/rear mounting shelves replace the
+    // full side rails that were intentionally removed from the prototype.
+    const mountStructure = new THREE.Group();
+    mountStructure.name = "Chassis crossmembers and component mounting shelves";
+    root.add(mountStructure);
+    addBox(mountStructure, [1.92, 0.12, 0.18], [0, 0.68, -1.05], materials.darkAlloy, 0.035);
+    addBox(mountStructure, [1.80, 0.12, 0.18], [0, 0.70, 0.94], materials.darkAlloy, 0.035);
+    addBox(mountStructure, [1.16, 0.10, 0.22], [0, 0.76, -0.36], materials.shellLight, 0.025);
+    for (const side of [-1, 1]) {
+      for (const z of [-1.05, 0.94]) {
+        addBox(mountStructure, [0.20, 0.12, 0.28], [side * 0.74, 0.70, z], materials.alloy, 0.025);
+        addScrew(mountStructure, [side * 0.74, 0.77, z], 0.026, materials.brightAlloy);
+      }
+    }
+    batchStaticMeshes(mountStructure);
+
+    // Front independent suspension: lower/upper A-arms and shock towers are
+    // cloned together, so the pivot groups and damper geometry stay aligned.
+    const frontUnit = cloneAssemblyPart(
+      frontSuspensionModel, "Front suspension unit", root, [0, 0.37, -1.97]
+    );
+
+    // Front wheels are children of the lower-arm pivots. That makes the hub
+    // assemblies follow the A-arm travel rather than floating beside it.
+    for (const side of [-1, 1]) {
+      const pivotName = side < 0 ? "Animated front A-arm pivot left" : "Animated front A-arm pivot right";
+      const pivot = frontUnit.getObjectByName(pivotName);
+      if (!pivot) throw new Error("Missing front A-arm pivot: " + pivotName);
+      const wheel = wheelTireModel.clone(true);
+      wheel.name = side < 0 ? "Front left wheel and tire" : "Front right wheel and tire";
+      wheel.visible = true;
+      wheel.position.set(side * 0.99, -0.42, 0);
+      // The detailed wheel face points outward on each side.
+      wheel.rotation.y = side < 0 ? Math.PI : 0;
+      pivot.add(wheel);
+    }
+
+    cloneAssemblyPart(frontKnucklesModel, "Front steering knuckles", root, [0, 0.57, -1.97]);
+    cloneAssemblyPart(steeringLinkageModel, "Front steering linkage", root, [0, 0.45, -1.97]);
+    cloneAssemblyPart(frontDifferentialModel, "Front differential unit", root, [0, 0.62, -1.32]);
+
+    // Front CVDs connect the differential outputs to the moving front hubs.
+    const frontCvdGroup = new THREE.Group();
+    frontCvdGroup.name = "Front CVD half-shafts";
+    root.add(frontCvdGroup);
+    for (const side of [-1, 1]) {
+      addPrototypeRod(frontCvdGroup,
+        [side * 0.58, 1.14, -1.34],
+        [side * 1.18, 1.14, -1.97],
+        0.045, materials.brightAlloy, 0.073);
+      const boot = new THREE.Group();
+      boot.name = side < 0 ? "Left front CVD rubber boot" : "Right front CVD rubber boot";
+      frontCvdGroup.add(boot);
+      for (let i = 0; i < 4; i++) {
+        const ring = new THREE.Mesh(
+          new THREE.TorusGeometry(0.068 - i * 0.004, 0.012, 7, 18),
+          materials.rubber
+        );
+        ring.position.set(side * (0.62 + i * 0.018), 1.14, -1.39 - i * 0.035);
+        ring.rotation.y = Math.PI / 2;
+        boot.add(ring);
+      }
+    }
+    batchStaticMeshes(frontCvdGroup);
+
+    // The centre differential, gearbox case and empty motor cradle form the
+    // central mechanical powertrain. No motor or electrical equipment is fitted.
+    cloneAssemblyPart(centerDifferentialModel, "Centre differential unit", root, [0, 0.62, -0.45]);
+    cloneAssemblyPart(gearboxModel, "Central gearbox housing", root, [0, 0.75, 0.35], [0.75, 0.75, 0.75]);
+    cloneAssemblyPart(motorMountModel, "Empty adjustable motor mount", root, [0, 1.05, 0.42], [0.75, 0.75, 0.75]);
+
+    // Centre-to-front and centre-to-rear prop shafts, with yokes at each end.
+    const propShaftGroup = new THREE.Group();
+    propShaftGroup.name = "Front and rear propeller shafts";
+    root.add(propShaftGroup);
+    addPrototypeRod(propShaftGroup, [0, 1.14, -1.02], [0, 1.14, -1.62],
+      0.050, materials.brightAlloy, 0.082);
+    addPrototypeRod(propShaftGroup, [0, 1.14, 0.12], [0, 1.14, 2.27],
+      0.052, materials.brightAlloy, 0.086);
+    for (const z of [-1.02, -1.62, 0.12, 2.27]) {
+      addCylinder(propShaftGroup, 0.076, 0.076, 0.15, materials.darkAlloy,
+        [0, 1.14, z], [Math.PI / 2, 0, 0], 22);
+      addBox(propShaftGroup, [0.18, 0.14, 0.11], [0, 1.14, z], materials.shellLight, 0.022);
+    }
+    batchStaticMeshes(propShaftGroup);
+
+    // Rear live axle, two rear wheels and hubs share one moving carrier.
+    const rearCarrier = new THREE.Group();
+    rearCarrier.name = "Animated rear solid axle carrier";
+    rearCarrier.position.set(0, 0.64, 1.97);
+    root.add(rearCarrier);
+    cloneAssemblyPart(rearAxleModel, "Solid rear axle housing", rearCarrier);
+    for (const side of [-1, 1]) {
+      const wheel = wheelTireModel.clone(true);
+      wheel.name = side < 0 ? "Rear left wheel and tire" : "Rear right wheel and tire";
+      wheel.visible = true;
+      wheel.position.set(side * 1.35, -0.34, 0);
+      wheel.rotation.y = side < 0 ? Math.PI : 0;
+      rearCarrier.add(wheel);
+    }
+
+    // Long trailing arms, upper locating links and lateral panhard bar.
+    cloneAssemblyPart(rearLinksModel, "Rear axle locating links", root, [0, 0.64, 1.15]);
+
+    // Four rear dampers (two per side) are mounted between the axle and the
+    // rear chassis crossmember, matching the auxiliary-shock approach seen
+    // on the 1/7 reference trucks.
+    const rearShockMounts = new THREE.Group();
+    rearShockMounts.name = "Rear shock upper mounting brackets";
+    root.add(rearShockMounts);
+    addBox(rearShockMounts, [1.45, 0.12, 0.18], [0, 1.82, 1.48], materials.darkAlloy, 0.03);
+    for (const side of [-1, 1]) {
+      addBox(rearShockMounts, [0.18, 0.16, 0.36], [side * 0.54, 1.77, 1.48], materials.alloy, 0.025);
+      addScrew(rearShockMounts, [side * 0.54, 1.86, 1.48], 0.026, materials.brightAlloy);
+    }
+
+    function buildRearDamper(side, offset, label) {
+      const shockRoot = new THREE.Group();
+      shockRoot.name = "Rear damper " + label;
+      root.add(shockRoot);
+
+      addCylinder(shockRoot, 0.088, 0.105, 0.54, materials.darkAlloy,
+        [0, 0.29, 0], [0, 0, 0], 26);
+      addCylinder(shockRoot, 0.075, 0.075, 0.41, materials.shellLight,
+        [0, 0.29, 0], [0, 0, 0], 24);
+      addTorus(shockRoot, 0.104, 0.014, materials.black,
+        [0, 0.56, 0], [Math.PI / 2, 0, 0], 22);
+
+      const spring = new THREE.Group();
+      spring.name = "Rear damper spring " + label;
+      spring.position.y = 0.25;
+      shockRoot.add(spring);
+      const points = [];
+      const turns = 6.5, samples = 104;
+      for (let i = 0; i <= samples; i++) {
+        const t = i / samples;
+        const angle = t * turns * Math.PI * 2;
+        points.push([Math.cos(angle) * 0.12, t * 0.58, Math.sin(angle) * 0.12]);
+      }
+      addTube(spring, points, 0.018, materials.orange, 7);
+      addTorus(spring, 0.125, 0.014, materials.darkAlloy,
+        [0, 0.58, 0], [Math.PI / 2, 0, 0], 22);
+
+      const rod = new THREE.Group();
+      rod.name = "Rear damper piston " + label;
+      rod.position.y = 0.48;
+      shockRoot.add(rod);
+      addCylinder(rod, 0.023, 0.023, 0.56, materials.brightAlloy,
+        [0, 0.22, 0], [0, 0, 0], 16);
+      addCylinder(rod, 0.07, 0.07, 0.10, materials.darkAlloy,
+        [0, 0.50, 0], [0, 0, 0], 22);
+
+      addBox(shockRoot, [0.17, 0.09, 0.13], [0, 0.02, 0], materials.shellLight, 0.02);
+      addTorus(shockRoot, 0.05, 0.013, materials.darkAlloy,
+        [0, 0.04, 0], [0, Math.PI / 2, 0], 20);
+      addBox(shockRoot, [0.17, 0.09, 0.13], [0, 1.02, 0], materials.shellLight, 0.02);
+      addTorus(shockRoot, 0.05, 0.013, materials.darkAlloy,
+        [0, 1.04, 0], [0, Math.PI / 2, 0], 20);
+
+      const lower = new THREE.Vector3(side * 0.46, 1.40, 1.97 + offset);
+      const upper = new THREE.Vector3(side * 0.54, 1.86, 1.48 + offset);
+      return { name: label, root: shockRoot, springGroup: spring, rodGroup: rod, side, offset, lower, upper };
+    }
+
+    const rearShocks = [];
+    for (const side of [-1, 1]) {
+      rearShocks.push(buildRearDamper(side, -0.15, (side < 0 ? "left" : "right") + " inner"));
+      rearShocks.push(buildRearDamper(side, 0.15, (side < 0 ? "left" : "right") + " outer"));
+    }
+
+    // Front and rear bumpers are retained; no roll cage or longitudinal side rails.
+    cloneAssemblyPart(bumpersModel, "Front and rear bumper pair", root, [0, 0.62, 0], [2.0, 0.90, 2.10]);
+
+    return root;
+  }
+
+  function alignAssemblyDamper(shock, lower, upper, compression) {
+    const up = new THREE.Vector3(0, 1, 0);
+    const direction = upper.clone().sub(lower);
+    const length = Math.max(0.55, direction.length());
+    const axis = direction.normalize();
+    shock.root.position.copy(lower).addScaledVector(axis, -0.04 * length);
+    shock.root.quaternion.setFromUnitVectors(up, axis);
+    shock.root.scale.set(1, length, 1);
+    shock.springGroup.scale.y = compression;
+    shock.rodGroup.position.y = 0.48 - (1 - compression) * 0.28;
+  }
+
+  function captureRollingChassisMotion(root) {
+    const front = root.getObjectByName("Front suspension unit");
+    const rearCarrier = root.getObjectByName("Animated rear solid axle carrier");
+    const rearLinks = root.getObjectByName("Rear axle locating links");
+    if (!front || !rearCarrier || !rearLinks) {
+      throw new Error("Rolling chassis is missing a suspension or axle assembly.");
+    }
+
+    const lowerPivots = [-1, 1].map(side => ({
+      side,
+      pivot: front.getObjectByName(side < 0 ? "Animated front A-arm pivot left" : "Animated front A-arm pivot right")
+    }));
+    const upperPivots = [-1, 1].map(side => ({
+      side,
+      pivot: front.getObjectByName(side < 0 ? "Left upper wishbone pivot" : "Right upper wishbone pivot")
+    }));
+    const frontShocks = [-1, 1].map(side => ({
+      side,
+      root: front.getObjectByName(side < 0 ? "Left moving front shock" : "Right moving front shock"),
+      springGroup: front.getObjectByName(side < 0 ? "Front shock spring left" : "Front shock spring right"),
+      rodGroup: front.getObjectByName(side < 0 ? "Front shock piston left" : "Front shock piston right")
+    }));
+    const rearShocks = [];
+    root.traverse(object => {
+      if (object.name.startsWith("Rear damper ") && object.name !== "Rear damper spring " && object.name !== "Rear damper piston ") {
+        const suffix = object.name.slice("Rear damper ".length);
+        rearShocks.push({
+          name: suffix,
+          root: object,
+          springGroup: object.getObjectByName("Rear damper spring " + suffix),
+          rodGroup: object.getObjectByName("Rear damper piston " + suffix),
+          side: suffix.startsWith("left") ? -1 : 1,
+          offset: suffix.endsWith("inner") ? -0.15 : 0.15
+        });
+      }
+    });
+
+    return { root, front, lowerPivots, upperPivots, frontShocks, rearCarrier, rearLinks, rearShocks };
+  }
+
+  function updateRollingChassisSuspension(motion, time, animate) {
+    const travel = animate ? Math.sin(time * 2.05) * 0.35 : 0;
+    const compression = animate
+      ? 0.64 + 0.36 * (0.5 + 0.5 * Math.sin(time * 2.05 + 0.28))
+      : 1;
+
+    for (const item of motion.lowerPivots) {
+      item.pivot.rotation.z = item.side * travel;
+    }
+    for (const item of motion.upperPivots) {
+      item.pivot.rotation.z = item.side * travel * 0.72;
+    }
+
+    motion.front.updateMatrixWorld(true);
+    for (const shock of motion.frontShocks) {
+      const arm = motion.lowerPivots.find(item => item.side === shock.side);
+      const lowerWorld = arm.pivot.localToWorld(new THREE.Vector3(shock.side * 0.72, 0.12, -0.015));
+      const upperWorld = motion.front.localToWorld(new THREE.Vector3(shock.side * 0.61, 1.49, 0.10));
+      const lower = motion.front.worldToLocal(lowerWorld.clone());
+      const upper = motion.front.worldToLocal(upperWorld);
+      alignAssemblyDamper(shock, lower, upper, compression);
+    }
+
+    const rearTravel = animate ? Math.sin(time * 2.05 + 1.05) * 0.13 : 0;
+    const rearPitch = animate ? Math.sin(time * 2.05 + 1.05) * 0.025 : 0;
+    motion.rearCarrier.position.y = 0.64 + rearTravel;
+    motion.rearCarrier.rotation.x = rearPitch;
+    motion.rearLinks.position.y = 0.64 + rearTravel * 0.48;
+    motion.rearLinks.rotation.x = rearPitch * 0.55;
+
+    for (const shock of motion.rearShocks) {
+      const lower = new THREE.Vector3(shock.side * 0.46, 1.40 + rearTravel, 1.97 + shock.offset);
+      const upper = new THREE.Vector3(shock.side * 0.54, 1.86, 1.48 + shock.offset);
+      alignAssemblyDamper(shock, lower, upper, compression);
+    }
+  }
+
+  const rollingChassisModel = buildRollingChassisAssembly();
+  rollingChassisModel.name = "Complete non-electrical 1/7 rolling chassis";
+  rollingChassisModel.visible = false;
+  showcase.add(rollingChassisModel);
+
+  const suspensionWorkingModel = rollingChassisModel.clone(true);
+  suspensionWorkingModel.name = "Complete rolling chassis - suspension working view";
+  suspensionWorkingModel.visible = false;
+  showcase.add(suspensionWorkingModel);
+
+  // A focused view shows the moving front and rear suspension without the
+  // heavier central drivetrain obscuring the arms, axle links and dampers.
+  for (const name of [
+    "Assembled skid plate",
+    "Front steering linkage",
+    "Front differential unit",
+    "Front CVD half-shafts",
+    "Centre differential unit",
+    "Central gearbox housing",
+    "Empty adjustable motor mount",
+    "Front and rear propeller shafts",
+    "Front and rear bumper pair"
+  ]) {
+    const object = suspensionWorkingModel.getObjectByName(name);
+    if (object) object.visible = false;
+  }
+
+  const rollingChassisMotion = captureRollingChassisMotion(rollingChassisModel);
+  const suspensionWorkingMotion = captureRollingChassisMotion(suspensionWorkingModel);
+  updateRollingChassisSuspension(rollingChassisMotion, 0, false);
+  updateRollingChassisSuspension(suspensionWorkingMotion, 0, false);
 
   const componentModels = {
     servo: servoModel,
