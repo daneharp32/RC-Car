@@ -2023,7 +2023,7 @@ export function createPartsLabSystem(game) {
     // wishbones' vertical arc so they do not hover above the moving wheels.
     const frontHubTravel = 1.01 * Math.sin(travel) + 0.42 * (Math.cos(travel) - 1);
     motion.frontKnuckles.position.y = 0.06 + frontHubTravel;
-    motion.steering.position.y = -0.06 + frontHubTravel;
+    motion.steering.position.y = -0.06; // steering rack is chassis-mounted, not on the moving upright
     motion.steering.rotation.y = wheelSteerAngle * 0.34;
     motion.servoHorn.rotation.y = wheelSteerAngle * 1.18;
     for (const item of motion.steeringPivots) {
