@@ -6,7 +6,7 @@ import { createControlsSystem } from "./controls.js";
 import { createImpactDamageSystem } from "./damage-system.js";
 import { createMultiplayerSystem } from "./multiplayer.js";
 import { createGarageSystem } from "./garage.js";
-import { createPartsLabSystem } from "./parts-lab.js?v=20261114-rollingchassis9";
+import { createPartsLabSystem } from "./parts-lab.js?v=20261115-electronics-steering11";
 import { createSandboxSystem } from "./sandbox.js";
 import { createTrackSystem } from "./track.js";
 import { createGravelBasinSystem } from "./gravel-map.js";
@@ -1448,9 +1448,15 @@ function animate(now) {
     if (!isPaused && drivingActive) {
       controls.updateDrivingControls(delta);
     } else {
-      // The showroom and builder are display-only: clear stale input and wheel
-      // forces instead of letting controls keep acting on the parked truck.
-      for (const key of Object.keys(controls.keys)) controls.keys[key] = false;
+      // The showroom and builder are display-only: keep physics input
+      // cleared. In the Parts Lab only, preserve the four steering keys so
+      // the assembled WIP servo, linkage and front hubs can be demonstrated.
+      const partsLabSteeringKeys = garage.viewMode === "parts-lab"
+        ? new Set(["a", "d", "arrowleft", "arrowright"])
+        : null;
+      for (const key of Object.keys(controls.keys)) {
+        if (!partsLabSteeringKeys?.has(key)) controls.keys[key] = false;
+      }
       for (let i = 0; i < 4; i++) {
         vehicle.applyEngineForce(0, i);
         vehicle.setBrake(0, i);

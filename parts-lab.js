@@ -1169,28 +1169,39 @@ export function createPartsLabSystem(game) {
 
   function buildFrontKnuckles() {
     const body = new THREE.Group();
+    body.name = "Paired steerable front hub carriers";
     frontKnucklesModel.add(body);
+    const steeringPivots = [];
+
     for (const side of [-1, 1]) {
-      const x = side * 1.02;
-      addBox(body, [0.17, 0.43, 0.27], [x, 0.57, 0], materials.darkAlloy, 0.045);
-      addBox(body, [0.20, 0.13, 0.22], [x, 0.34, 0], materials.shellLight, 0.025);
-      addBox(body, [0.20, 0.12, 0.22], [x, 0.80, 0], materials.shellLight, 0.025);
+      const pivot = new THREE.Group();
+      pivot.name = side < 0 ? "Left steering knuckle pivot" : "Right steering knuckle pivot";
+      pivot.position.set(side * 1.02, 0.57, 0);
+      body.add(pivot);
+      steeringPivots.push({ side, pivot });
 
-      // Stub axle, bearing seat and 17 mm-style wheel mounting face.
-      addCylinder(body, 0.11, 0.11, 0.22, materials.brightAlloy,
-        [side * 1.18, 0.57, 0], [0, 0, Math.PI / 2], 28);
-      addCylinder(body, 0.18, 0.18, 0.065, materials.darkAlloy,
-        [side * 1.31, 0.57, 0], [0, 0, Math.PI / 2], 28);
-      addCylinder(body, 0.12, 0.12, 0.075, materials.alloy,
-        [side * 1.37, 0.57, 0], [0, 0, Math.PI / 2], 24);
+      // Main upright with upper and lower ball-joint ears.
+      addBox(pivot, [0.17, 0.43, 0.27], [0, 0, 0], materials.darkAlloy, 0.045);
+      addBox(pivot, [0.20, 0.13, 0.22], [0, -0.23, 0], materials.shellLight, 0.025);
+      addBox(pivot, [0.20, 0.12, 0.22], [0, 0.23, 0], materials.shellLight, 0.025);
 
-      // Steering arm and vertical hinge pins.
-      addPrototypeRod(body, [x, 0.77, 0.07], [side * 0.91, 0.88, 0.38], 0.045, materials.shellLight, 0.06);
-      addCylinder(body, 0.04, 0.04, 0.11, materials.black,
-        [x, 0.57, -0.13], [0, 0, 0], 18);
+      // Stepped stub axle, bearing seat and outer 17 mm-style hex hub.
+      addCylinder(pivot, 0.11, 0.11, 0.22, materials.brightAlloy,
+        [side * 0.16, 0, 0], [0, 0, Math.PI / 2], 28);
+      addCylinder(pivot, 0.18, 0.18, 0.065, materials.darkAlloy,
+        [side * 0.29, 0, 0], [0, 0, Math.PI / 2], 28);
+      addCylinder(pivot, 0.12, 0.12, 0.075, materials.alloy,
+        [side * 0.35, 0, 0], [0, 0, Math.PI / 2], 24);
+
+      // Steering arm and kingpin detail stay on the same steerable upright.
+      addPrototypeRod(pivot, [0, 0.20, 0.07], [-side * 0.11, 0.31, 0.38],
+        0.045, materials.shellLight, 0.06);
+      addCylinder(pivot, 0.04, 0.04, 0.11, materials.black,
+        [0, 0, -0.13], [0, 0, 0], 18);
+
+      batchStaticMeshes(pivot);
     }
-    batchStaticMeshes(body);
-    return body;
+    return { body, steeringPivots };
   }
   const frontKnuckleParts = buildFrontKnuckles();
 
@@ -1201,18 +1212,37 @@ export function createPartsLabSystem(game) {
 
   function buildSteeringLinkage() {
     const body = new THREE.Group();
+    body.name = "Rack, bellcrank and front tie rods";
     steeringLinkageModel.add(body);
-    addBox(body, [0.66, 0.10, 0.15], [0, 0.82, 0.30], materials.darkAlloy, 0.035);
-    addCylinder(body, 0.095, 0.095, 0.12, materials.brightAlloy,
-      [0, 0.90, 0.30], [0, 0, 0], 24);
-    addBox(body, [0.52, 0.055, 0.08], [0, 0.96, 0.30], materials.shellLight, 0.02);
 
+    const rack = new THREE.Group();
+    rack.name = "Steering rack and bellcrank";
+    body.add(rack);
+    addBox(rack, [0.66, 0.10, 0.15], [0, 0.82, 0.30], materials.darkAlloy, 0.035);
+    addCylinder(rack, 0.095, 0.095, 0.12, materials.brightAlloy,
+      [0, 0.90, 0.30], [0, 0, 0], 24);
+    addBox(rack, [0.52, 0.055, 0.08], [0, 0.96, 0.30], materials.shellLight, 0.02);
+    batchStaticMeshes(rack);
+
+    // The individual-part viewer keeps sample rods; the assembled chassis
+    // hides these and substitutes pivot-to-pivot articulated tie rods.
+    const sampleTieRods = new THREE.Group();
+    sampleTieRods.name = "Static front tie rods";
+    body.add(sampleTieRods);
     for (const side of [-1, 1]) {
-      addPrototypeRod(body, [side * 0.28, 0.84, 0.30], [side * 0.92, 0.88, 0.38], 0.027, materials.brightAlloy, 0.05);
-      addPrototypeRod(body, [side * 0.92, 0.88, 0.38], [side * 0.98, 0.78, 0.09], 0.034, materials.darkAlloy, 0.052);
+      addPrototypeRod(sampleTieRods, [side * 0.28, 0.84, 0.30],
+        [side * 0.92, 0.88, 0.38], 0.027, materials.brightAlloy, 0.05);
+      addPrototypeRod(sampleTieRods, [side * 0.92, 0.88, 0.38],
+        [side * 0.98, 0.78, 0.09], 0.034, materials.darkAlloy, 0.052);
     }
-    addPrototypeRod(body, [0.0, 1.04, 0.24], [0.0, 0.84, 0.30], 0.032, materials.orange, 0.055);
-    batchStaticMeshes(body);
+    batchStaticMeshes(sampleTieRods);
+
+    const sampleDragLink = new THREE.Group();
+    sampleDragLink.name = "Static servo saver drag link";
+    body.add(sampleDragLink);
+    addPrototypeRod(sampleDragLink, [0.0, 1.04, 0.24], [0.0, 0.84, 0.30],
+      0.032, materials.orange, 0.055);
+    batchStaticMeshes(sampleDragLink);
     return body;
   }
   const steeringLinkageParts = buildSteeringLinkage();
@@ -1511,12 +1541,13 @@ export function createPartsLabSystem(game) {
     const root = new THREE.Group();
     root.name = "Assembled 1/7 mechanical rolling chassis";
 
-    // Central underbody plate. Its existing outline is enlarged uniformly
-    // to a roughly 300 x 225 mm pan, based on the reference trucks.
+    // Forward central belly pan, shortened to about 230 x 220 mm in the
+    // assembled scale model. The longer open rear section matches the
+    // underside layout visible on the DF7, Desert King and FMS 1/7 trucks.
     const panGroup = new THREE.Group();
     panGroup.name = "Assembled skid plate";
     root.add(panGroup);
-    cloneAssemblyPart(skidPlateModel, "Skid plate component", panGroup, [0, 0.26, 0], [1.42, 1, 1.42]);
+    cloneAssemblyPart(skidPlateModel, "Skid plate component", panGroup, [0, 0.26, -0.38], [1.42, 1, 1.10]);
 
     // Structural crossmembers and front/rear mounting shelves replace the
     // full side rails that were intentionally removed from the prototype.
@@ -1524,10 +1555,10 @@ export function createPartsLabSystem(game) {
     mountStructure.name = "Chassis crossmembers and component mounting shelves";
     root.add(mountStructure);
     addBox(mountStructure, [1.92, 0.12, 0.18], [0, 0.62, -1.05], materials.darkAlloy, 0.035);
-    addBox(mountStructure, [1.80, 0.12, 0.18], [0, 0.62, 0.94], materials.darkAlloy, 0.035);
+    addBox(mountStructure, [1.80, 0.12, 0.18], [0, 0.62, 0.45], materials.darkAlloy, 0.035);
     addBox(mountStructure, [1.16, 0.10, 0.22], [0, 0.72, -0.36], materials.shellLight, 0.025);
     for (const side of [-1, 1]) {
-      for (const z of [-1.05, 0.94]) {
+      for (const z of [-1.05, 0.45]) {
         addBox(mountStructure, [0.20, 0.12, 0.28], [side * 0.74, 0.62, z], materials.alloy, 0.025);
         addScrew(mountStructure, [side * 0.74, 0.69, z], 0.026, materials.brightAlloy);
       }
@@ -1547,10 +1578,22 @@ export function createPartsLabSystem(game) {
     // rear skid crossmember without adding full-length side frame rails.
     for (const side of [-1, 1]) {
       addPrototypeRod(mountStructure,
-        [side * 0.54, 0.68, 0.94],
-        [side * 0.54, 1.28, 1.48],
+        [side * 0.54, 0.68, 0.45],
+        [side * 0.54, 1.58, 1.48],
         0.048, materials.shellLight, 0.068);
     }
+    // Local equipment trays bolt onto the crossmembers and forward skid-pan area.
+    addBox(mountStructure, [0.78, 0.10, 0.70], [-0.58, 0.62, -1.52], materials.darkAlloy, 0.035);
+    for (const x of [-0.87, -0.29]) {
+      for (const z of [-1.76, -1.28]) addScrew(mountStructure, [x, 0.68, z], 0.025, materials.brightAlloy);
+    }
+    addBox(mountStructure, [0.78, 0.10, 1.58], [-0.56, 0.62, 0.23], materials.darkAlloy, 0.03);
+    for (const x of [-0.84, -0.28]) {
+      addBox(mountStructure, [0.06, 0.12, 1.06], [x, 0.72, 0.23], materials.shellLight, 0.012);
+    }
+    addBox(mountStructure, [0.92, 0.10, 0.82], [0.10, 0.62, 0.76], materials.darkAlloy, 0.03);
+    addBox(mountStructure, [1.02, 0.12, 0.84], [0.55, 0.62, 1.03], materials.darkAlloy, 0.03);
+
     batchStaticMeshes(mountStructure);
 
     // Front independent suspension: lower/upper A-arms and shock towers are
@@ -1559,24 +1602,29 @@ export function createPartsLabSystem(game) {
       frontSuspensionModel, "Front suspension unit", root, [0, -0.14, -1.97]
     );
 
-    // Front wheels are children of the lower-arm pivots. That makes the hub
-    // assemblies follow the A-arm travel rather than floating beside it.
+    // Steerable knuckles carry the front wheels. This keeps the hubs on the
+    // upright centreline while the lower A-arms provide vertical travel.
+    const frontKnuckles = cloneAssemblyPart(frontKnucklesModel, "Front steering knuckles", root, [0, 0.06, -1.97]);
+    const steering = cloneAssemblyPart(steeringLinkageModel, "Front steering linkage", root, [0, -0.06, -1.97]);
+    const staticSteeringTieRods = steering.getObjectByName("Static front tie rods");
+    const staticServoDragLink = steering.getObjectByName("Static servo saver drag link");
+    if (staticSteeringTieRods) staticSteeringTieRods.visible = false;
+    if (staticServoDragLink) staticServoDragLink.visible = false;
+    const frontSteeringPivots = [];
     for (const side of [-1, 1]) {
-      const pivotName = side < 0 ? "Animated front A-arm pivot left" : "Animated front A-arm pivot right";
-      const pivot = frontUnit.getObjectByName(pivotName);
-      if (!pivot) throw new Error("Missing front A-arm pivot: " + pivotName);
+      const pivotName = side < 0 ? "Left steering knuckle pivot" : "Right steering knuckle pivot";
+      const pivot = frontKnuckles.getObjectByName(pivotName);
+      if (!pivot) throw new Error("Missing front steering knuckle pivot: " + pivotName);
+      frontSteeringPivots.push({ side, pivot });
+
       const wheel = wheelTireModel.clone(true);
-      wheel.name = side < 0 ? "Front left wheel and tire" : "Front right wheel and tire";
+      wheel.name = side < 0 ? "Front left steerable wheel and tire" : "Front right steerable wheel and tire";
       wheel.visible = true;
       wheel.scale.set(1.20, 1.08, 1.08);
-      wheel.position.set(side * 1.01, -0.4872, 0);
-      // The detailed wheel face points outward on each side.
+      wheel.position.set(side * 0.35, -0.9072, 0);
       wheel.rotation.y = side < 0 ? Math.PI : 0;
       pivot.add(wheel);
     }
-
-    cloneAssemblyPart(frontKnucklesModel, "Front steering knuckles", root, [0, 0.06, -1.97]);
-    cloneAssemblyPart(steeringLinkageModel, "Front steering linkage", root, [0, -0.06, -1.97]);
     cloneAssemblyPart(frontDifferentialModel, "Front differential unit", root, [0, 0.32, -1.50]);
 
     // Front CVDs articulate between the fixed differential outputs and
@@ -1626,11 +1674,100 @@ export function createPartsLabSystem(game) {
       }
     }
 
-    // The centre differential, gearbox case and empty motor cradle form the
-    // central mechanical powertrain. No motor or electrical equipment is fitted.
+    // The centre differential, gearbox case and adjustable motor cradle
+    // form the rear-central mechanical powertrain. The motor is installed below.
     cloneAssemblyPart(centerDifferentialModel, "Centre differential unit", root, [0, 0.32, -0.45]);
     cloneAssemblyPart(gearboxModel, "Central gearbox housing", root, [0.55, 0.425, 0.35], [0.65, 0.75, 0.75]);
-    cloneAssemblyPart(motorMountModel, "Empty adjustable motor mount", root, [0.55, 0.90, 0.42], [0.75, 0.75, 0.75]);
+    cloneAssemblyPart(motorMountModel, "Adjustable motor mount", root, [0.55, 0.42, 1.03], [0.75, 0.75, 0.75]);
+
+    // Full electrical package is now installed on its own trays: a steering
+    // servo up front, hardcase battery on the left tray, ESC beside the motor,
+    // and a 4274-size motor in the empty mechanical cradle.
+    const servoInstall = cloneAssemblyPart(
+      servoModel, "Steering servo installation", root, [-0.58, 0.61, -1.52], [0.52, 0.52, 0.52]
+    );
+    const servoHorn = servoInstall.getObjectByName("Animated servo output horn");
+    if (!servoHorn) throw new Error("Steering servo horn was not found in the assembled model.");
+
+    const batteryInstall = cloneAssemblyPart(
+      batteryModel, "Hardcase battery installation", root, [-0.56, 0.50, 0.23], [1.02, 0.82, 0.82]
+    );
+    batteryInstall.rotation.y = Math.PI / 2;
+
+    const escInstall = cloneAssemblyPart(
+      escModel, "Brushless ESC installation", root, [0.10, 0.60, 0.75], [0.46, 0.46, 0.46]
+    );
+    const escRotor = escInstall.getObjectByName("Animated seven blade ESC fan");
+    if (!escRotor) throw new Error("ESC cooling fan rotor was not found in the assembled model.");
+
+    const motorInstall = cloneAssemblyPart(
+      motorModel, "4274 brushless motor installation", root, [0.55, 0.58, 1.02], [0.60, 0.60, 0.60]
+    );
+    motorInstall.rotation.y = Math.PI;
+    const installedMotorShaft = motorInstall.getObjectByName("Aligned rotating motor shaft and pinion");
+    if (!installedMotorShaft) throw new Error("Motor output shaft was not found in the assembled model.");
+
+    // Servo-to-bellcrank pushrod: the lower ball follows the rotating horn
+    // and the opposite eye follows the steering rack.
+    const servoDragLink = new THREE.Group();
+    servoDragLink.name = "Servo-to-steering bellcrank pushrod";
+    root.add(servoDragLink);
+    const servoDragRod = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.022, 0.022, 1, 14, 1),
+      materials.brightAlloy
+    );
+    servoDragRod.name = "Servo drag-link shaft";
+    servoDragRod.castShadow = true;
+    servoDragLink.add(servoDragRod);
+    const servoDragBalls = [];
+    for (let i = 0; i < 2; i++) {
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.046, 16, 12), materials.darkAlloy);
+      ball.name = i === 0 ? "Servo horn ball joint" : "Steering bellcrank ball joint";
+      ball.castShadow = true;
+      servoDragLink.add(ball);
+      servoDragBalls.push(ball);
+    }
+
+    const steeringTieRodGroup = new THREE.Group();
+    steeringTieRodGroup.name = "Articulated front steering tie rods";
+    root.add(steeringTieRodGroup);
+    for (const side of [-1, 1]) {
+      const assembly = new THREE.Group();
+      assembly.name = side < 0 ? "Left dynamic steering tie rod" : "Right dynamic steering tie rod";
+      steeringTieRodGroup.add(assembly);
+      const rod = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.026, 0.026, 1, 14, 1),
+        materials.brightAlloy
+      );
+      rod.name = side < 0 ? "Left tie-rod shaft" : "Right tie-rod shaft";
+      rod.castShadow = true;
+      assembly.add(rod);
+      for (let i = 0; i < 2; i++) {
+        const ball = new THREE.Mesh(new THREE.SphereGeometry(0.047, 16, 12), materials.darkAlloy);
+        ball.name = i === 0 ? "Rack-side ball joint" : "Upright-side ball joint";
+        ball.castShadow = true;
+        assembly.add(ball);
+      }
+    }
+
+    // Neat high-current and motor phase-wire runs join the battery, ESC and
+    // motor without crossing the steering linkage or rear axle opening.
+    addTube(root, [
+      [-1.18, 0.72, 0.58], [-1.02, 0.70, 0.45], [-0.70, 0.69, 0.29], [-0.34, 0.72, 0.25]
+    ], 0.024, materials.red, 7);
+    addTube(root, [
+      [-1.18, 0.68, 0.62], [-1.02, 0.66, 0.49], [-0.70, 0.65, 0.33], [-0.34, 0.68, 0.29]
+    ], 0.024, materials.black, 7);
+    const phaseWireColors = [materials.blue, materials.orange, materials.gold];
+    for (let i = 0; i < 3; i++) {
+      const z = 0.92 + i * 0.045;
+      addTube(root, [
+        [0.42, 0.82 + i * 0.025, z],
+        [0.48, 0.94 + i * 0.025, z + 0.08],
+        [0.55, 1.08 + i * 0.025, z + 0.12],
+        [0.55, 1.20 + i * 0.025, z + 0.17]
+      ], 0.018, phaseWireColors[i], 7);
+    }
 
     // Centre-to-front and centre-to-rear prop shafts, with yokes at each end.
     const propShaftGroup = new THREE.Group();
@@ -1672,10 +1809,10 @@ export function createPartsLabSystem(game) {
     const rearShockMounts = new THREE.Group();
     rearShockMounts.name = "Rear shock upper mounting brackets";
     root.add(rearShockMounts);
-    addBox(rearShockMounts, [1.45, 0.12, 0.18], [0, 1.32, 1.48], materials.darkAlloy, 0.03);
+    addBox(rearShockMounts, [1.45, 0.12, 0.18], [0, 1.62, 1.48], materials.darkAlloy, 0.03);
     for (const side of [-1, 1]) {
-      addBox(rearShockMounts, [0.18, 0.16, 0.36], [side * 0.54, 1.28, 1.48], materials.alloy, 0.025);
-      addScrew(rearShockMounts, [side * 0.54, 1.37, 1.48], 0.026, materials.brightAlloy);
+      addBox(rearShockMounts, [0.18, 0.16, 0.36], [side * 0.54, 1.58, 1.48], materials.alloy, 0.025);
+      addScrew(rearShockMounts, [side * 0.54, 1.67, 1.48], 0.026, materials.brightAlloy);
     }
 
     function buildRearDamper(side, offset, label) {
@@ -1722,7 +1859,7 @@ export function createPartsLabSystem(game) {
         [0, 1.04, 0], [0, Math.PI / 2, 0], 20);
 
       const lower = new THREE.Vector3(side * 0.46, 0.90, 1.97 + offset);
-      const upper = new THREE.Vector3(side * 0.54, 1.35, 1.48 + offset);
+      const upper = new THREE.Vector3(side * 0.54, 1.65, 1.48 + offset);
       return { name: label, root: shockRoot, springGroup: spring, rodGroup: rod, side, offset, lower, upper };
     }
 
@@ -1741,7 +1878,7 @@ export function createPartsLabSystem(game) {
   function alignAssemblyDamper(shock, lower, upper, compression) {
     const up = new THREE.Vector3(0, 1, 0);
     const direction = upper.clone().sub(lower);
-    const length = Math.max(0.55, direction.length());
+    const length = Math.max(0.32, direction.length());
     const axis = direction.normalize();
     shock.root.position.copy(lower).addScaledVector(axis, -0.04 * length);
     shock.root.quaternion.setFromUnitVectors(up, axis);
@@ -1775,11 +1912,48 @@ export function createPartsLabSystem(game) {
       springGroup: front.getObjectByName(side < 0 ? "Front shock spring left" : "Front shock spring right"),
       rodGroup: front.getObjectByName(side < 0 ? "Front shock piston left" : "Front shock piston right")
     }));
+    const steeringPivots = [-1, 1].map(side => ({
+      side,
+      pivot: frontKnuckles.getObjectByName(side < 0 ? "Left steering knuckle pivot" : "Right steering knuckle pivot")
+    }));
+    const steeringTieRodGroup = root.getObjectByName("Articulated front steering tie rods");
+    const steeringTieRods = [-1, 1].map(side => {
+      const assembly = steeringTieRodGroup?.getObjectByName(side < 0 ? "Left dynamic steering tie rod" : "Right dynamic steering tie rod");
+      return {
+        side,
+        rod: assembly?.getObjectByName(side < 0 ? "Left tie-rod shaft" : "Right tie-rod shaft"),
+        balls: [
+          assembly?.getObjectByName("Rack-side ball joint"),
+          assembly?.getObjectByName("Upright-side ball joint")
+        ]
+      };
+    });
+    const servoInstall = root.getObjectByName("Steering servo installation");
+    const servoHorn = servoInstall?.getObjectByName("Animated servo output horn");
+    const escInstall = root.getObjectByName("Brushless ESC installation");
+    const escRotor = escInstall?.getObjectByName("Animated seven blade ESC fan");
+    const motorInstall = root.getObjectByName("4274 brushless motor installation");
+    const motorShaft = motorInstall?.getObjectByName("Aligned rotating motor shaft and pinion");
+    const servoDragLink = root.getObjectByName("Servo-to-steering bellcrank pushrod");
+    const servoDragRod = servoDragLink?.getObjectByName("Servo drag-link shaft");
+    const servoDragBalls = [
+      servoDragLink?.getObjectByName("Servo horn ball joint"),
+      servoDragLink?.getObjectByName("Steering bellcrank ball joint")
+    ];
+
+    if (!servoHorn || !escRotor || !motorShaft || !servoDragRod ||
+        steeringPivots.some(item => !item.pivot) ||
+        steeringTieRods.some(item => !item.rod || item.balls.some(ball => !ball))) {
+      throw new Error("Rolling chassis is missing a steering or electrical component.");
+    }
+
     const frontCvdAssemblies = [-1, 1].map(side => {
       const group = frontCvd.getObjectByName(side < 0 ? "Left front CVD moving assembly" : "Right front CVD moving assembly");
+      const knucklePivot = steeringPivots.find(item => item.side === side)?.pivot;
       return {
         side,
         group,
+        knucklePivot,
         shaft: group?.getObjectByName(side < 0 ? "Left front CVD shaft" : "Right front CVD shaft"),
         innerCup: group?.getObjectByName(side < 0 ? "Left inner CV cup" : "Right inner CV cup"),
         outerCup: group?.getObjectByName(side < 0 ? "Left outer CV cup" : "Right outer CV cup"),
@@ -1803,11 +1977,37 @@ export function createPartsLabSystem(game) {
       }
     });
 
-    return { root, front, lowerPivots, upperPivots, frontShocks, frontKnuckles, frontCvd, frontCvdAssemblies, steering, rearCarrier, rearLinks, rearShocks };
+    return {
+      root, front, lowerPivots, upperPivots, frontShocks, frontKnuckles,
+      steeringPivots, steeringTieRods, frontCvd, frontCvdAssemblies, steering,
+      servoHorn, servoDragRod, servoDragBalls, escRotor, motorShaft,
+      rearCarrier, rearLinks, rearShocks
+    };
   }
 
-  function updateRollingChassisSuspension(motion, time, animate) {
+  function updateDynamicLink(root, rod, balls, startWorld, endWorld) {
+    const start = root.worldToLocal(startWorld.clone());
+    const end = root.worldToLocal(endWorld.clone());
+    const direction = end.clone().sub(start);
+    const length = Math.max(0.06, direction.length());
+    rod.position.copy(start).add(end).multiplyScalar(0.5);
+    rod.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+    rod.scale.set(1, length, 1);
+    balls[0].position.copy(start);
+    balls[1].position.copy(end);
+  }
+
+  function updateDynamicServoPushrod(motion) {
+    motion.root.updateMatrixWorld(true);
+    const hornWorld = motion.servoHorn.localToWorld(new THREE.Vector3(0.54, 0.067, 0));
+    const bellcrankWorld = motion.steering.localToWorld(new THREE.Vector3(0, 1.04, 0.24));
+    updateDynamicLink(motion.root, motion.servoDragRod, motion.servoDragBalls, hornWorld, bellcrankWorld);
+  }
+
+  function updateRollingChassisSuspension(motion, time, animate, steeringInput = 0) {
     const travel = animate ? Math.sin(time * 2.05) * 0.35 : 0;
+    const steering = THREE.MathUtils.clamp(steeringInput, -1, 1);
+    const wheelSteerAngle = -steering * 0.45;
     const compression = animate
       ? 0.64 + 0.36 * (0.5 + 0.5 * Math.sin(time * 2.05 + 0.28))
       : 1;
@@ -1823,14 +2023,30 @@ export function createPartsLabSystem(game) {
     // wishbones' vertical arc so they do not hover above the moving wheels.
     const frontHubTravel = 1.01 * Math.sin(travel) + 0.42 * (Math.cos(travel) - 1);
     motion.frontKnuckles.position.y = 0.06 + frontHubTravel;
-    motion.steering.position.y = -0.06 + frontHubTravel;
+    motion.steering.position.y = -0.06; // steering rack is chassis-mounted, not on the moving upright
+    motion.steering.rotation.y = wheelSteerAngle * 0.34;
+    motion.servoHorn.rotation.y = wheelSteerAngle * 1.18;
+    for (const item of motion.steeringPivots) {
+      const ackermann = 1 + item.side * steering * 0.065;
+      item.pivot.rotation.y = wheelSteerAngle * ackermann;
+    }
 
-    // Keep each half-shaft between the fixed differential and the moving hub.
+    // Keep each half-shaft between the fixed differential outputs and the
+    // moving/steering hub carriers.
+    motion.root.updateMatrixWorld(true);
+    motion.frontKnuckles.updateMatrixWorld(true);
+    for (const tieRod of motion.steeringTieRods) {
+      const rackEnd = motion.steering.localToWorld(new THREE.Vector3(tieRod.side * 0.28, 0.84, 0.30));
+      const knucklePivot = motion.steeringPivots.find(item => item.side === tieRod.side).pivot;
+      const uprightEnd = knucklePivot.localToWorld(new THREE.Vector3(-tieRod.side * 0.11, 0.31, 0.38));
+      updateDynamicLink(motion.root, tieRod.rod, tieRod.balls, rackEnd, uprightEnd);
+    }
     const shaftUp = new THREE.Vector3(0, 1, 0);
     const shaftNormal = new THREE.Vector3(0, 0, 1);
     for (const cvd of motion.frontCvdAssemblies) {
       const inner = new THREE.Vector3(cvd.side * 0.58, 0.84, -1.52);
-      const outer = new THREE.Vector3(cvd.side * 1.18, 0.63 + frontHubTravel, -1.97);
+      const outerWorld = cvd.knucklePivot.localToWorld(new THREE.Vector3(cvd.side * 0.16, 0, 0));
+      const outer = motion.root.worldToLocal(outerWorld.clone());
       const direction = outer.clone().sub(inner);
       const length = Math.max(0.1, direction.length());
       const axis = direction.normalize();
@@ -1858,22 +2074,29 @@ export function createPartsLabSystem(game) {
       alignAssemblyDamper(shock, lower, upper, compression);
     }
 
-    const rearTravel = animate ? Math.sin(time * 2.05 + 1.05) * 0.13 : 0;
-    const rearPitch = animate ? Math.sin(time * 2.05 + 1.05) * 0.025 : 0;
+    const rearTravel = animate ? Math.sin(time * 2.05 + 1.05) * 0.34 : 0;
+    const rearCompression = animate
+      ? THREE.MathUtils.clamp(1 - ((rearTravel + 0.34) / 0.68) * 0.18, 0.82, 1)
+      : 1;
+    const rearPitch = animate ? Math.sin(time * 2.05 + 1.05) * 0.045 : 0;
     motion.rearCarrier.position.y = 0.13 + rearTravel;
     motion.rearCarrier.rotation.x = rearPitch;
-    motion.rearLinks.position.y = 0.13 + rearTravel * 0.48;
-    motion.rearLinks.rotation.x = rearPitch * 0.55;
+    motion.rearLinks.position.y = 0.13 + rearTravel * 0.70;
+    motion.rearLinks.rotation.x = rearPitch * 0.72;
 
     for (const shock of motion.rearShocks) {
       const lower = new THREE.Vector3(shock.side * 0.46, 0.90 + rearTravel, 1.97 + shock.offset);
-      const upper = new THREE.Vector3(shock.side * 0.54, 1.35, 1.48 + shock.offset);
-      alignAssemblyDamper(shock, lower, upper, compression);
+      const upper = new THREE.Vector3(shock.side * 0.54, 1.65, 1.48 + shock.offset);
+      alignAssemblyDamper(shock, lower, upper, rearCompression);
     }
+
+    updateDynamicServoPushrod(motion);
+    motion.escRotor.rotation.y = animate ? time * 31 : 0;
+    motion.motorShaft.rotation.z = animate ? time * 22 : 0;
   }
 
   const rollingChassisModel = buildRollingChassisAssembly();
-  rollingChassisModel.name = "Complete non-electrical 1/7 rolling chassis";
+  rollingChassisModel.name = "Complete 1/7 assembled rolling chassis";
   rollingChassisModel.visible = false;
   showcase.add(rollingChassisModel);
 
@@ -1886,7 +2109,6 @@ export function createPartsLabSystem(game) {
   // heavier central drivetrain obscuring the arms, axle links and dampers.
   for (const name of [
     "Assembled skid plate",
-    "Front steering linkage",
     "Front differential unit",
     "Front CVD half-shafts",
     "Centre differential unit",
@@ -1901,8 +2123,9 @@ export function createPartsLabSystem(game) {
 
   const rollingChassisMotion = captureRollingChassisMotion(rollingChassisModel);
   const suspensionWorkingMotion = captureRollingChassisMotion(suspensionWorkingModel);
-  updateRollingChassisSuspension(rollingChassisMotion, 0, false);
-  updateRollingChassisSuspension(suspensionWorkingMotion, 0, false);
+  let assembledSteeringInput = 0;
+  updateRollingChassisSuspension(rollingChassisMotion, 0, false, 0);
+  updateRollingChassisSuspension(suspensionWorkingMotion, 0, false, 0);
 
   const componentModels = {
     servo: servoModel,
@@ -2043,14 +2266,14 @@ export function createPartsLabSystem(game) {
       specs: "LAYOUT      ·  Front + rear crossbars\nMOUNT       ·  Braced chassis tabs\nMATERIAL    ·  Alloy and tubular details\nSTATUS      ·  Standalone pair"
     },
     rollingChassis: {
-      name: "COMPLETE MECHANICAL ROLLING CHASSIS",
-      description: "An assembled 1/7-scale mechanical chassis using a 425 mm wheelbase layout: independent front double wishbones, steering hubs and links, front/centre differentials, a central gearbox, front half-shafts, prop shafts, a straight live rear axle with trailing links, wheels, dampers and bumpers. Electrical equipment is intentionally omitted.",
-      specs: "REFERENCE   ·  1/7 class · 425 mm wheelbase\nFRONT       ·  Independent double-wishbone\nREAR        ·  Solid axle + trailing / locating links\nDRIVE       ·  Front, centre and rear mechanical drive\nOMISSIONS   ·  Servo, motor, ESC and battery"
+      name: "COMPLETE 1/7 ROLLING CHASSIS",
+      description: "A complete mechanical and electrical 1/7 desert-truck chassis using the reference 425 mm wheelbase layout. It includes independent front double wishbones, servo-operated steering, front/centre differentials, a 4274-style motor, spinning-fan ESC, hardcase battery, shaft-driven 4WD and a live solid rear axle with long-travel suspension. Use A/D or the left/right arrow keys to steer the front wheels and servo together.",
+      specs: "REFERENCE   ·  1/7 class · 425 mm wheelbase\nFRONT       ·  Servo-linked 2WS / double-wishbone\nREAR        ·  Solid axle + extended travel links\nELECTRICS   ·  Servo, motor, ESC fan and battery\nINPUT       ·  A/D or left/right arrow keys"
     },
     suspensionWorking: {
       name: "WORKING FRONT + REAR SUSPENSION",
-      description: "A focused view of the assembled suspension. Front upper and lower A-arms move through vertical travel with steering hubs and wheels following the lower arms; the rear axle, wheels and locating links move together while four rear dampers and the front coil-overs compress.",
-      specs: "FRONT       ·  Moving upper / lower A-arms\nDAMPERS     ·  Front coil-overs + four rear shocks\nREAR        ·  Live axle with trailing links\nMOTION      ·  Pause / resume using the motion control"
+      description: "A focused view of the assembled suspension with the steering servo and ESC fan still visible. Front upper and lower A-arms move through vertical travel, the front wheels steer with the servo and the CVD shafts articulate; the rear axle rises and falls through extended travel with its wheels, locating links and four dampers following. Use A/D or the left/right arrow keys to steer.",
+      specs: "FRONT       ·  Moving A-arms + servo-linked steering\nDAMPERS     ·  Front coil-overs + four rear shocks\nREAR        ·  Solid axle / extended travel\nELECTRICS   ·  Servo horn + spinning ESC fan\nINPUT       ·  A/D or left/right arrow keys"
     },
   };
 
@@ -2141,8 +2364,9 @@ export function createPartsLabSystem(game) {
       for (const item of suspensionArmSet.pivots) item.pivot.rotation.z = 0;
       for (const item of suspensionUpperArmSet.pivots) item.pivot.rotation.z = 0;
       updateSuspensionDemo(0, false);
-      updateRollingChassisSuspension(rollingChassisMotion, 0, false);
-      updateRollingChassisSuspension(suspensionWorkingMotion, 0, false);
+      assembledSteeringInput = 0;
+      updateRollingChassisSuspension(rollingChassisMotion, 0, false, 0);
+      updateRollingChassisSuspension(suspensionWorkingMotion, 0, false, 0);
     }
   }
 
@@ -2165,8 +2389,24 @@ export function createPartsLabSystem(game) {
   }
 
   function update(delta, now, isActive) {
-    if (!visible || !isActive || !motionEnabled) return;
+    if (!visible || !isActive) return;
     const time = now * 0.001;
+    if (activePart === "rollingChassis" || activePart === "suspensionWorking") {
+      if (!motionEnabled) return;
+      const keys = game.controls?.keys || {};
+      const steerLeft = Boolean(keys.a || keys.arrowleft);
+      const steerRight = Boolean(keys.d || keys.arrowright);
+      const targetSteering = (steerRight ? 1 : 0) - (steerLeft ? 1 : 0);
+      assembledSteeringInput +=
+        (targetSteering - assembledSteeringInput) *
+        (1 - Math.exp(-12 * Math.max(0, delta)));
+      const motion = activePart === "rollingChassis"
+        ? rollingChassisMotion
+        : suspensionWorkingMotion;
+      updateRollingChassisSuspension(motion, time, true, assembledSteeringInput);
+      return;
+    }
+    if (!motionEnabled) return;
     if (activePart === "servo") {
       servoParts.hornPivot.rotation.y = Math.sin(time * 1.75) * 0.62;
     } else if (activePart === "motor") {
