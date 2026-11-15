@@ -405,7 +405,8 @@ export function createPartsLabSystem(game) {
 
   const motorParts = buildMotor();
   const motorShaft = motorParts.shaftGroup;
-  batchStaticMeshes(motorParts.body, [motorShaft]);
+  const motorDisplayStand = motorParts.body.getObjectByName("Standalone motor display mount");
+  batchStaticMeshes(motorParts.body, [motorShaft, motorDisplayStand]);
   batchStaticMeshes(motorShaft, [], { castShadow: false, receiveShadow: false });
 
   const escModel = new THREE.Group();
