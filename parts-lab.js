@@ -1293,6 +1293,61 @@ export function createPartsLabSystem(game) {
   }
   const driveShaftParts = buildDriveShafts();
 
+  const frontCVDShaftsModel = new THREE.Group();
+  frontCVDShaftsModel.name = "Independent front CVD half-shafts";
+  frontCVDShaftsModel.visible = false;
+  showcase.add(frontCVDShaftsModel);
+
+  function buildFrontCVDShafts() {
+    const body = new THREE.Group();
+    frontCVDShaftsModel.add(body);
+    for (const side of [-1, 1]) {
+      const inner = new THREE.Vector3(side * 0.46, 0.54, -0.60);
+      const outer = new THREE.Vector3(side * 1.18, 0.57, 0.02);
+      const direction = outer.clone().sub(inner).normalize();
+
+      // Hardened steel half-shaft with inner and outer universal/CV cups.
+      addPrototypeRod(body, inner.toArray(), outer.toArray(), 0.043, materials.brightAlloy, 0.072);
+      for (const point of [inner, outer]) {
+        const cup = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.085, 0.085, 0.16, 22),
+          materials.darkAlloy
+        );
+        cup.position.copy(point);
+        cup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+        cup.castShadow = true;
+        body.add(cup);
+      }
+
+      // Short flexible rubber gaiter around the inboard joint.
+      const bootCenter = inner.clone().lerp(outer, 0.22);
+      const bootQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction);
+      for (let i = 0; i < 4; i++) {
+        const ring = new THREE.Mesh(
+          new THREE.TorusGeometry(0.069 - i * 0.003, 0.012, 7, 18),
+          materials.rubber
+        );
+        ring.position.copy(bootCenter).addScaledVector(direction, (i - 1.5) * 0.055);
+        ring.quaternion.copy(bootQuat);
+        ring.castShadow = true;
+        body.add(ring);
+      }
+
+      // Outer stub and small retaining cap at the hub-carrier end.
+      const cap = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.058, 0.058, 0.12, 20),
+        materials.alloy
+      );
+      cap.position.copy(outer).addScaledVector(direction, 0.105);
+      cap.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+      cap.castShadow = true;
+      body.add(cap);
+    }
+    batchStaticMeshes(body);
+    return body;
+  }
+  const frontCVDParts = buildFrontCVDShafts();
+
   const motorMountModel = new THREE.Group();
   motorMountModel.name = "Adjustable 42 to 50 size motor mount";
   motorMountModel.visible = false;
@@ -1437,6 +1492,7 @@ export function createPartsLabSystem(game) {
     frontKnuckles: frontKnucklesModel,
     steeringLinkage: steeringLinkageModel,
     frontDifferential: frontDifferentialModel,
+    frontCVDShafts: frontCVDShaftsModel,
     centerDifferential: centerDifferentialModel,
     rearLinks: rearLinksModel,
     driveShafts: driveShaftsModel,
@@ -1526,6 +1582,11 @@ export function createPartsLabSystem(game) {
       name: "FRONT DIFFERENTIAL",
       description: "A compact front differential case with left and right output cups and a simple mounting bulkhead for the independent front drive.",
       specs: "DRIVE       ·  Front axle differential\nOUTPUTS     ·  Left and right half-shafts\nCASE        ·  Enclosed alloy-style housing\nSTATUS      ·  Standalone prototype"
+    },
+    frontCVDShafts: {
+      name: "FRONT CVD HALF-SHAFTS",
+      description: "A mirrored pair of articulated front constant-velocity half-shafts with inner joint cups, rubber gaiters and outer hub-end couplings for the independent front suspension.",
+      specs: "DRIVE       ·  Front independent axle shafts\nJOINTS      ·  Inner + outer CV cups\nBOOT        ·  Flexible rubber gaiters\nSTATUS      ·  Standalone pair"
     },
     centerDifferential: {
       name: "CENTRE DIFFERENTIAL",
