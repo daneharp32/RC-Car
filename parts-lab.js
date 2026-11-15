@@ -1539,8 +1539,8 @@ export function createPartsLabSystem(game) {
     },
     skidPlate: {
       name: "MAIN METAL SKID PLATE",
-      description: "A formed vertical chassis side plate matching the reference profile, with a long lower rail, raised centre section, tapered transition, stepped rear notch and countersunk fastener rows.",
-      specs: "REFERENCE   ·  425 mm target wheelbase\nPROFILE     ·  Approx. 320 × 115 × 5 mm\nFEATURES    ·  Raised centre + stepped cutout\nFASTENERS   ·  Countersunk mounting pattern"
+      description: "A horizontal under-chassis aluminum pan with a broad flat face, tapered ends, rounded perimeter and countersunk mounting points on its upper surface.",
+      specs: "REFERENCE   ·  425 mm target wheelbase\nPAN         ·  Approx. 320 × 110 × 5 mm\nORIENTATION ·  Flat in chassis X-Z plane\nFASTENERS   ·  Countersunk top-side pattern"
     },
     frontAArms: {
       name: "FRONT LOWER A-ARMS",
