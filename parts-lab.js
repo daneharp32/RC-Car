@@ -1430,7 +1430,19 @@ export function createPartsLabSystem(game) {
     skidPlate: skidPlateModel,
     frontAArms: frontAArmsModel,
     rearAxle: rearAxleModel,
-    frontSuspension: frontSuspensionModel
+    frontSuspension: frontSuspensionModel,
+    chassisFrame: chassisFrameModel,
+    frontUpperArms: frontUpperArmsModel,
+    frontKnuckles: frontKnucklesModel,
+    steeringLinkage: steeringLinkageModel,
+    frontDifferential: frontDifferentialModel,
+    centerDifferential: centerDifferentialModel,
+    rearLinks: rearLinksModel,
+    driveShafts: driveShaftsModel,
+    motorMount: motorMountModel,
+    wheelTire: wheelTireModel,
+    bumpers: bumpersModel,
+    rollCage: rollCageModel
   };
 
   const partDetails = {
@@ -1488,6 +1500,66 @@ export function createPartsLabSystem(game) {
       name: "FRONT SUSPENSION DEMONSTRATOR",
       description: "A standalone pair of front lower A-arms connected visually to two coil-over shocks. The arms pivot up and down while the shock rods and coil springs compress and extend together.",
       specs: "LAYOUT      ·  Mirrored front lower A-arms\nDAMPERS     ·  Twin coil-over shocks\nMOVEMENT    ·  Arm travel + spring compression\nSTATUS      ·  Standalone animated assembly"
+    },
+    chassisFrame: {
+      name: "ALUMINUM CHASSIS FRAME",
+      description: "Twin longitudinal frame rails, upper equipment deck, battery tray and crossmembers. It is a separate structural prototype, not an assembled chassis.",
+      specs: "LAYOUT      ·  Twin-rail three-layer frame\nDECK        ·  Upper electronics plate\nTRAY        ·  Recessed battery bay\nSTATUS      ·  Standalone structure"
+    },
+    frontUpperArms: {
+      name: "FRONT UPPER A-ARMS",
+      description: "A mirrored pair of compact upper wishbones to complement the lower A-arms in the independent front suspension. They move vertically with the standalone suspension travel demonstration.",
+      specs: "LAYOUT      ·  Left and right upper arms\nPIVOTS      ·  Twin inner hinge points\nOUTER       ·  Upright ball-joint mount\nMOTION      ·  Matching suspension travel"
+    },
+    frontKnuckles: {
+      name: "FRONT STEERING KNUCKLES",
+      description: "Left and right front hub carriers with stub axles, bearing bosses and steering-arm mounts.",
+      specs: "LAYOUT      ·  Independent left/right carriers\nHUB         ·  17 mm style wheel mount\nSTEERING    ·  Outboard steering arms\nSTATUS      ·  Standalone pair"
+    },
+    steeringLinkage: {
+      name: "FRONT STEERING LINKAGE",
+      description: "A central servo-saver/rack bar with drag link and left/right tie rods that connect the steering system conceptually to both front knuckles.",
+      specs: "LAYOUT      ·  Transverse steering rack\nLINKS       ·  Drag link + two tie rods\nJOINTS      ·  Ball-end style pivots\nSTATUS      ·  Standalone assembly"
+    },
+    frontDifferential: {
+      name: "FRONT DIFFERENTIAL",
+      description: "A compact front differential case with left and right output cups and a simple mounting bulkhead for the independent front drive.",
+      specs: "DRIVE       ·  Front axle differential\nOUTPUTS     ·  Left and right half-shafts\nCASE        ·  Enclosed alloy-style housing\nSTATUS      ·  Standalone prototype"
+    },
+    centerDifferential: {
+      name: "CENTRE DIFFERENTIAL",
+      description: "A centre differential housing with forward and rearward prop-shaft outputs for the four-wheel-drive layout.",
+      specs: "DRIVE       ·  4WD power split\nOUTPUTS     ·  Front and rear shafts\nCASE        ·  Enclosed central housing\nSTATUS      ·  Standalone prototype"
+    },
+    rearLinks: {
+      name: "REAR TRAILING ARMS & LINKS",
+      description: "A pair of long lower trailing arms, triangulated upper locating links and a lateral panhard bar. These pieces locate the rear solid axle while allowing suspension travel.",
+      specs: "LAYOUT      ·  Solid rear axle location\nLOWER       ·  Twin trailing arms\nUPPER       ·  Triangulated locating links\nLATERAL     ·  Panhard / track bar"
+    },
+    driveShafts: {
+      name: "FRONT & REAR PROPELLER SHAFTS",
+      description: "Two telescoping centre drive shafts with universal-joint yokes connecting a centre differential to the front differential and rear axle.",
+      specs: "DRIVE       ·  Shaft-driven 4WD\nFRONT       ·  Centre-to-front prop shaft\nREAR        ·  Centre-to-rear prop shaft\nJOINTS      ·  Universal-style couplings"
+    },
+    motorMount: {
+      name: "ADJUSTABLE MOTOR MOUNT",
+      description: "An alloy cradle and slotted side plates sized as a visual mount for a large 42–50 size brushless motor.",
+      specs: "FORMAT      ·  1/7 desert truck class\nFIT         ·  42–50 size motor envelope\nADJUST      ·  Slotted pinion-mesh rails\nSTATUS      ·  Standalone bracket"
+    },
+    wheelTire: {
+      name: "OFF-ROAD WHEEL & TIRE",
+      description: "A single large-scale desert tire with chunky tread blocks, alloy-style six-spoke rim, beadlock ring and 17 mm style hub centre.",
+      specs: "REFERENCE   ·  1/7 desert truck class\nTIRE        ·  Approx. 135–146 mm diameter\nRIM         ·  Six-spoke beadlock style\nHUB         ·  17 mm style centre"
+    },
+    bumpers: {
+      name: "FRONT & REAR BUMPERS",
+      description: "A pair of simple structural bumper bars with corner braces and mounting points for the front and rear of the rolling chassis.",
+      specs: "LAYOUT      ·  Front + rear crossbars\nMOUNT       ·  Braced chassis tabs\nMATERIAL    ·  Alloy and tubular details\nSTATUS      ·  Standalone pair"
+    },
+    rollCage: {
+      name: "TUBULAR BODY / SAFETY CAGE",
+      description: "A separate perimeter roll cage with side rails, roof crossbars and diagonal braces inspired by desert short-course chassis structures.",
+      specs: "LAYOUT      ·  Open tubular perimeter\nROOF        ·  Three crossbars\nBRACING     ·  Diagonal side supports\nSTATUS      ·  Standalone structure"
     }
   };
 
