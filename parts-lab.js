@@ -757,58 +757,55 @@ export function createPartsLabSystem(game) {
 
   function buildSkidPlate() {
     const body = new THREE.Group();
-    body.name = "Profiled chassis side plate with countersunk fasteners";
+    body.name = "Flat under-chassis aluminum skid plate";
     skidPlateModel.add(body);
 
-    // The reference is a tall side chassis plate, not a thin horizontal floor:
-    // long lower rail, raised centre, tapered front transition and a stepped
-    // rear notch. Envelope is approximately 320 x 115 x 5 mm at this scale.
-    const profile = new THREE.Shape();
-    profile.moveTo(-1.27, 0.30);
-    profile.lineTo(1.27, 0.30);
-    profile.lineTo(1.27, 0.56);
-    profile.lineTo(0.99, 0.58);
-    profile.lineTo(1.06, 0.78);
-    profile.lineTo(1.15, 1.12);
-    profile.lineTo(-0.63, 1.12);
-    profile.lineTo(-0.82, 0.98);
-    profile.lineTo(-1.04, 0.65);
-    profile.lineTo(-1.27, 0.56);
-    // Close the polygon explicitly with the supported path line operation.
-    profile.lineTo(-1.27, 0.30);
+    // Horizontal pan: X is width, Z is vehicle length, and the plate
+    // thickness runs vertically along Y.
+    const outline = new THREE.Shape();
+    outline.moveTo(-0.38, -1.27);
+    outline.lineTo(0.38, -1.27);
+    outline.lineTo(0.45, -1.12);
+    outline.lineTo(0.45, 0.88);
+    outline.lineTo(0.34, 1.22);
+    outline.lineTo(-0.34, 1.22);
+    outline.lineTo(-0.45, 0.88);
+    outline.lineTo(-0.45, -1.12);
+    outline.lineTo(-0.38, -1.27);
 
-    const plateGeometry = new THREE.ExtrudeGeometry(profile, {
-      depth: 0.045, bevelEnabled: true, bevelSegments: 2, steps: 1,
-      bevelSize: 0.012, bevelThickness: 0.008, curveSegments: 4
+    const plateGeometry = new THREE.ExtrudeGeometry(outline, {
+      depth: 0.045,
+      bevelEnabled: true,
+      bevelSegments: 2,
+      steps: 1,
+      bevelSize: 0.012,
+      bevelThickness: 0.008,
+      curveSegments: 4
     });
-    // The broad face is vertical and faces the +X viewing direction.
-    plateGeometry.rotateY(Math.PI / 2);
+    // Map the shape's XY plane onto the horizontal XZ plane.
+    plateGeometry.rotateX(Math.PI / 2);
     const plate = new THREE.Mesh(plateGeometry, materials.alloy);
-    plate.position.set(0.33, 0, 0);
-    plate.name = "Stepped formed aluminum side chassis plate";
+    plate.position.set(0, 0.30, 0);
+    plate.name = "Horizontal flat aluminum chassis skid plate";
     plate.castShadow = true;
     plate.receiveShadow = true;
     body.add(plate);
 
-    // Countersunk fasteners follow the actual profile on the outward face.
-    const holes = [
-      [-1.14,0.47],[-0.98,0.67],[-0.80,0.95],[-0.55,1.055],[-0.16,1.055],
-      [0.22,1.055],[0.60,1.055],[0.96,0.91],
-      [-1.05,0.36],[-0.75,0.42],[-0.40,0.43],[-0.04,0.43],[0.33,0.43],[0.70,0.43],
-      [-0.82,0.78],[-0.50,0.72],[-0.15,0.70],[0.22,0.70],[0.60,0.70]
+    // Countersunk fasteners sit on the upward-facing side of the pan.
+    const fasteners = [
+      [-0.34,-1.02], [0.34,-1.02], [-0.34,-0.66], [0.34,-0.66],
+      [-0.34,-0.28], [0.34,-0.28], [-0.34,0.22], [0.34,0.22],
+      [-0.34,0.62], [0.34,0.62], [-0.27,1.02], [0.27,1.02],
+      [-0.16,-0.82], [0.16,-0.82], [-0.16,0.84], [0.16,0.84]
     ];
-    for (const [u, y] of holes) {
-      const z = -u;
-      addCylinder(body, 0.028, 0.028, 0.018, materials.darkAlloy,
-        [0.382, y, z], [0, 0, Math.PI / 2], 20);
-      addTorus(body, 0.024, 0.0055, materials.black,
-        [0.394, y, z], [0, Math.PI / 2, 0], 20);
-      addBox(body, [0.004, 0.0045, 0.025],
-        [0.399, y, z], materials.brightAlloy, 0.001);
+    for (const [x, z] of fasteners) {
+      addTorus(body, 0.027, 0.0055, materials.darkAlloy,
+        [x, 0.306, z], [Math.PI / 2, 0, 0], 18);
+      addScrew(body, [x, 0.3125, z], 0.024, materials.brightAlloy);
     }
 
     for (const z of [-0.12, 0.12]) {
-      addBox(body, [0.012, 0.055, 0.018], [0.404, 0.39, z], materials.black, 0.006);
+      addBox(body, [0.018, 0.006, 0.062], [0, 0.315, z], materials.black, 0.006);
     }
     return { body, plate };
   }
@@ -928,20 +925,85 @@ export function createPartsLabSystem(game) {
   batchStaticMeshes(rearAxleParts.body);
 
   const frontSuspensionModel = new THREE.Group();
-  frontSuspensionModel.name = "Animated front suspension assembly demonstration";
+  frontSuspensionModel.name = "Triangulated independent front suspension assembly";
   frontSuspensionModel.visible = false;
   showcase.add(frontSuspensionModel);
 
-  // A short upper rail and twin shock towers make the suspension endpoints
-  // visible without pretending the prototype is already fitted to a chassis.
-  addBox(frontSuspensionModel, [1.35, 0.12, 0.48], [0, 1.34, -0.06], materials.shell, 0.055);
+  // Central lower bulkhead anchors the inboard suspension pivots.
+  addBox(frontSuspensionModel, [1.28, 0.16, 0.38],
+    [0, 0.94, -0.24], materials.darkAlloy, 0.045);
+  addBox(frontSuspensionModel, [1.10, 0.075, 0.22],
+    [0, 1.045, -0.22], materials.shellLight, 0.025);
+
   const suspensionArmSet = buildAnimatedFrontArmPair(frontSuspensionModel);
   const suspensionUpperArmSet = buildFrontUpperArms(frontSuspensionModel);
+
+  // Paired CNC-style triangular tower plates, one on each side of the
+  // suspension. The top mounts are carried by a shared cross-brace.
   for (const side of [-1, 1]) {
-    addBox(frontSuspensionModel, [0.15, 0.78, 0.18], [side * 0.61, 0.91, 0.04], materials.darkAlloy, 0.03);
-    addBox(frontSuspensionModel, [0.27, 0.12, 0.24], [side * 0.61, 1.31, 0.04], materials.shellLight, 0.025);
-    addCylinder(frontSuspensionModel, 0.06, 0.06, 0.19, materials.brightAlloy,
-      [side * 0.61, 1.36, 0.04], [0, 0, Math.PI / 2], 20);
+    const towerShape = new THREE.Shape();
+    towerShape.moveTo(-0.34, 0.98);
+    towerShape.lineTo(0.34, 0.98);
+    towerShape.lineTo(0.22, 1.46);
+    towerShape.lineTo(0.14, 1.56);
+    towerShape.lineTo(-0.14, 1.56);
+    towerShape.lineTo(-0.22, 1.46);
+    towerShape.lineTo(-0.34, 0.98);
+
+    const towerGeometry = new THREE.ExtrudeGeometry(towerShape, {
+      depth: 0.075,
+      bevelEnabled: true,
+      bevelSegments: 1,
+      steps: 1,
+      bevelSize: 0.012,
+      bevelThickness: 0.008,
+      curveSegments: 4
+    });
+    towerGeometry.rotateY(Math.PI / 2);
+    const tower = new THREE.Mesh(towerGeometry, materials.darkAlloy);
+    tower.position.set(side * 0.49, 0, 0.015);
+    tower.name = side < 0 ? "Left triangular front shock tower" : "Right triangular front shock tower";
+    tower.castShadow = true;
+    tower.receiveShadow = true;
+    frontSuspensionModel.add(tower);
+
+    // Diagonal braces triangulate each tower into its footplate.
+    addPrototypeRod(frontSuspensionModel,
+      [side * 0.34, 0.99, -0.25], [side * 0.61, 1.50, 0.10],
+      0.052, materials.shellLight, 0.068);
+    addPrototypeRod(frontSuspensionModel,
+      [side * 0.70, 0.99, -0.25], [side * 0.61, 1.50, 0.10],
+      0.052, materials.shellLight, 0.068);
+
+    // Wide footplates with two fasteners each clamp the towers to the bulkhead.
+    addBox(frontSuspensionModel, [0.36, 0.12, 0.34],
+      [side * 0.49, 1.00, -0.22], materials.alloy, 0.028);
+    for (const dx of [-0.105, 0.105]) {
+      addScrew(frontSuspensionModel, [side * 0.49 + dx, 1.068, -0.22],
+        0.026, materials.brightAlloy);
+    }
+
+    // Double-shear upper clevis captures each shock eyelet between two lugs.
+    const upperX = side * 0.61;
+    for (const offset of [-0.085, 0.085]) {
+      addBox(frontSuspensionModel, [0.055, 0.16, 0.19],
+        [upperX + offset, 1.49, 0.10], materials.shellLight, 0.018);
+    }
+    addCylinder(frontSuspensionModel, 0.046, 0.046, 0.27,
+      materials.brightAlloy, [upperX, 1.49, 0.10], [0, 0, Math.PI / 2], 22);
+    addTorus(frontSuspensionModel, 0.052, 0.010, materials.black,
+      [upperX - side * 0.14, 1.49, 0.10], [0, Math.PI / 2, 0], 20);
+    addTorus(frontSuspensionModel, 0.052, 0.010, materials.black,
+      [upperX + side * 0.14, 1.49, 0.10], [0, Math.PI / 2, 0], 20);
+  }
+
+  // Full-width upper crossmember ties both shock towers into one structure.
+  addBox(frontSuspensionModel, [1.48, 0.11, 0.16],
+    [0, 1.54, 0.10], materials.alloy, 0.028);
+  addBox(frontSuspensionModel, [1.20, 0.052, 0.10],
+    [0, 1.615, 0.10], materials.darkAlloy, 0.016);
+  for (const x of [-0.58, 0.58]) {
+    addScrew(frontSuspensionModel, [x, 1.65, 0.10], 0.024, materials.brightAlloy);
   }
 
   function buildAnimatedDemoShock(parent, side) {
@@ -949,47 +1011,46 @@ export function createPartsLabSystem(game) {
     root.name = side < 0 ? "Left moving front shock" : "Right moving front shock";
     parent.add(root);
 
-    // Local +Y runs from the lower A-arm attachment to the upper tower.
-    addCylinder(root, 0.095, 0.112, 0.54, materials.darkAlloy,
+    // Local +Y runs from the lower arm mount into the double-shear tower lug.
+    addCylinder(root, 0.092, 0.108, 0.56, materials.darkAlloy,
       [0, 0.29, 0], [0, 0, 0], 28);
-    addCylinder(root, 0.082, 0.082, 0.42, materials.shellLight,
+    addCylinder(root, 0.078, 0.078, 0.43, materials.shellLight,
       [0, 0.29, 0], [0, 0, 0], 28);
-    addTorus(root, 0.115, 0.016, materials.black,
+    addTorus(root, 0.108, 0.015, materials.black,
       [0, 0.56, 0], [Math.PI / 2, 0, 0], 24);
 
     const springGroup = new THREE.Group();
     springGroup.position.y = 0.25;
     root.add(springGroup);
     const springPoints = [];
-    const turns = 6.5, samples = turns * 18;
+    const turns = 7, samples = turns * 20;
     for (let i = 0; i <= samples; i++) {
       const t = i / samples;
       const angle = t * turns * Math.PI * 2;
-      springPoints.push([Math.cos(angle) * 0.135, t * 0.58, Math.sin(angle) * 0.135]);
+      springPoints.push([Math.cos(angle) * 0.125, t * 0.59, Math.sin(angle) * 0.125]);
     }
-    addTube(springGroup, springPoints, 0.022, materials.orange, 7);
-    addTorus(springGroup, 0.14, 0.018, materials.darkAlloy,
-      [0, 0.58, 0], [Math.PI / 2, 0, 0], 24);
+    addTube(springGroup, springPoints, 0.019, materials.orange, 7);
+    addTorus(springGroup, 0.13, 0.015, materials.darkAlloy,
+      [0, 0.59, 0], [Math.PI / 2, 0, 0], 24);
 
     const rodGroup = new THREE.Group();
     rodGroup.position.y = 0.48;
     root.add(rodGroup);
-    addCylinder(rodGroup, 0.026, 0.026, 0.55, materials.brightAlloy,
+    addCylinder(rodGroup, 0.024, 0.024, 0.58, materials.brightAlloy,
       [0, 0.22, 0], [0, 0, 0], 18);
-    addCylinder(rodGroup, 0.078, 0.078, 0.10, materials.darkAlloy,
+    addCylinder(rodGroup, 0.074, 0.074, 0.10, materials.darkAlloy,
       [0, 0.50, 0], [0, 0, 0], 24);
-    addCylinder(rodGroup, 0.055, 0.055, 0.12, materials.black,
+    addCylinder(rodGroup, 0.052, 0.052, 0.12, materials.black,
       [0, 0.56, 0], [Math.PI / 2, 0, 0], 20);
-    addTorus(rodGroup, 0.055, 0.012, materials.brightAlloy,
+    addTorus(rodGroup, 0.052, 0.011, materials.brightAlloy,
       [0, 0.62, 0], [0, Math.PI / 2, 0], 20);
 
-    // Eyelets are aligned across the truck (X axis), at the ends of the
-    // shock assembly rather than appearing as loose decorative rings.
-    addBox(root, [0.19, 0.10, 0.15], [0, 0.02, 0], materials.shellLight, 0.025);
-    addTorus(root, 0.055, 0.015, materials.darkAlloy,
+    // Captured mounting eyes with a transverse bolt axis at both ends.
+    addBox(root, [0.18, 0.095, 0.14], [0, 0.02, 0], materials.shellLight, 0.022);
+    addTorus(root, 0.052, 0.014, materials.darkAlloy,
       [0, 0.04, 0], [0, Math.PI / 2, 0], 24);
-    addBox(root, [0.19, 0.10, 0.15], [0, 1.02, 0], materials.shellLight, 0.025);
-    addTorus(root, 0.055, 0.015, materials.darkAlloy,
+    addBox(root, [0.18, 0.095, 0.14], [0, 1.02, 0], materials.shellLight, 0.022);
+    addTorus(root, 0.052, 0.014, materials.darkAlloy,
       [0, 1.04, 0], [0, Math.PI / 2, 0], 24);
 
     batchStaticMeshes(root, [springGroup, rodGroup]);
@@ -1031,40 +1092,6 @@ export function createPartsLabSystem(game) {
     }
     return rod;
   }
-
-  const chassisFrameModel = new THREE.Group();
-  chassisFrameModel.name = "Three-layer aluminum chassis frame and upper deck";
-  chassisFrameModel.visible = false;
-  showcase.add(chassisFrameModel);
-
-  function buildChassisFrame() {
-    const body = new THREE.Group();
-    chassisFrameModel.add(body);
-
-    // Twin longitudinal aluminum rails form the rolling chassis spine.
-    for (const x of [-0.52, 0.52]) {
-      addBox(body, [0.15, 0.22, 2.58], [x, 0.48, 0], materials.darkAlloy, 0.035);
-      addBox(body, [0.095, 0.035, 2.44], [x, 0.61, 0], materials.alloy, 0.012);
-    }
-
-    // Upper equipment deck, centre battery tray and the four main crossmembers.
-    addBox(body, [0.88, 0.075, 1.72], [0, 0.72, -0.03], materials.alloy, 0.025);
-    addBox(body, [0.72, 0.035, 1.25], [0, 0.78, -0.05], materials.black, 0.018);
-    addBox(body, [0.64, 0.055, 0.76], [0, 0.83, -0.04], materials.shellLight, 0.02);
-    for (const z of [-1.10, -0.52, 0.50, 1.10]) {
-      addBox(body, [1.16, 0.13, 0.14], [0, 0.47, z], materials.shellLight, 0.025);
-      for (const x of [-0.48, 0.48]) addScrew(body, [x, 0.55, z], 0.025, materials.brightAlloy);
-    }
-
-    // Diagonal upper braces support the deck and open body cage.
-    for (const side of [-1, 1]) {
-      addPrototypeRod(body, [side * 0.52, 0.55, -0.90], [side * 0.38, 0.92, -0.46], 0.035, materials.darkAlloy);
-      addPrototypeRod(body, [side * 0.52, 0.55, 0.90], [side * 0.38, 0.92, 0.46], 0.035, materials.darkAlloy);
-    }
-    batchStaticMeshes(body);
-    return body;
-  }
-  const chassisFrameParts = buildChassisFrame();
 
   const frontUpperArmsModel = new THREE.Group();
   frontUpperArmsModel.name = "Pair of independent front upper A arms";
@@ -1449,32 +1476,6 @@ export function createPartsLabSystem(game) {
   }
   const bumperParts = buildBumpers();
 
-  const rollCageModel = new THREE.Group();
-  rollCageModel.name = "Tubular body safety cage";
-  rollCageModel.visible = false;
-  showcase.add(rollCageModel);
-
-  function buildRollCage() {
-    const body = new THREE.Group();
-    rollCageModel.add(body);
-    for (const x of [-0.52, 0.52]) {
-      addPrototypeRod(body, [x, 0.42, -1.06], [x, 1.34, -0.62], 0.045, materials.darkAlloy);
-      addPrototypeRod(body, [x, 1.34, -0.62], [x, 1.34, 0.75], 0.045, materials.darkAlloy);
-      addPrototypeRod(body, [x, 1.34, 0.75], [x, 0.42, 1.08], 0.045, materials.darkAlloy);
-      addPrototypeRod(body, [x, 0.42, -1.06], [x, 0.42, 1.08], 0.035, materials.shellLight);
-    }
-    for (const z of [-0.62, 0.0, 0.75]) {
-      addPrototypeRod(body, [-0.52, 1.34, z], [0.52, 1.34, z], 0.038, materials.shellLight);
-    }
-    for (const side of [-1, 1]) {
-      addPrototypeRod(body, [side * 0.52, 0.42, -0.95], [side * 0.52, 1.34, 0.74], 0.032, materials.darkAlloy);
-      addPrototypeRod(body, [side * 0.52, 1.34, -0.62], [0, 0.42, 0.95], 0.032, materials.shellLight);
-    }
-    batchStaticMeshes(body);
-    return body;
-  }
-  const rollCageParts = buildRollCage();
-
   const componentModels = {
     servo: servoModel,
     motor: motorModel,
@@ -1487,7 +1488,6 @@ export function createPartsLabSystem(game) {
     frontAArms: frontAArmsModel,
     rearAxle: rearAxleModel,
     frontSuspension: frontSuspensionModel,
-    chassisFrame: chassisFrameModel,
     frontUpperArms: frontUpperArmsModel,
     frontKnuckles: frontKnucklesModel,
     steeringLinkage: steeringLinkageModel,
@@ -1499,7 +1499,6 @@ export function createPartsLabSystem(game) {
     motorMount: motorMountModel,
     wheelTire: wheelTireModel,
     bumpers: bumpersModel,
-    rollCage: rollCageModel
   };
 
   const partDetails = {
@@ -1540,8 +1539,8 @@ export function createPartsLabSystem(game) {
     },
     skidPlate: {
       name: "MAIN METAL SKID PLATE",
-      description: "A formed vertical chassis side plate matching the reference profile, with a long lower rail, raised centre section, tapered transition, stepped rear notch and countersunk fastener rows.",
-      specs: "REFERENCE   ·  425 mm target wheelbase\nPROFILE     ·  Approx. 320 × 115 × 5 mm\nFEATURES    ·  Raised centre + stepped cutout\nFASTENERS   ·  Countersunk mounting pattern"
+      description: "A horizontal under-chassis aluminum pan with a broad flat face, tapered ends, rounded perimeter and countersunk mounting points on its upper surface.",
+      specs: "REFERENCE   ·  425 mm target wheelbase\nPAN         ·  Approx. 320 × 110 × 5 mm\nORIENTATION ·  Flat in chassis X-Z plane\nFASTENERS   ·  Countersunk top-side pattern"
     },
     frontAArms: {
       name: "FRONT LOWER A-ARMS",
@@ -1557,11 +1556,6 @@ export function createPartsLabSystem(game) {
       name: "FRONT SUSPENSION DEMONSTRATOR",
       description: "A standalone pair of front lower A-arms connected visually to two coil-over shocks. The arms pivot up and down while the shock rods and coil springs compress and extend together.",
       specs: "LAYOUT      ·  Mirrored front lower A-arms\nDAMPERS     ·  Twin coil-over shocks\nMOVEMENT    ·  Arm travel + spring compression\nSTATUS      ·  Standalone animated assembly"
-    },
-    chassisFrame: {
-      name: "ALUMINUM CHASSIS FRAME",
-      description: "Twin longitudinal frame rails, upper equipment deck, battery tray and crossmembers. It is a separate structural prototype, not an assembled chassis.",
-      specs: "LAYOUT      ·  Twin-rail three-layer frame\nDECK        ·  Upper electronics plate\nTRAY        ·  Recessed battery bay\nSTATUS      ·  Standalone structure"
     },
     frontUpperArms: {
       name: "FRONT UPPER A-ARMS",
@@ -1618,11 +1612,6 @@ export function createPartsLabSystem(game) {
       description: "A pair of simple structural bumper bars with corner braces and mounting points for the front and rear of the rolling chassis.",
       specs: "LAYOUT      ·  Front + rear crossbars\nMOUNT       ·  Braced chassis tabs\nMATERIAL    ·  Alloy and tubular details\nSTATUS      ·  Standalone pair"
     },
-    rollCage: {
-      name: "TUBULAR BODY / SAFETY CAGE",
-      description: "A separate perimeter roll cage with side rails, roof crossbars and diagonal braces inspired by desert short-course chassis structures.",
-      specs: "LAYOUT      ·  Open tubular perimeter\nROOF        ·  Three crossbars\nBRACING     ·  Diagonal side supports\nSTATUS      ·  Standalone structure"
-    }
   };
 
   let activePart = "servo";
@@ -1633,7 +1622,7 @@ export function createPartsLabSystem(game) {
   function selectPart(id) {
     if (!componentModels[id]) return;
     activePart = id;
-    if (game.controls) game.controls.cameraOrbitYaw = id === "skidPlate" ? Math.PI / 2 : 0;
+    if (game.controls) game.controls.cameraOrbitYaw = 0;
     for (const [key, model] of Object.entries(componentModels)) {
       model.visible = key === id;
     }
@@ -1672,14 +1661,18 @@ export function createPartsLabSystem(game) {
       const arm = suspensionArmSet.pivots.find(item => item.side === shock.side);
       if (!arm) continue;
       const lowerWorld = arm.pivot.localToWorld(new THREE.Vector3(shock.side * 0.72, 0.12, -0.015));
-      const upperWorld = new THREE.Vector3(shock.side * 0.61, 1.36, 0.04);
+      const upperWorld = new THREE.Vector3(shock.side * 0.61, 1.49, 0.10);
       const lower = frontSuspensionModel.worldToLocal(lowerWorld.clone());
       const upper = frontSuspensionModel.worldToLocal(upperWorld);
       const direction = upper.sub(lower);
       const length = Math.max(0.65, direction.length());
 
-      shock.root.position.copy(lower);
-      shock.root.quaternion.setFromUnitVectors(up, direction.normalize());
+      const shockAxis = direction.normalize();
+      // The shock eyelet centres are at local Y=.04 and Y=1.04.
+      // Offset the root so those centres land exactly on the moving arm and
+      // fixed tower bolts instead of hovering a few millimetres beyond them.
+      shock.root.position.copy(lower).addScaledVector(shockAxis, -0.04 * length);
+      shock.root.quaternion.setFromUnitVectors(up, shockAxis);
       shock.root.scale.set(1, length, 1);
       shock.springGroup.scale.y = compression;
       shock.rodGroup.position.y = 0.48 - (1 - compression) * 0.30;
@@ -1723,7 +1716,7 @@ export function createPartsLabSystem(game) {
   }
 
   function resetView() {
-    if (game.controls) game.controls.cameraOrbitYaw = activePart === "skidPlate" ? Math.PI / 2 : 0;
+    if (game.controls) game.controls.cameraOrbitYaw = 0;
   }
 
   function update(delta, now, isActive) {
@@ -1769,10 +1762,9 @@ export function createPartsLabSystem(game) {
     update,
     resetView,
     getFocusPosition() {
-      if (activePart === "skidPlate") return new THREE.Vector3(0, 0.70, 0);
+      if (activePart === "skidPlate") return new THREE.Vector3(0, 0.30, 0);
       if (activePart === "frontAArms" || activePart === "rearAxle" || activePart === "rearLinks") return new THREE.Vector3(0, 0.52, 0);
-      if (activePart === "frontSuspension") return new THREE.Vector3(0, 0.85, 0);
-      if (activePart === "chassisFrame" || activePart === "rollCage") return new THREE.Vector3(0, 0.88, 0);
+      if (activePart === "frontSuspension") return new THREE.Vector3(0, 1.00, 0);
       if (activePart === "frontKnuckles" || activePart === "steeringLinkage" || activePart === "frontDifferential") return new THREE.Vector3(0, 0.62, 0);
       if (activePart === "rearLinks" || activePart === "driveShafts" || activePart === "centerDifferential") return new THREE.Vector3(0, 0.58, 0);
       return new THREE.Vector3(0, 0.92, 0);
