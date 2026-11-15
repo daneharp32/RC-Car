@@ -774,6 +774,7 @@
     }
     .parts-lab-copy { margin: 0 0 17px; color: #aebdca; font-size: 11px; line-height: 1.55; }
     .parts-lab-part-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin: 9px 0 13px; }
+    .parts-lab-part-divider { grid-column: 1 / -1; padding-top: 8px; margin-top: 3px; border-top: 1px solid rgba(150,185,215,.14); }
     .parts-lab-part-button {
       min-width: 0; min-height: 56px; padding: 8px 5px; display: flex; flex-direction: column;
       justify-content: center; gap: 4px; color: #dce8f2;
@@ -915,6 +916,7 @@
     <p class="parts-lab-copy">Inspect the new standalone component models. These are display models only and are not connected to either truck chassis.</p>
     <div class="parts-lab-section-label">SELECT A COMPONENT</div>
     <div class="parts-lab-part-list" role="group" aria-label="Choose a work-in-progress component">
+      <div class="parts-lab-section-label parts-lab-part-divider">EXISTING COMPONENT PROTOTYPES</div>
       <button class="parts-lab-part-button active" type="button" data-wip-part="servo" aria-pressed="true">
         <strong>SERVO</strong><small>STEERING</small>
       </button>
@@ -935,6 +937,16 @@
       </button>
       <button class="parts-lab-part-button" type="button" data-wip-part="spring" aria-pressed="false">
         <strong>SPRING</strong><small>SUSPENSION</small>
+      </button>
+      <div class="parts-lab-section-label parts-lab-part-divider">CHASSIS STRUCTURE · DEVELOPMENT</div>
+      <button class="parts-lab-part-button" type="button" data-wip-part="skidPlate" aria-pressed="false">
+        <strong>SKID PLATE</strong><small>MAIN BASE</small>
+      </button>
+      <button class="parts-lab-part-button" type="button" data-wip-part="frontAArms" aria-pressed="false">
+        <strong>FRONT A-ARMS</strong><small>WISHBONES</small>
+      </button>
+      <button class="parts-lab-part-button" type="button" data-wip-part="rearAxle" aria-pressed="false">
+        <strong>REAR AXLE</strong><small>SOLID AXLE BAR</small>
       </button>
     </div>
     <div class="parts-lab-info" aria-live="polite">

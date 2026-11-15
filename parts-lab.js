@@ -746,6 +746,148 @@ export function createPartsLabSystem(game) {
   batchStaticMeshes(standaloneSpring.body,[standaloneSpring.springGroup]);
   batchStaticMeshes(standaloneSpring.springGroup,[],{castShadow:false,receiveShadow:false});
 
+
+  // MAIN CHASSIS DEVELOPMENT PARTS
+  // These prototypes use the user's 425 mm wheelbase reference as a scale anchor.
+  // They are independent display pieces and are not installed on either car.
+  const skidPlateModel = new THREE.Group();
+  skidPlateModel.name = "Main flat metal chassis skid plate";
+  skidPlateModel.visible = false;
+  showcase.add(skidPlateModel);
+
+  function buildSkidPlate() {
+    const body = new THREE.Group();
+    body.name = "3 mm aluminum chassis plate";
+    skidPlateModel.add(body);
+
+    // Approx. 310 x 100 x 3.5 mm in the 425 mm wheelbase scale reference.
+    addBox(body, [0.80, 0.028, 2.48], [0, 0.285, 0], materials.alloy, 0.012);
+
+    // Practical edge mounting points and central drivetrain crossmember holes.
+    for (const z of [-1.02, -0.62, 0.62, 1.02]) {
+      for (const x of [-0.29, 0.29]) {
+        addTorus(body, 0.034, 0.006, materials.darkAlloy,
+          [x, 0.302, z], [Math.PI / 2, 0, 0], 20);
+        addScrew(body, [x, 0.303, z], 0.022, materials.brightAlloy);
+      }
+    }
+    for (const z of [-0.26, 0.26]) {
+      addTorus(body, 0.043, 0.007, materials.darkAlloy,
+        [0, 0.302, z], [Math.PI / 2, 0, 0], 20);
+      addScrew(body, [0, 0.303, z], 0.025, materials.brightAlloy);
+    }
+    return { body };
+  }
+  const skidPlateParts = buildSkidPlate();
+  batchStaticMeshes(skidPlateParts.body);
+
+  const frontAArmsModel = new THREE.Group();
+  frontAArmsModel.name = "Pair of front double wishbone A arms";
+  frontAArmsModel.visible = false;
+  showcase.add(frontAArmsModel);
+
+  function buildFrontAArms() {
+    const body = new THREE.Group();
+    body.name = "Mirrored front lower A arms";
+    frontAArmsModel.add(body);
+
+    for (const side of [-1, 1]) {
+      // Broad triangular lower arm, connecting two inner pivots to one
+      // outboard ball-joint carrier.
+      const outline = new THREE.Shape();
+      outline.moveTo(side * 0.36, -0.34);
+      outline.lineTo(side * 0.36, 0.34);
+      outline.lineTo(side * 1.10, 0.015);
+      outline.lineTo(side * 0.36, -0.34);
+      const armGeometry = new THREE.ExtrudeGeometry(outline, {
+        depth: 0.075,
+        bevelEnabled: true,
+        bevelSegments: 1,
+        steps: 1,
+        bevelSize: 0.018,
+        bevelThickness: 0.012,
+        curveSegments: 4
+      });
+      armGeometry.rotateX(Math.PI / 2);
+      armGeometry.translate(0, 0.355, 0);
+      const arm = new THREE.Mesh(armGeometry, materials.darkAlloy);
+      arm.name = side < 0 ? "Left front lower A arm" : "Right front lower A arm";
+      arm.castShadow = true;
+      arm.receiveShadow = true;
+      body.add(arm);
+
+      // Inner hinge barrels run across the pivot axis.
+      for (const z of [-0.34, 0.34]) {
+        addCylinder(body, 0.066, 0.066, 0.17, materials.black,
+          [side * 0.36, 0.35, z], [0, 0, Math.PI / 2], 24);
+        addCylinder(body, 0.045, 0.045, 0.19, materials.brightAlloy,
+          [side * 0.36, 0.35, z], [0, 0, Math.PI / 2], 20);
+      }
+
+      // Outboard ball-joint cup is centred over the tapered arm tip.
+      addCylinder(body, 0.105, 0.105, 0.11, materials.black,
+        [side * 1.08, 0.34, 0.015], [0, 0, 0], 28);
+      addCylinder(body, 0.072, 0.072, 0.13, materials.brightAlloy,
+        [side * 1.08, 0.405, 0.015], [0, 0, 0], 24);
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.075, 20, 14), materials.darkAlloy);
+      ball.position.set(side * 1.08, 0.48, 0.015);
+      ball.castShadow = true;
+      body.add(ball);
+    }
+
+    // Simple crossmember represents the front inner-pivot mounting area.
+    addBox(body, [0.90, 0.10, 0.16], [0, 0.32, -0.42], materials.shellLight, 0.025);
+    return { body };
+  }
+  const frontAArmsParts = buildFrontAArms();
+  batchStaticMeshes(frontAArmsParts.body);
+
+  const rearAxleModel = new THREE.Group();
+  rearAxleModel.name = "Full width solid rear axle assembly";
+  rearAxleModel.visible = false;
+  showcase.add(rearAxleModel);
+
+  function buildRearAxle() {
+    const body = new THREE.Group();
+    body.name = "Straight axle tubes and central differential housing";
+    rearAxleModel.add(body);
+
+    // Differential pumpkin is deeper than the straight axle tubes.
+    addBox(body, [0.56, 0.43, 0.52], [0, 0.50, 0], materials.shell, 0.14);
+    addCylinder(body, 0.255, 0.255, 0.075, materials.darkAlloy,
+      [0, 0.51, 0.275], [Math.PI / 2, 0, 0], 36);
+    addCylinder(body, 0.205, 0.205, 0.035, materials.black,
+      [0, 0.51, 0.325], [Math.PI / 2, 0, 0], 32);
+    addTorus(body, 0.222, 0.014, materials.brightAlloy,
+      [0, 0.51, 0.347], [0, 0, 0], 36);
+
+    // Straight tubes extend symmetrically from the centre differential.
+    for (const side of [-1, 1]) {
+      addCylinder(body, 0.115, 0.115, 0.88, materials.darkAlloy,
+        [side * 0.68, 0.50, 0], [0, 0, Math.PI / 2], 32);
+      addCylinder(body, 0.085, 0.085, 0.18, materials.shellLight,
+        [side * 1.04, 0.50, 0], [0, 0, Math.PI / 2], 28);
+
+      // Wheel-end backing plate, bearing ring and short hub stub.
+      addCylinder(body, 0.205, 0.205, 0.10, materials.black,
+        [side * 1.12, 0.50, 0], [0, 0, Math.PI / 2], 32);
+      addTorus(body, 0.145, 0.014, materials.brightAlloy,
+        [side * 1.16, 0.50, 0], [0, Math.PI / 2, 0], 28);
+      addCylinder(body, 0.075, 0.075, 0.16, materials.alloy,
+        [side * 1.20, 0.50, 0], [0, 0, Math.PI / 2], 24);
+    }
+
+    // Top saddles mark future suspension-link and shock attachment zones.
+    for (const x of [-0.46, 0.46]) {
+      addBox(body, [0.20, 0.12, 0.27], [x, 0.77, 0], materials.shellLight, 0.035);
+      addCylinder(body, 0.052, 0.052, 0.18, materials.darkAlloy,
+        [x, 0.85, 0], [0, 0, Math.PI / 2], 20);
+    }
+    return { body };
+  }
+  const rearAxleParts = buildRearAxle();
+  batchStaticMeshes(rearAxleParts.body);
+
   const componentModels = {
     servo: servoModel,
     motor: motorModel,
@@ -753,7 +895,10 @@ export function createPartsLabSystem(game) {
     battery: batteryModel,
     gearbox: gearboxModel,
     shock: shockModel,
-    spring: springModel
+    spring: springModel,
+    skidPlate: skidPlateModel,
+    frontAArms: frontAArmsModel,
+    rearAxle: rearAxleModel
   };
 
   const partDetails = {
@@ -791,6 +936,21 @@ export function createPartsLabSystem(game) {
       name: "SUSPENSION COIL SPRING",
       description: "A standalone suspension spring with visible coils and a repeating compression and extension demonstration.",
       specs: "ACTION      ·  Repeated compression cycle\nTYPE        ·  Steel coil-over spring\nSEATS       ·  Upper and lower retainers\nMOTION      ·  Animated pitch change"
+    },
+    skidPlate: {
+      name: "MAIN METAL SKID PLATE",
+      description: "A flat central aluminum chassis plate with rounded edges and practical mounting points. Sized as the centre section of a truck using a 425 mm target wheelbase.",
+      specs: "REFERENCE   ·  425 mm target wheelbase\nPLATE       ·  Approx. 310 × 100 × 3.5 mm\nMATERIAL    ·  Brushed aluminum appearance\nSTATUS      ·  Standalone prototype"
+    },
+    frontAArms: {
+      name: "FRONT LOWER A-ARMS",
+      description: "A mirrored pair of broad front lower wishbones. Each arm joins two inner chassis pivots to an outboard ball-joint carrier. These are geometry studies and are not connected to steering or wheels.",
+      specs: "LAYOUT      ·  Left and right pair\nTYPE        ·  Double-wishbone lower arms\nJOINTS      ·  Two inner pivots per side\nSTATUS      ·  Standalone prototype"
+    },
+    rearAxle: {
+      name: "SOLID REAR AXLE BAR",
+      description: "A full-width straight rear axle housing with a central differential pumpkin, axle tubes, wheel-end hubs and simple upper mounting saddles. It is not connected to the chassis or suspension.",
+      specs: "LAYOUT      ·  Full-width solid axle\nHOUSING     ·  Central differential + tubes\nENDS        ·  Left and right hub stubs\nSTATUS      ·  Standalone prototype"
     }
   };
 
@@ -888,7 +1048,8 @@ export function createPartsLabSystem(game) {
     update,
     resetView,
     getFocusPosition() {
-      return new THREE.Vector3(0, 0.92, 0);
+      const chassisPart = activePart === "skidPlate" || activePart === "frontAArms" || activePart === "rearAxle";
+      return new THREE.Vector3(0, chassisPart ? 0.52 : 0.92, 0);
     },
     get activePart() { return activePart; },
     get motionEnabled() { return motionEnabled; },
