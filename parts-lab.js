@@ -926,6 +926,78 @@ export function createPartsLabSystem(game) {
   const rearAxleParts = buildRearAxle();
   batchStaticMeshes(rearAxleParts.body);
 
+  const frontSuspensionModel = new THREE.Group();
+  frontSuspensionModel.name = "Animated front suspension assembly demonstration";
+  frontSuspensionModel.visible = false;
+  showcase.add(frontSuspensionModel);
+
+  // A short upper rail and twin shock towers make the suspension endpoints
+  // visible without pretending the prototype is already fitted to a chassis.
+  addBox(frontSuspensionModel, [1.35, 0.12, 0.48], [0, 1.34, -0.06], materials.shell, 0.055);
+  const suspensionArmSet = buildAnimatedFrontArmPair(frontSuspensionModel);
+  for (const side of [-1, 1]) {
+    addBox(frontSuspensionModel, [0.15, 0.78, 0.18], [side * 0.61, 0.91, 0.04], materials.darkAlloy, 0.03);
+    addBox(frontSuspensionModel, [0.27, 0.12, 0.24], [side * 0.61, 1.31, 0.04], materials.shellLight, 0.025);
+    addCylinder(frontSuspensionModel, 0.06, 0.06, 0.19, materials.brightAlloy,
+      [side * 0.61, 1.36, 0.04], [0, 0, Math.PI / 2], 20);
+  }
+
+  function buildAnimatedDemoShock(parent, side) {
+    const root = new THREE.Group();
+    root.name = side < 0 ? "Left moving front shock" : "Right moving front shock";
+    parent.add(root);
+
+    // Local +Y runs from the lower A-arm attachment to the upper tower.
+    addCylinder(root, 0.095, 0.112, 0.54, materials.darkAlloy,
+      [0, 0.29, 0], [0, 0, 0], 28);
+    addCylinder(root, 0.082, 0.082, 0.42, materials.shellLight,
+      [0, 0.29, 0], [0, 0, 0], 28);
+    addTorus(root, 0.115, 0.016, materials.black,
+      [0, 0.56, 0], [Math.PI / 2, 0, 0], 24);
+
+    const springGroup = new THREE.Group();
+    springGroup.position.y = 0.25;
+    root.add(springGroup);
+    const springPoints = [];
+    const turns = 6.5, samples = turns * 18;
+    for (let i = 0; i <= samples; i++) {
+      const t = i / samples;
+      const angle = t * turns * Math.PI * 2;
+      springPoints.push([Math.cos(angle) * 0.135, t * 0.58, Math.sin(angle) * 0.135]);
+    }
+    addTube(springGroup, springPoints, 0.022, materials.orange, 7);
+    addTorus(springGroup, 0.14, 0.018, materials.darkAlloy,
+      [0, 0.58, 0], [Math.PI / 2, 0, 0], 24);
+
+    const rodGroup = new THREE.Group();
+    rodGroup.position.y = 0.48;
+    root.add(rodGroup);
+    addCylinder(rodGroup, 0.026, 0.026, 0.55, materials.brightAlloy,
+      [0, 0.22, 0], [0, 0, 0], 18);
+    addCylinder(rodGroup, 0.078, 0.078, 0.10, materials.darkAlloy,
+      [0, 0.50, 0], [0, 0, 0], 24);
+    addCylinder(rodGroup, 0.055, 0.055, 0.12, materials.black,
+      [0, 0.56, 0], [Math.PI / 2, 0, 0], 20);
+    addTorus(rodGroup, 0.055, 0.012, materials.brightAlloy,
+      [0, 0.62, 0], [0, Math.PI / 2, 0], 20);
+
+    // Eyelets are aligned across the truck (X axis), at the ends of the
+    // shock assembly rather than appearing as loose decorative rings.
+    addBox(root, [0.19, 0.10, 0.15], [0, 0.02, 0], materials.shellLight, 0.025);
+    addTorus(root, 0.055, 0.015, materials.darkAlloy,
+      [0, 0.04, 0], [0, Math.PI / 2, 0], 24);
+    addBox(root, [0.19, 0.10, 0.15], [0, 1.02, 0], materials.shellLight, 0.025);
+    addTorus(root, 0.055, 0.015, materials.darkAlloy,
+      [0, 1.04, 0], [0, Math.PI / 2, 0], 24);
+
+    batchStaticMeshes(root, [springGroup, rodGroup]);
+    batchStaticMeshes(springGroup, [], { castShadow: false, receiveShadow: false });
+    batchStaticMeshes(rodGroup, [], { castShadow: false, receiveShadow: false });
+    return { root, springGroup, rodGroup, side };
+  }
+
+  const suspensionShocks = [-1, 1].map(side => buildAnimatedDemoShock(frontSuspensionModel, side));
+
   const componentModels = {
     servo: servoModel,
     motor: motorModel,
@@ -936,7 +1008,8 @@ export function createPartsLabSystem(game) {
     spring: springModel,
     skidPlate: skidPlateModel,
     frontAArms: frontAArmsModel,
-    rearAxle: rearAxleModel
+    rearAxle: rearAxleModel,
+    frontSuspension: frontSuspensionModel
   };
 
   const partDetails = {
