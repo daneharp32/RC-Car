@@ -1730,7 +1730,9 @@ export function createPartsLabSystem(game) {
     }));
     const rearShocks = [];
     root.traverse(object => {
-      if (object.name.startsWith("Rear damper ") && object.name !== "Rear damper spring " && object.name !== "Rear damper piston ") {
+      if (object.name.startsWith("Rear damper ") &&
+          !object.name.startsWith("Rear damper spring ") &&
+          !object.name.startsWith("Rear damper piston ")) {
         const suffix = object.name.slice("Rear damper ".length);
         rearShocks.push({
           name: suffix,
@@ -1827,6 +1829,8 @@ export function createPartsLabSystem(game) {
     frontAArms: frontAArmsModel,
     rearAxle: rearAxleModel,
     frontSuspension: frontSuspensionModel,
+    rollingChassis: rollingChassisModel,
+    suspensionWorking: suspensionWorkingModel,
     frontUpperArms: frontUpperArmsModel,
     frontKnuckles: frontKnucklesModel,
     steeringLinkage: steeringLinkageModel,
@@ -1951,6 +1955,16 @@ export function createPartsLabSystem(game) {
       description: "A pair of simple structural bumper bars with corner braces and mounting points for the front and rear of the rolling chassis.",
       specs: "LAYOUT      ·  Front + rear crossbars\nMOUNT       ·  Braced chassis tabs\nMATERIAL    ·  Alloy and tubular details\nSTATUS      ·  Standalone pair"
     },
+    rollingChassis: {
+      name: "COMPLETE MECHANICAL ROLLING CHASSIS",
+      description: "An assembled 1/7-scale mechanical chassis using a 425 mm wheelbase layout: independent front double wishbones, steering hubs and links, front/centre differentials, a central gearbox, front half-shafts, prop shafts, a straight live rear axle with trailing links, wheels, dampers and bumpers. Electrical equipment is intentionally omitted.",
+      specs: "REFERENCE   ·  1/7 class · 425 mm wheelbase\nFRONT       ·  Independent double-wishbone\nREAR        ·  Solid axle + trailing / locating links\nDRIVE       ·  Front, centre and rear mechanical drive\nOMISSIONS   ·  Servo, motor, ESC and battery"
+    },
+    suspensionWorking: {
+      name: "WORKING FRONT + REAR SUSPENSION",
+      description: "A focused view of the assembled suspension. Front upper and lower A-arms move through vertical travel with steering hubs and wheels following the lower arms; the rear axle, wheels and locating links move together while four rear dampers and the front coil-overs compress.",
+      specs: "FRONT       ·  Moving upper / lower A-arms\nDAMPERS     ·  Front coil-overs + four rear shocks\nREAR        ·  Live axle with trailing links\nMOTION      ·  Pause / resume using the motion control"
+    },
   };
 
   let activePart = "servo";
@@ -2037,6 +2051,8 @@ export function createPartsLabSystem(game) {
       for (const item of suspensionArmSet.pivots) item.pivot.rotation.z = 0;
       for (const item of suspensionUpperArmSet.pivots) item.pivot.rotation.z = 0;
       updateSuspensionDemo(0, false);
+      updateRollingChassisSuspension(rollingChassisMotion, 0, false);
+      updateRollingChassisSuspension(suspensionWorkingMotion, 0, false);
     }
   }
 
@@ -2081,6 +2097,10 @@ export function createPartsLabSystem(game) {
       for (const item of upperArmSet.pivots) item.pivot.rotation.z = item.side * upperTravel;
     } else if (activePart === "frontSuspension") {
       updateSuspensionDemo(time, true);
+    } else if (activePart === "rollingChassis") {
+      updateRollingChassisSuspension(rollingChassisMotion, time, true);
+    } else if (activePart === "suspensionWorking") {
+      updateRollingChassisSuspension(suspensionWorkingMotion, time, true);
     }
   }
 
@@ -2104,9 +2124,21 @@ export function createPartsLabSystem(game) {
       if (activePart === "skidPlate") return new THREE.Vector3(0, 0.30, 0);
       if (activePart === "frontAArms" || activePart === "rearAxle" || activePart === "rearLinks") return new THREE.Vector3(0, 0.52, 0);
       if (activePart === "frontSuspension") return new THREE.Vector3(0, 1.00, 0);
+      if (activePart === "rollingChassis") return new THREE.Vector3(0, 1.12, 0);
+      if (activePart === "suspensionWorking") return new THREE.Vector3(0, 1.22, 0);
       if (activePart === "frontKnuckles" || activePart === "steeringLinkage" || activePart === "frontDifferential") return new THREE.Vector3(0, 0.62, 0);
       if (activePart === "rearLinks" || activePart === "driveShafts" || activePart === "centerDifferential") return new THREE.Vector3(0, 0.58, 0);
       return new THREE.Vector3(0, 0.92, 0);
+    },
+    getCameraDistance() {
+      if (activePart === "rollingChassis") return 7.4;
+      if (activePart === "suspensionWorking") return 6.3;
+      return 3.7;
+    },
+    getCameraHeight() {
+      if (activePart === "rollingChassis") return 3.05;
+      if (activePart === "suspensionWorking") return 2.65;
+      return 1.65;
     },
     get activePart() { return activePart; },
     get motionEnabled() { return motionEnabled; },
