@@ -6,7 +6,7 @@ import { createControlsSystem } from "./controls.js";
 import { createImpactDamageSystem } from "./damage-system.js";
 import { createMultiplayerSystem } from "./multiplayer.js";
 import { createGarageSystem } from "./garage.js";
-import { createPartsLabSystem } from "./parts-lab.js?v=20261114-skidplate6";
+import { createPartsLabSystem } from "./parts-lab.js?v=20261114-rollingchassis7";
 import { createSandboxSystem } from "./sandbox.js";
 import { createTrackSystem } from "./track.js";
 import { createGravelBasinSystem } from "./gravel-map.js";
@@ -1585,8 +1585,8 @@ function animate(now) {
     easeCameraFov(58, delta, 4.0);
     const showroomScale = Math.max(1, localCar.root.scale.x || 1);
     const isPartsLab = garage.viewMode === "parts-lab";
-    const distance = (isPartsLab ? 3.7 : garage.viewMode === "sandbox-builder" ? 3.45 : garage.viewMode === "garage" ? 2.35 : 5.1) * showroomScale;
-    const height = (isPartsLab ? 1.65 : garage.viewMode === "sandbox-builder" ? 1.55 : garage.viewMode === "garage" ? 1.18 : 2.15) * showroomScale;
+    const distance = (isPartsLab ? (partsLab.getCameraDistance?.() ?? 3.7) : garage.viewMode === "sandbox-builder" ? 3.45 : garage.viewMode === "garage" ? 2.35 : 5.1) * showroomScale;
+    const height = (isPartsLab ? (partsLab.getCameraHeight?.() ?? 1.65) : garage.viewMode === "sandbox-builder" ? 1.55 : garage.viewMode === "garage" ? 1.18 : 2.15) * showroomScale;
     const orbitDirection = new THREE.Vector3(0, 0, 1)
       .applyAxisAngle(new THREE.Vector3(0, 1, 0), controls.cameraOrbitYaw + (garage.viewMode === "menu" ? -0.18 : 0));
     const showroomAnchor = isPartsLab ? partsLab.getFocusPosition() : localCar.root.position.clone();
