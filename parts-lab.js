@@ -350,13 +350,16 @@ export function createPartsLabSystem(game) {
       addScrew(body, [x, y, 0.666], 0.028, materials.brightAlloy, "z");
     }
 
-    // The display mount contacts the lower arc of the motor can and sits
-    // flat on the pedestal rather than floating under it.
-    addBox(body, [0.88, 0.12, 0.90], [0, 0.18, -0.02], materials.darkAlloy, 0.045);
-    addBox(body, [0.69, 0.10, 0.72], [0, 0.27, -0.02], materials.black, 0.025);
+    // The individual motor viewer uses a compact display cradle. The
+    // assembled truck hides this and uses the separate adjustable mount.
+    const displayMount = new THREE.Group();
+    displayMount.name = "Standalone motor display mount";
+    body.add(displayMount);
+    addBox(displayMount, [0.88, 0.12, 0.90], [0, 0.18, -0.02], materials.darkAlloy, 0.045);
+    addBox(displayMount, [0.69, 0.10, 0.72], [0, 0.27, -0.02], materials.black, 0.025);
     for (const x of [-0.34, 0.34]) {
-      addBox(body, [0.12, 0.22, 0.92], [x, 0.35, -0.02], materials.shellLight, 0.025);
-      for (const z of [-0.35, 0.31]) addScrew(body, [x, 0.47, z], 0.03);
+      addBox(displayMount, [0.12, 0.22, 0.92], [x, 0.35, -0.02], materials.shellLight, 0.025);
+      for (const z of [-0.35, 0.31]) addScrew(displayMount, [x, 0.47, z], 0.03);
     }
 
     // Straight motor shaft exits the front end bell. The pinion is fitted
@@ -402,7 +405,8 @@ export function createPartsLabSystem(game) {
 
   const motorParts = buildMotor();
   const motorShaft = motorParts.shaftGroup;
-  batchStaticMeshes(motorParts.body, [motorShaft]);
+  const motorDisplayStand = motorParts.body.getObjectByName("Standalone motor display mount");
+  batchStaticMeshes(motorParts.body, [motorShaft, motorDisplayStand]);
   batchStaticMeshes(motorShaft, [], { castShadow: false, receiveShadow: false });
 
   const escModel = new THREE.Group();
@@ -839,7 +843,7 @@ export function createPartsLabSystem(game) {
     for (const side of [-1, 1]) {
       const pivot = new THREE.Group();
       pivot.name = side < 0 ? "Animated front A-arm pivot left" : "Animated front A-arm pivot right";
-      pivot.position.set(side * 0.36, 0.35, 0);
+      pivot.position.set(side * 0.30, 0.35, 0);
       frame.add(pivot);
       pivots.push({ side, pivot });
 
@@ -875,9 +879,9 @@ export function createPartsLabSystem(game) {
       // Fixed inner pivot bushings are attached to the chassis-side bracket.
       for (const z of [-0.34, 0.34]) {
         addCylinder(frame, 0.066, 0.066, 0.17, materials.black,
-          [side * 0.36, 0.35, z], [0, 0, Math.PI / 2], 24);
+          [side * 0.30, 0.35, z], [0, 0, Math.PI / 2], 24);
         addCylinder(frame, 0.045, 0.045, 0.19, materials.brightAlloy,
-          [side * 0.36, 0.35, z], [0, 0, Math.PI / 2], 20);
+          [side * 0.30, 0.35, z], [0, 0, Math.PI / 2], 20);
       }
     }
 
@@ -1129,7 +1133,7 @@ export function createPartsLabSystem(game) {
       const outline = new THREE.Shape();
       outline.moveTo(0, -0.26);
       outline.lineTo(0, 0.26);
-      outline.lineTo(side * 0.57, 0.015);
+      outline.lineTo(side * 0.67, 0.015);
       outline.lineTo(0, -0.26);
       const geometry = new THREE.ExtrudeGeometry(outline, {
         depth: 0.055, bevelEnabled: true, bevelSegments: 1, steps: 1,
@@ -1144,9 +1148,9 @@ export function createPartsLabSystem(game) {
       pivot.add(arm);
 
       addCylinder(pivot, 0.072, 0.072, 0.10, materials.darkAlloy,
-        [side * 0.55, 0.045, 0.015], [0, 0, 0], 22);
+        [side * 0.65, 0.045, 0.015], [0, 0, 0], 22);
       addCylinder(pivot, 0.045, 0.045, 0.13, materials.brightAlloy,
-        [side * 0.55, 0.09, 0.015], [0, 0, 0], 18);
+        [side * 0.65, 0.09, 0.015], [0, 0, 0], 18);
     }
 
     for (const side of [-1, 1]) {
@@ -1522,11 +1526,10 @@ export function createPartsLabSystem(game) {
   }
   const bumperParts = buildBumpers();
 
-  // COMPLETE MECHANICAL ROLLING CHASSIS
+  // COMPLETE 1/7 ROLLING CHASSIS
   // Scaled around the shared 425 mm wheelbase / 135-146 mm tire envelope.
-  // The servo, motor, ESC and battery are intentionally left out; the motor
-  // mount remains as an empty mechanical bracket. Previously removed frame
-  // rails and the roll cage remain excluded from this prototype.
+  // Electronics are installed on individual trays; the removed full-length
+  // side rails and roll cage remain excluded from this prototype.
   function cloneAssemblyPart(source, name, parent, position = [0, 0, 0], scale = [1, 1, 1]) {
     const copy = source.clone(true);
     copy.name = name;
@@ -1541,13 +1544,14 @@ export function createPartsLabSystem(game) {
     const root = new THREE.Group();
     root.name = "Assembled 1/7 mechanical rolling chassis";
 
-    // Forward central belly pan, shortened to about 230 x 220 mm in the
-    // assembled scale model. The longer open rear section matches the
-    // underside layout visible on the DF7, Desert King and FMS 1/7 trucks.
+    // Forward central belly pan, about 270 x 220 mm at assembled scale.
+    // Its front edge sits close behind the front axle and its rear edge stops
+    // well before the live axle, matching the long open rear section on the
+    // DF7, Desert King and FMS 1/7 underside references.
     const panGroup = new THREE.Group();
     panGroup.name = "Assembled skid plate";
     root.add(panGroup);
-    cloneAssemblyPart(skidPlateModel, "Skid plate component", panGroup, [0, 0.26, -0.38], [1.42, 1, 1.10]);
+    cloneAssemblyPart(skidPlateModel, "Skid plate component", panGroup, [0, 0.26, -0.50], [1.42, 1, 1.30]);
 
     // Structural crossmembers and front/rear mounting shelves replace the
     // full side rails that were intentionally removed from the prototype.
@@ -1583,28 +1587,44 @@ export function createPartsLabSystem(game) {
         0.048, materials.shellLight, 0.068);
     }
     // Local equipment trays bolt onto the crossmembers and forward skid-pan area.
-    addBox(mountStructure, [0.78, 0.10, 0.70], [-0.58, 0.62, -1.52], materials.darkAlloy, 0.035);
-    for (const x of [-0.87, -0.29]) {
-      for (const z of [-1.76, -1.28]) addScrew(mountStructure, [x, 0.68, z], 0.025, materials.brightAlloy);
+    // Steering-servo tray for the high-torque servo case.
+    addBox(mountStructure, [0.90, 0.10, 0.72], [-0.58, 0.62, -1.52], materials.darkAlloy, 0.035);
+    for (const x of [-1.00, -0.16]) {
+      for (const z of [-1.78, -1.26]) addScrew(mountStructure, [x, 0.68, z], 0.025, materials.brightAlloy);
     }
-    addBox(mountStructure, [0.78, 0.10, 1.58], [-0.56, 0.62, 0.23], materials.darkAlloy, 0.03);
-    for (const x of [-0.84, -0.28]) {
-      addBox(mountStructure, [0.06, 0.12, 1.06], [x, 0.72, 0.23], materials.shellLight, 0.012);
+
+    // Longitudinal LiPo tray follows the published 181 x 47.5 mm envelope.
+    addBox(mountStructure, [0.52, 0.10, 1.72], [-0.62, 0.62, 0.23], materials.darkAlloy, 0.03);
+    for (const x of [-0.86, -0.38]) {
+      addBox(mountStructure, [0.045, 0.09, 1.62], [x, 0.715, 0.23], materials.shellLight, 0.012);
+      for (const z of [-0.49, 0.95]) {
+        addBox(mountStructure, [0.075, 0.035, 0.075], [x, 0.78, z], materials.darkAlloy, 0.012);
+      }
     }
-    addBox(mountStructure, [0.92, 0.10, 0.82], [0.10, 0.62, 0.76], materials.darkAlloy, 0.03);
-    addBox(mountStructure, [1.02, 0.12, 0.84], [0.55, 0.62, 1.03], materials.darkAlloy, 0.03);
+    for (const z of [-0.40, 0.86]) {
+      addBox(mountStructure, [0.50, 0.025, 0.055], [-0.62, 1.205, z], materials.black, 0.012);
+    }
+
+    // ESC tray is adjacent to the battery and clears the motor cradle.
+    addBox(mountStructure, [0.62, 0.10, 0.62], [-0.02, 0.61, 0.75], materials.darkAlloy, 0.03);
+    for (const x of [-0.26, 0.22]) {
+      for (const z of [0.53, 0.97]) addScrew(mountStructure, [x, 0.68, z], 0.024, materials.brightAlloy);
+    }
+
+    // Adjustable motor-mount pad sits over the rear crossmember.
+    addBox(mountStructure, [1.02, 0.12, 0.84], [0.70, 0.62, 1.03], materials.darkAlloy, 0.03);
 
     batchStaticMeshes(mountStructure);
 
     // Front independent suspension: lower/upper A-arms and shock towers are
     // cloned together, so the pivot groups and damper geometry stay aligned.
     const frontUnit = cloneAssemblyPart(
-      frontSuspensionModel, "Front suspension unit", root, [0, -0.14, -1.97]
+      frontSuspensionModel, "Front suspension unit", root, [0, -0.08, -1.97]
     );
 
     // Steerable knuckles carry the front wheels. This keeps the hubs on the
     // upright centreline while the lower A-arms provide vertical travel.
-    const frontKnuckles = cloneAssemblyPart(frontKnucklesModel, "Front steering knuckles", root, [0, 0.06, -1.97]);
+    const frontKnuckles = cloneAssemblyPart(frontKnucklesModel, "Front steering knuckles", root, [0, 0.12, -1.97]);
     const steering = cloneAssemblyPart(steeringLinkageModel, "Front steering linkage", root, [0, -0.06, -1.97]);
     const staticSteeringTieRods = steering.getObjectByName("Static front tie rods");
     const staticServoDragLink = steering.getObjectByName("Static servo saver drag link");
@@ -1621,7 +1641,7 @@ export function createPartsLabSystem(game) {
       wheel.name = side < 0 ? "Front left steerable wheel and tire" : "Front right steerable wheel and tire";
       wheel.visible = true;
       wheel.scale.set(1.20, 1.08, 1.08);
-      wheel.position.set(side * 0.35, -0.9072, 0);
+      wheel.position.set(side * 0.33, -0.9072, 0);
       wheel.rotation.y = side < 0 ? Math.PI : 0;
       pivot.add(wheel);
     }
@@ -1677,33 +1697,35 @@ export function createPartsLabSystem(game) {
     // The centre differential, gearbox case and adjustable motor cradle
     // form the rear-central mechanical powertrain. The motor is installed below.
     cloneAssemblyPart(centerDifferentialModel, "Centre differential unit", root, [0, 0.32, -0.45]);
-    cloneAssemblyPart(gearboxModel, "Central gearbox housing", root, [0.55, 0.425, 0.35], [0.65, 0.75, 0.75]);
-    cloneAssemblyPart(motorMountModel, "Adjustable motor mount", root, [0.55, 0.42, 1.03], [0.75, 0.75, 0.75]);
+    cloneAssemblyPart(gearboxModel, "Central gearbox housing", root, [0.70, 0.425, 0.35], [0.65, 0.75, 0.75]);
+    cloneAssemblyPart(motorMountModel, "Adjustable motor mount", root, [0.70, 0.42, 1.03], [0.75, 0.75, 0.75]);
 
     // Full electrical package is now installed on its own trays: a steering
     // servo up front, hardcase battery on the left tray, ESC beside the motor,
     // and a 4274-size motor in the empty mechanical cradle.
     const servoInstall = cloneAssemblyPart(
-      servoModel, "Steering servo installation", root, [-0.58, 0.61, -1.52], [0.52, 0.52, 0.52]
+      servoModel, "Steering servo installation", root, [-0.58, 0.61, -1.52], [0.48, 0.50, 0.50]
     );
     const servoHorn = servoInstall.getObjectByName("Animated servo output horn");
     if (!servoHorn) throw new Error("Steering servo horn was not found in the assembled model.");
 
     const batteryInstall = cloneAssemblyPart(
-      batteryModel, "Hardcase battery installation", root, [-0.56, 0.50, 0.23], [1.02, 0.82, 0.82]
+      batteryModel, "Hardcase battery installation", root, [-0.62, 0.48, 0.23], [1.155, 1.00, 0.71]
     );
     batteryInstall.rotation.y = Math.PI / 2;
 
     const escInstall = cloneAssemblyPart(
-      escModel, "Brushless ESC installation", root, [0.10, 0.60, 0.75], [0.46, 0.46, 0.46]
+      escModel, "Brushless ESC installation", root, [-0.02, 0.626, 0.75], [0.40, 0.40, 0.40]
     );
     const escRotor = escInstall.getObjectByName("Animated seven blade ESC fan");
     if (!escRotor) throw new Error("ESC cooling fan rotor was not found in the assembled model.");
 
     const motorInstall = cloneAssemblyPart(
-      motorModel, "4274 brushless motor installation", root, [0.55, 0.58, 1.02], [0.60, 0.60, 0.60]
+      motorModel, "4274 brushless motor installation", root, [0.70, 0.58, 1.02], [0.37, 0.37, 0.60]
     );
     motorInstall.rotation.y = Math.PI;
+    const motorDisplayStand = motorInstall.getObjectByName("Standalone motor display mount");
+    if (motorDisplayStand) motorDisplayStand.visible = false;
     const installedMotorShaft = motorInstall.getObjectByName("Aligned rotating motor shaft and pinion");
     if (!installedMotorShaft) throw new Error("Motor output shaft was not found in the assembled model.");
 
@@ -1750,34 +1772,56 @@ export function createPartsLabSystem(game) {
       }
     }
 
-    // Neat high-current and motor phase-wire runs join the battery, ESC and
-    // motor without crossing the steering linkage or rear axle opening.
+    // Battery power leads run from the left-side hardcase to the ESC input
+    // connectors. Routes stay low against the tray and clear of the servo.
     addTube(root, [
-      [-1.18, 0.72, 0.58], [-1.02, 0.70, 0.45], [-0.70, 0.69, 0.29], [-0.34, 0.72, 0.25]
+      [-1.032, 0.79, -0.151],
+      [-0.90, 0.78, -0.06],
+      [-0.62, 0.77, 0.10],
+      [-0.35, 0.76, 0.22],
+      [-0.176, 0.746, 0.342]
     ], 0.024, materials.red, 7);
     addTube(root, [
-      [-1.18, 0.68, 0.62], [-1.02, 0.66, 0.49], [-0.70, 0.65, 0.33], [-0.34, 0.68, 0.29]
+      [-1.032, 0.79, -0.290],
+      [-0.90, 0.78, -0.22],
+      [-0.62, 0.77, -0.02],
+      [-0.34, 0.76, 0.16],
+      [-0.108, 0.746, 0.342]
     ], 0.024, materials.black, 7);
-    const phaseWireColors = [materials.blue, materials.orange, materials.gold];
-    for (let i = 0; i < 3; i++) {
-      const z = 0.92 + i * 0.045;
-      addTube(root, [
-        [0.42, 0.82 + i * 0.025, z],
-        [0.48, 0.94 + i * 0.025, z + 0.08],
-        [0.55, 1.08 + i * 0.025, z + 0.12],
-        [0.55, 1.20 + i * 0.025, z + 0.17]
-      ], 0.018, phaseWireColors[i], 7);
-    }
+
+    // Three phase leads connect the ESC output bank to their matching motor
+    // terminals. Each tube terminates at the visible grommet on the 4274 can.
+    addTube(root, [
+      [0.412, 0.758, 0.922],
+      [0.48, 0.81, 1.12],
+      [0.55, 0.87, 1.38],
+      [0.64, 0.91, 1.64],
+      [0.70, 0.917, 1.858]
+    ], 0.018, materials.orange, 7);
+    addTube(root, [
+      [0.412, 0.758, 0.970],
+      [0.47, 0.81, 1.15],
+      [0.53, 0.87, 1.40],
+      [0.59, 0.91, 1.66],
+      [0.643, 0.917, 1.858]
+    ], 0.018, materials.gold, 7);
+    addTube(root, [
+      [0.412, 0.758, 1.018],
+      [0.49, 0.82, 1.18],
+      [0.57, 0.88, 1.42],
+      [0.67, 0.91, 1.66],
+      [0.757, 0.917, 1.858]
+    ], 0.018, materials.blue, 7);
 
     // Centre-to-front and centre-to-rear prop shafts, with yokes at each end.
     const propShaftGroup = new THREE.Group();
     propShaftGroup.name = "Front and rear propeller shafts";
     root.add(propShaftGroup);
-    addPrototypeRod(propShaftGroup, [0, 0.84, -1.02], [0, 0.84, -1.29],
+    addPrototypeRod(propShaftGroup, [0, 0.84, -0.92], [0, 0.84, -1.18],
       0.050, materials.brightAlloy, 0.082);
-    addPrototypeRod(propShaftGroup, [0, 0.84, 0.12], [0, 0.63, 2.27],
+    addPrototypeRod(propShaftGroup, [0, 0.84, 0.02], [0, 0.69, 2.27],
       0.052, materials.brightAlloy, 0.086);
-    for (const [z, y] of [[-1.02, 0.84], [-1.29, 0.84], [0.12, 0.84], [2.27, 0.63]]) {
+    for (const [z, y] of [[-0.92, 0.84], [-1.18, 0.84], [0.02, 0.84], [2.27, 0.69]]) {
       addCylinder(propShaftGroup, 0.076, 0.076, 0.15, materials.darkAlloy,
         [0, y, z], [Math.PI / 2, 0, 0], 22);
       addBox(propShaftGroup, [0.18, 0.14, 0.11], [0, y, z], materials.shellLight, 0.022);
@@ -1787,7 +1831,7 @@ export function createPartsLabSystem(game) {
     // Rear live axle, two rear wheels and hubs share one moving carrier.
     const rearCarrier = new THREE.Group();
     rearCarrier.name = "Animated rear solid axle carrier";
-    rearCarrier.position.set(0, 0.13, 1.97);
+    rearCarrier.position.set(0, 0.19, 1.97);
     root.add(rearCarrier);
     cloneAssemblyPart(rearAxleModel, "Solid rear axle housing", rearCarrier);
     for (const side of [-1, 1]) {
@@ -1801,7 +1845,7 @@ export function createPartsLabSystem(game) {
     }
 
     // Long trailing arms, upper locating links and lateral panhard bar.
-    cloneAssemblyPart(rearLinksModel, "Rear axle locating links", root, [0, 0.13, 1.15]);
+    cloneAssemblyPart(rearLinksModel, "Rear axle locating links", root, [0, 0.19, 1.15]);
 
     // Four rear dampers (two per side) are mounted between the axle and the
     // rear chassis crossmember, matching the auxiliary-shock approach seen
@@ -1858,7 +1902,7 @@ export function createPartsLabSystem(game) {
       addTorus(shockRoot, 0.05, 0.013, materials.darkAlloy,
         [0, 1.04, 0], [0, Math.PI / 2, 0], 20);
 
-      const lower = new THREE.Vector3(side * 0.46, 0.90, 1.97 + offset);
+      const lower = new THREE.Vector3(side * 0.46, 0.96, 1.97 + offset);
       const upper = new THREE.Vector3(side * 0.54, 1.65, 1.48 + offset);
       return { name: label, root: shockRoot, springGroup: spring, rodGroup: rod, side, offset, lower, upper };
     }
@@ -2022,7 +2066,7 @@ export function createPartsLabSystem(game) {
     // Hub carriers, steering arms and front CVD outers follow the lower
     // wishbones' vertical arc so they do not hover above the moving wheels.
     const frontHubTravel = 1.01 * Math.sin(travel) + 0.42 * (Math.cos(travel) - 1);
-    motion.frontKnuckles.position.y = 0.06 + frontHubTravel;
+    motion.frontKnuckles.position.y = 0.12 + frontHubTravel;
     motion.steering.position.y = -0.06; // steering rack is chassis-mounted, not on the moving upright
     motion.steering.rotation.y = wheelSteerAngle * 0.34;
     motion.servoHorn.rotation.y = wheelSteerAngle * 1.18;
@@ -2045,7 +2089,7 @@ export function createPartsLabSystem(game) {
     const shaftNormal = new THREE.Vector3(0, 0, 1);
     for (const cvd of motion.frontCvdAssemblies) {
       const inner = new THREE.Vector3(cvd.side * 0.58, 0.84, -1.52);
-      const outerWorld = cvd.knucklePivot.localToWorld(new THREE.Vector3(cvd.side * 0.16, 0, 0));
+      const outerWorld = cvd.knucklePivot.localToWorld(new THREE.Vector3(cvd.side * 0.16, -0.0672, 0));
       const outer = motion.root.worldToLocal(outerWorld.clone());
       const direction = outer.clone().sub(inner);
       const length = Math.max(0.1, direction.length());
@@ -2079,13 +2123,13 @@ export function createPartsLabSystem(game) {
       ? THREE.MathUtils.clamp(1 - ((rearTravel + 0.34) / 0.68) * 0.18, 0.82, 1)
       : 1;
     const rearPitch = animate ? Math.sin(time * 2.05 + 1.05) * 0.045 : 0;
-    motion.rearCarrier.position.y = 0.13 + rearTravel;
+    motion.rearCarrier.position.y = 0.19 + rearTravel;
     motion.rearCarrier.rotation.x = rearPitch;
-    motion.rearLinks.position.y = 0.13 + rearTravel * 0.70;
+    motion.rearLinks.position.y = 0.19 + rearTravel * 0.70;
     motion.rearLinks.rotation.x = rearPitch * 0.72;
 
     for (const shock of motion.rearShocks) {
-      const lower = new THREE.Vector3(shock.side * 0.46, 0.90 + rearTravel, 1.97 + shock.offset);
+      const lower = new THREE.Vector3(shock.side * 0.46, 0.96 + rearTravel, 1.97 + shock.offset);
       const upper = new THREE.Vector3(shock.side * 0.54, 1.65, 1.48 + shock.offset);
       alignAssemblyDamper(shock, lower, upper, rearCompression);
     }
@@ -2113,7 +2157,7 @@ export function createPartsLabSystem(game) {
     "Front CVD half-shafts",
     "Centre differential unit",
     "Central gearbox housing",
-    "Empty adjustable motor mount",
+    "Adjustable motor mount",
     "Front and rear propeller shafts",
     "Front and rear bumper pair"
   ]) {
@@ -2162,8 +2206,8 @@ export function createPartsLabSystem(game) {
     },
     motor: {
       name: "540 BRUSHLESS MOTOR",
-      description: "A 1/10-scale-style brushless motor mock-up with a vented can, machined end bells, bearing seats, cooling details, phase leads, mounting plate and rotating output shaft with pinion.",
-      specs: "FORMAT      ·  540-size visual model\nROTOR       ·  Animated output shaft\nCOOLING     ·  Radial ports and vented end bell\nCONNECTION  ·  Three phase wires"
+      description: "A detailed standalone brushless motor mock-up with a vented can, machined end bells, bearing seats, phase leads and rotating pinion shaft. In the assembled chassis the display cradle is hidden and the motor is fitted to a 42 × 74 mm 4274-size envelope.",
+      specs: "STANDALONE  ·  Detailed brushless motor model\nASSEMBLED   ·  4274 / approx. 42 × 74 mm\nROTOR       ·  Animated output shaft\nCONNECTION  ·  Three phase wires"
     },
     esc: {
       name: "BRUSHLESS ESC",
@@ -2172,8 +2216,8 @@ export function createPartsLabSystem(game) {
     },
     battery: {
       name: "2S HARDCASE LIPO BATTERY",
-      description: "A simple full-length hardcase pack with molded case seams, cell markings, balance lead, and main power connector.",
-      specs: "FORMAT      ·  2S hardcase pack\nVOLTAGE     ·  7.4 V nominal\nCASE        ·  Molded protective shell\nLEADS       ·  Main power and balance"
+      description: "A full-length hardcase pack with molded case seams, cell markings, balance lead and main power connector. In the assembled chassis it is fitted lengthwise in a retaining tray based on the 1/7 reference battery compartment.",
+      specs: "FORMAT      ·  2S hardcase pack\nVOLTAGE     ·  7.4 V nominal\nASSEMBLED   ·  181 × 47.5 × 54 mm envelope\nLEADS       ·  Main power and balance"
     },
     gearbox: {
       name: "SHORT-COURSE GEARBOX",
@@ -2192,8 +2236,8 @@ export function createPartsLabSystem(game) {
     },
     skidPlate: {
       name: "MAIN METAL SKID PLATE",
-      description: "A shortened, wider central aluminum pan inspired by the DF7, Desert King and FMS 1/7 chassis underside photographs. It has tapered ends, a broad central footprint and mounting rows that stay clear of the front and rear suspension zones.",
-      specs: "REFERENCE   ·  425 mm wheelbase class\nPAN         ·  Approx. 225 × 170 × 5 mm (estimated)\nSHAPE       ·  Broad centre, tapered ends\nFASTENERS   ·  Recessed perimeter + inner rows"
+      description: "A tapered aluminum belly pan inspired by the DF7, Desert King and FMS 1/7 underside photographs. The assembled version is moved forward and scaled to a broader 270 × 221 mm footprint, leaving a clearly open section before the rear solid axle.",
+      specs: "REFERENCE   ·  425 mm wheelbase class\nASSEMBLED   ·  Approx. 270 × 221 × 5 mm\nPOSITION    ·  Forward of centre, behind front axle\nFASTENERS   ·  Recessed perimeter + inner rows"
     },
     frontAArms: {
       name: "FRONT LOWER A-ARMS",
@@ -2267,8 +2311,8 @@ export function createPartsLabSystem(game) {
     },
     rollingChassis: {
       name: "COMPLETE 1/7 ROLLING CHASSIS",
-      description: "A complete mechanical and electrical 1/7 desert-truck chassis using the reference 425 mm wheelbase layout. It includes independent front double wishbones, servo-operated steering, front/centre differentials, a 4274-style motor, spinning-fan ESC, hardcase battery, shaft-driven 4WD and a live solid rear axle with long-travel suspension. Use A/D or the left/right arrow keys to steer the front wheels and servo together.",
-      specs: "REFERENCE   ·  1/7 class · 425 mm wheelbase\nFRONT       ·  Servo-linked 2WS / double-wishbone\nREAR        ·  Solid axle + extended travel links\nELECTRICS   ·  Servo, motor, ESC fan and battery\nINPUT       ·  A/D or left/right arrow keys"
+      description: "A complete 1/7 desert-truck chassis arranged around a 425 mm wheelbase and 290 mm track. The battery sits lengthwise on the left tray, the 150A ESC is beside it, the 4274 motor is seated in its rear mount and the steering servo is positioned behind the front bulkhead. The shortened belly pan sits forward, leaving open space before the solid rear axle. Use A/D or the left/right arrow keys to steer the servo, tie rods and front hubs together.",
+      specs: "ENVELOPE    ·  Approx. 693 × 346 mm\nWHEELBASE   ·  426 mm / 425 mm class\nTRACK       ·  Approx. 292 mm\nPAN         ·  Approx. 270 × 221 mm, forward mounted\nELECTRICS   ·  Servo, 4274 motor, 150A ESC, LiPo\nINPUT       ·  A/D or left/right arrow keys"
     },
     suspensionWorking: {
       name: "WORKING FRONT + REAR SUSPENSION",
