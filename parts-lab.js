@@ -1674,8 +1674,8 @@ export function createPartsLabSystem(game) {
       }
     }
 
-    // The centre differential, gearbox case and empty motor cradle form the
-    // central mechanical powertrain. No motor or electrical equipment is fitted.
+    // The centre differential, gearbox case and adjustable motor cradle
+    // form the rear-central mechanical powertrain. The motor is installed below.
     cloneAssemblyPart(centerDifferentialModel, "Centre differential unit", root, [0, 0.32, -0.45]);
     cloneAssemblyPart(gearboxModel, "Central gearbox housing", root, [0.55, 0.425, 0.35], [0.65, 0.75, 0.75]);
     cloneAssemblyPart(motorMountModel, "Adjustable motor mount", root, [0.55, 0.42, 1.03], [0.75, 0.75, 0.75]);
