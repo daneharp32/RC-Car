@@ -6,7 +6,7 @@ import { createControlsSystem } from "./controls.js";
 import { createImpactDamageSystem } from "./damage-system.js";
 import { createMultiplayerSystem } from "./multiplayer.js";
 import { createGarageSystem } from "./garage.js";
-import { createPartsLabSystem } from "./parts-lab.js?v=20261115-electronics-steering11";
+import { createPartsLabSystem } from "./parts-lab.js?v=20261115-proportions12";
 import { createSandboxSystem } from "./sandbox.js";
 import { createTrackSystem } from "./track.js";
 import { createGravelBasinSystem } from "./gravel-map.js";
