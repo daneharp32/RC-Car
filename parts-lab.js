@@ -2076,7 +2076,7 @@ export function createPartsLabSystem(game) {
 
     const rearTravel = animate ? Math.sin(time * 2.05 + 1.05) * 0.34 : 0;
     const rearCompression = animate
-      ? THREE.MathUtils.clamp(1 - ((rearTravel + 0.34) / 0.68) * 0.34, 0.66, 1)
+      ? THREE.MathUtils.clamp(1 - ((rearTravel + 0.34) / 0.68) * 0.18, 0.82, 1)
       : 1;
     const rearPitch = animate ? Math.sin(time * 2.05 + 1.05) * 0.045 : 0;
     motion.rearCarrier.position.y = 0.13 + rearTravel;
