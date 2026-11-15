@@ -1522,8 +1522,9 @@ export function createPartsLabSystem(game) {
     const root = new THREE.Group();
     root.name = "Assembled 1/7 mechanical rolling chassis";
 
-    // Central underbody plate. Its existing outline is enlarged uniformly
-    // to a roughly 300 x 225 mm pan, based on the reference trucks.
+    // Forward central belly pan, shortened to about 230 x 220 mm in the
+    // assembled scale model. The longer open rear section matches the
+    // underside layout visible on the DF7, Desert King and FMS 1/7 trucks.
     const panGroup = new THREE.Group();
     panGroup.name = "Assembled skid plate";
     root.add(panGroup);
@@ -1572,6 +1573,7 @@ export function createPartsLabSystem(game) {
       addBox(mountStructure, [0.06, 0.12, 1.06], [x, 0.72, 0.23], materials.shellLight, 0.012);
     }
     addBox(mountStructure, [0.92, 0.10, 0.82], [0.10, 0.62, 0.76], materials.darkAlloy, 0.03);
+    addBox(mountStructure, [1.02, 0.12, 0.84], [0.55, 0.62, 1.03], materials.darkAlloy, 0.03);
 
     batchStaticMeshes(mountStructure);
 
@@ -1653,13 +1655,13 @@ export function createPartsLabSystem(game) {
     // central mechanical powertrain. No motor or electrical equipment is fitted.
     cloneAssemblyPart(centerDifferentialModel, "Centre differential unit", root, [0, 0.32, -0.45]);
     cloneAssemblyPart(gearboxModel, "Central gearbox housing", root, [0.55, 0.425, 0.35], [0.65, 0.75, 0.75]);
-    cloneAssemblyPart(motorMountModel, "Adjustable motor mount", root, [0.55, 0.90, 1.03], [0.75, 0.75, 0.75]);
+    cloneAssemblyPart(motorMountModel, "Adjustable motor mount", root, [0.55, 0.42, 1.03], [0.75, 0.75, 0.75]);
 
     // Full electrical package is now installed on its own trays: a steering
     // servo up front, hardcase battery on the left tray, ESC beside the motor,
     // and a 4274-size motor in the empty mechanical cradle.
     const servoInstall = cloneAssemblyPart(
-      servoModel, "Steering servo installation", root, [-0.58, 0.58, -1.52], [0.52, 0.52, 0.52]
+      servoModel, "Steering servo installation", root, [-0.58, 0.61, -1.52], [0.52, 0.52, 0.52]
     );
     const servoHorn = servoInstall.getObjectByName("Animated servo output horn");
     if (!servoHorn) throw new Error("Steering servo horn was not found in the assembled model.");
@@ -1676,7 +1678,7 @@ export function createPartsLabSystem(game) {
     if (!escRotor) throw new Error("ESC cooling fan rotor was not found in the assembled model.");
 
     const motorInstall = cloneAssemblyPart(
-      motorModel, "4274 brushless motor installation", root, [0.55, 1.02, 1.02], [0.60, 0.60, 0.60]
+      motorModel, "4274 brushless motor installation", root, [0.55, 0.97, 1.02], [0.60, 0.60, 0.60]
     );
     motorInstall.rotation.y = Math.PI;
     const installedMotorShaft = motorInstall.getObjectByName("Aligned rotating motor shaft and pinion");
@@ -2006,8 +2008,8 @@ export function createPartsLabSystem(game) {
     const rearPitch = animate ? Math.sin(time * 2.05 + 1.05) * 0.045 : 0;
     motion.rearCarrier.position.y = 0.13 + rearTravel;
     motion.rearCarrier.rotation.x = rearPitch;
-    motion.rearLinks.position.y = 0.13 + rearTravel * 0.48;
-    motion.rearLinks.rotation.x = rearPitch * 0.55;
+    motion.rearLinks.position.y = 0.13 + rearTravel * 0.70;
+    motion.rearLinks.rotation.x = rearPitch * 0.72;
 
     for (const shock of motion.rearShocks) {
       const lower = new THREE.Vector3(shock.side * 0.46, 0.90 + rearTravel, 1.97 + shock.offset);
