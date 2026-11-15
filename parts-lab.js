@@ -936,6 +936,7 @@ export function createPartsLabSystem(game) {
   // visible without pretending the prototype is already fitted to a chassis.
   addBox(frontSuspensionModel, [1.35, 0.12, 0.48], [0, 1.34, -0.06], materials.shell, 0.055);
   const suspensionArmSet = buildAnimatedFrontArmPair(frontSuspensionModel);
+  const suspensionUpperArmSet = buildFrontUpperArms(frontSuspensionModel);
   for (const side of [-1, 1]) {
     addBox(frontSuspensionModel, [0.15, 0.78, 0.18], [side * 0.61, 0.91, 0.04], materials.darkAlloy, 0.03);
     addBox(frontSuspensionModel, [0.27, 0.12, 0.24], [side * 0.61, 1.31, 0.04], materials.shellLight, 0.025);
@@ -999,6 +1000,481 @@ export function createPartsLabSystem(game) {
 
   const suspensionShocks = [-1, 1].map(side => buildAnimatedDemoShock(frontSuspensionModel, side));
 
+  // Additional chassis / driveline prototypes, kept independent for review.
+  function addPrototypeRod(parent, start, end, radius, material, eyeRadius = radius * 1.45) {
+    const a = new THREE.Vector3(start[0], start[1], start[2]);
+    const b = new THREE.Vector3(end[0], end[1], end[2]);
+    const direction = b.clone().sub(a);
+    const length = Math.max(0.02, direction.length());
+    const unit = direction.clone().normalize();
+
+    const rod = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, length, 14, 1), material);
+    rod.position.copy(a).add(b).multiplyScalar(0.5);
+    rod.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), unit);
+    rod.castShadow = true;
+    rod.receiveShadow = true;
+    parent.add(rod);
+
+    for (const point of [a, b]) {
+      const eye = new THREE.Mesh(
+        new THREE.TorusGeometry(eyeRadius, Math.max(0.008, radius * 0.24), 7, 16),
+        materials.darkAlloy
+      );
+      eye.position.copy(point);
+      eye.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), unit);
+      eye.castShadow = true;
+      parent.add(eye);
+      const pin = new THREE.Mesh(new THREE.SphereGeometry(radius * 0.9, 12, 8), materials.brightAlloy);
+      pin.position.copy(point);
+      pin.castShadow = true;
+      parent.add(pin);
+    }
+    return rod;
+  }
+
+  const chassisFrameModel = new THREE.Group();
+  chassisFrameModel.name = "Three-layer aluminum chassis frame and upper deck";
+  chassisFrameModel.visible = false;
+  showcase.add(chassisFrameModel);
+
+  function buildChassisFrame() {
+    const body = new THREE.Group();
+    chassisFrameModel.add(body);
+
+    // Twin longitudinal aluminum rails form the rolling chassis spine.
+    for (const x of [-0.52, 0.52]) {
+      addBox(body, [0.15, 0.22, 2.58], [x, 0.48, 0], materials.darkAlloy, 0.035);
+      addBox(body, [0.095, 0.035, 2.44], [x, 0.61, 0], materials.alloy, 0.012);
+    }
+
+    // Upper equipment deck, centre battery tray and the four main crossmembers.
+    addBox(body, [0.88, 0.075, 1.72], [0, 0.72, -0.03], materials.alloy, 0.025);
+    addBox(body, [0.72, 0.035, 1.25], [0, 0.78, -0.05], materials.black, 0.018);
+    addBox(body, [0.64, 0.055, 0.76], [0, 0.83, -0.04], materials.shellLight, 0.02);
+    for (const z of [-1.10, -0.52, 0.50, 1.10]) {
+      addBox(body, [1.16, 0.13, 0.14], [0, 0.47, z], materials.shellLight, 0.025);
+      for (const x of [-0.48, 0.48]) addScrew(body, [x, 0.55, z], 0.025, materials.brightAlloy);
+    }
+
+    // Diagonal upper braces support the deck and open body cage.
+    for (const side of [-1, 1]) {
+      addPrototypeRod(body, [side * 0.52, 0.55, -0.90], [side * 0.38, 0.92, -0.46], 0.035, materials.darkAlloy);
+      addPrototypeRod(body, [side * 0.52, 0.55, 0.90], [side * 0.38, 0.92, 0.46], 0.035, materials.darkAlloy);
+    }
+    batchStaticMeshes(body);
+    return body;
+  }
+  const chassisFrameParts = buildChassisFrame();
+
+  const frontUpperArmsModel = new THREE.Group();
+  frontUpperArmsModel.name = "Pair of independent front upper A arms";
+  frontUpperArmsModel.visible = false;
+  showcase.add(frontUpperArmsModel);
+
+  function buildFrontUpperArms(parent) {
+    const frame = new THREE.Group();
+    parent.add(frame);
+    const pivots = [];
+
+    for (const side of [-1, 1]) {
+      const pivot = new THREE.Group();
+      pivot.position.set(side * 0.34, 0.88, 0);
+      pivot.name = side < 0 ? "Left upper wishbone pivot" : "Right upper wishbone pivot";
+      frame.add(pivot);
+      pivots.push({ side, pivot });
+
+      const outline = new THREE.Shape();
+      outline.moveTo(0, -0.26);
+      outline.lineTo(0, 0.26);
+      outline.lineTo(side * 0.57, 0.015);
+      outline.lineTo(0, -0.26);
+      const geometry = new THREE.ExtrudeGeometry(outline, {
+        depth: 0.055, bevelEnabled: true, bevelSegments: 1, steps: 1,
+        bevelSize: 0.012, bevelThickness: 0.008, curveSegments: 4
+      });
+      geometry.rotateX(Math.PI / 2);
+      geometry.translate(0, -0.0275, 0);
+      const arm = new THREE.Mesh(geometry, materials.shellLight);
+      arm.name = side < 0 ? "Left front upper A arm" : "Right front upper A arm";
+      arm.castShadow = true;
+      arm.receiveShadow = true;
+      pivot.add(arm);
+
+      addCylinder(pivot, 0.072, 0.072, 0.10, materials.darkAlloy,
+        [side * 0.55, 0.045, 0.015], [0, 0, 0], 22);
+      addCylinder(pivot, 0.045, 0.045, 0.13, materials.brightAlloy,
+        [side * 0.55, 0.09, 0.015], [0, 0, 0], 18);
+    }
+
+    for (const side of [-1, 1]) {
+      for (const z of [-0.26, 0.26]) {
+        addCylinder(frame, 0.055, 0.055, 0.15, materials.black,
+          [side * 0.34, 0.88, z], [0, 0, Math.PI / 2], 20);
+      }
+    }
+    batchStaticMeshes(frame, pivots.map(item => item.pivot));
+    for (const item of pivots) batchStaticMeshes(item.pivot, [], { castShadow: false, receiveShadow: false });
+    return { frame, pivots };
+  }
+
+  const upperArmSet = buildFrontUpperArms(frontUpperArmsModel);
+
+  const frontKnucklesModel = new THREE.Group();
+  frontKnucklesModel.name = "Front steering knuckles and wheel hub carriers";
+  frontKnucklesModel.visible = false;
+  showcase.add(frontKnucklesModel);
+
+  function buildFrontKnuckles() {
+    const body = new THREE.Group();
+    frontKnucklesModel.add(body);
+    for (const side of [-1, 1]) {
+      const x = side * 1.02;
+      addBox(body, [0.17, 0.43, 0.27], [x, 0.57, 0], materials.darkAlloy, 0.045);
+      addBox(body, [0.20, 0.13, 0.22], [x, 0.34, 0], materials.shellLight, 0.025);
+      addBox(body, [0.20, 0.12, 0.22], [x, 0.80, 0], materials.shellLight, 0.025);
+
+      // Stub axle, bearing seat and 17 mm-style wheel mounting face.
+      addCylinder(body, 0.11, 0.11, 0.22, materials.brightAlloy,
+        [side * 1.18, 0.57, 0], [0, 0, Math.PI / 2], 28);
+      addCylinder(body, 0.18, 0.18, 0.065, materials.darkAlloy,
+        [side * 1.31, 0.57, 0], [0, 0, Math.PI / 2], 28);
+      addCylinder(body, 0.12, 0.12, 0.075, materials.alloy,
+        [side * 1.37, 0.57, 0], [0, 0, Math.PI / 2], 24);
+
+      // Steering arm and vertical hinge pins.
+      addPrototypeRod(body, [x, 0.77, 0.07], [side * 0.91, 0.88, 0.38], 0.045, materials.shellLight, 0.06);
+      addCylinder(body, 0.04, 0.04, 0.11, materials.black,
+        [x, 0.57, -0.13], [0, 0, 0], 18);
+    }
+    batchStaticMeshes(body);
+    return body;
+  }
+  const frontKnuckleParts = buildFrontKnuckles();
+
+  const steeringLinkageModel = new THREE.Group();
+  steeringLinkageModel.name = "Front steering tie rods and servo saver linkage";
+  steeringLinkageModel.visible = false;
+  showcase.add(steeringLinkageModel);
+
+  function buildSteeringLinkage() {
+    const body = new THREE.Group();
+    steeringLinkageModel.add(body);
+    addBox(body, [0.66, 0.10, 0.15], [0, 0.82, 0.30], materials.darkAlloy, 0.035);
+    addCylinder(body, 0.095, 0.095, 0.12, materials.brightAlloy,
+      [0, 0.90, 0.30], [0, 0, 0], 24);
+    addBox(body, [0.52, 0.055, 0.08], [0, 0.96, 0.30], materials.shellLight, 0.02);
+
+    for (const side of [-1, 1]) {
+      addPrototypeRod(body, [side * 0.28, 0.84, 0.30], [side * 0.92, 0.88, 0.38], 0.027, materials.brightAlloy, 0.05);
+      addPrototypeRod(body, [side * 0.92, 0.88, 0.38], [side * 0.98, 0.78, 0.09], 0.034, materials.darkAlloy, 0.052);
+    }
+    addPrototypeRod(body, [0.0, 1.04, 0.24], [0.0, 0.84, 0.30], 0.032, materials.orange, 0.055);
+    batchStaticMeshes(body);
+    return body;
+  }
+  const steeringLinkageParts = buildSteeringLinkage();
+
+  const frontDifferentialModel = new THREE.Group();
+  frontDifferentialModel.name = "Front differential and independent drive bulkhead";
+  frontDifferentialModel.visible = false;
+  showcase.add(frontDifferentialModel);
+
+  function buildFrontDifferential() {
+    const body = new THREE.Group();
+    frontDifferentialModel.add(body);
+    addBox(body, [0.64, 0.48, 0.52], [0, 0.52, -0.05], materials.shell, 0.12);
+    addCylinder(body, 0.25, 0.25, 0.09, materials.darkAlloy,
+      [0, 0.53, 0.23], [Math.PI / 2, 0, 0], 32);
+    addCylinder(body, 0.20, 0.20, 0.045, materials.black,
+      [0, 0.53, 0.29], [Math.PI / 2, 0, 0], 28);
+    addTorus(body, 0.215, 0.012, materials.brightAlloy,
+      [0, 0.53, 0.32], [0, 0, 0], 32);
+    for (const side of [-1, 1]) {
+      addCylinder(body, 0.095, 0.095, 0.20, materials.alloy,
+        [side * 0.40, 0.52, -0.02], [0, 0, Math.PI / 2], 24);
+      addCylinder(body, 0.065, 0.065, 0.16, materials.darkAlloy,
+        [side * 0.53, 0.52, -0.02], [0, 0, Math.PI / 2], 20);
+      addTorus(body, 0.067, 0.010, materials.brightAlloy,
+        [side * 0.58, 0.52, -0.02], [0, Math.PI / 2, 0], 20);
+    }
+    for (const x of [-0.40, 0.40]) {
+      addBox(body, [0.20, 0.14, 0.18], [x, 0.25, -0.05], materials.darkAlloy, 0.025);
+    }
+    batchStaticMeshes(body);
+    return body;
+  }
+  const frontDifferentialParts = buildFrontDifferential();
+
+  const centerDifferentialModel = new THREE.Group();
+  centerDifferentialModel.name = "Centre differential and transfer output case";
+  centerDifferentialModel.visible = false;
+  showcase.add(centerDifferentialModel);
+
+  function buildCenterDifferential() {
+    const body = new THREE.Group();
+    centerDifferentialModel.add(body);
+    addBox(body, [0.74, 0.54, 0.64], [0, 0.52, 0], materials.shell, 0.14);
+    addBox(body, [0.82, 0.12, 0.72], [0, 0.28, 0], materials.darkAlloy, 0.04);
+    addCylinder(body, 0.29, 0.29, 0.09, materials.black,
+      [0, 0.53, 0.34], [Math.PI / 2, 0, 0], 36);
+    addCylinder(body, 0.23, 0.23, 0.05, materials.alloy,
+      [0, 0.53, 0.40], [Math.PI / 2, 0, 0], 32);
+    addTorus(body, 0.25, 0.016, materials.brightAlloy,
+      [0, 0.53, 0.43], [0, 0, 0], 36);
+    for (let i = 0; i < 8; i++) {
+      const angle = i / 8 * Math.PI * 2;
+      addScrew(body, [Math.cos(angle) * 0.22, 0.53 + Math.sin(angle) * 0.22, 0.45], 0.022, materials.brightAlloy, "z");
+    }
+    for (const side of [-1, 1]) {
+      addCylinder(body, 0.075, 0.075, 0.20, materials.darkAlloy,
+        [0, 0.52, side * 0.47], [Math.PI / 2, 0, 0], 22);
+      addTorus(body, 0.06, 0.012, materials.brightAlloy,
+        [0, 0.52, side * 0.56], [0, 0, 0], 20);
+    }
+    batchStaticMeshes(body);
+    return body;
+  }
+  const centerDifferentialParts = buildCenterDifferential();
+
+  const rearLinksModel = new THREE.Group();
+  rearLinksModel.name = "Solid rear axle trailing arms and locating links";
+  rearLinksModel.visible = false;
+  showcase.add(rearLinksModel);
+
+  function buildRearLinks() {
+    const body = new THREE.Group();
+    rearLinksModel.add(body);
+
+    // Lower trailing arms run forward from the rear axle line.
+    for (const side of [-1, 1]) {
+      addPrototypeRod(body, [side * 0.44, 0.40, -0.95], [side * 0.54, 0.45, 0.82], 0.065, materials.darkAlloy, 0.095);
+      addPrototypeRod(body, [side * 0.26, 0.73, -0.62], [side * 0.28, 0.72, 0.80], 0.042, materials.shellLight, 0.065);
+    }
+
+    // Triangulated upper links resist axle wrap and lateral movement.
+    addPrototypeRod(body, [-0.30, 0.78, -0.58], [-0.18, 0.74, 0.78], 0.038, materials.brightAlloy, 0.06);
+    addPrototypeRod(body, [0.30, 0.78, -0.58], [0.18, 0.74, 0.78], 0.038, materials.brightAlloy, 0.06);
+
+    // Panhard / track bar locates the axle across the chassis.
+    addPrototypeRod(body, [-0.48, 0.66, 0.78], [0.48, 0.83, -0.55], 0.035, materials.orange, 0.058);
+    for (const side of [-1, 1]) {
+      addBox(body, [0.20, 0.22, 0.20], [side * 0.48, 0.50, 0.78], materials.darkAlloy, 0.035);
+      addCylinder(body, 0.055, 0.055, 0.24, materials.brightAlloy,
+        [side * 0.48, 0.50, 0.78], [0, 0, Math.PI / 2], 20);
+    }
+    batchStaticMeshes(body);
+    return body;
+  }
+  const rearLinkParts = buildRearLinks();
+
+  const driveShaftsModel = new THREE.Group();
+  driveShaftsModel.name = "Front and rear propeller shaft assemblies";
+  driveShaftsModel.visible = false;
+  showcase.add(driveShaftsModel);
+
+  function buildDriveShafts() {
+    const body = new THREE.Group();
+    driveShaftsModel.add(body);
+    for (const side of [-1, 1]) {
+      const z0 = side < 0 ? -0.38 : 0.38;
+      const z1 = side < 0 ? -1.08 : 1.08;
+      addPrototypeRod(body, [0, 0.54, z0], [0, 0.54, z1], 0.052, materials.brightAlloy, 0.085);
+      const mid = (z0 + z1) * 0.5;
+      addCylinder(body, 0.085, 0.085, 0.30, materials.darkAlloy,
+        [0, 0.54, mid], [Math.PI / 2, 0, 0], 24);
+      for (const z of [z0, z1]) {
+        addBox(body, [0.20, 0.16, 0.13], [0, 0.54, z], materials.shellLight, 0.025);
+        addCylinder(body, 0.04, 0.04, 0.19, materials.black,
+          [0, 0.54, z], [Math.PI / 2, 0, 0], 16);
+      }
+    }
+    batchStaticMeshes(body);
+    return body;
+  }
+  const driveShaftParts = buildDriveShafts();
+
+  const frontCVDShaftsModel = new THREE.Group();
+  frontCVDShaftsModel.name = "Independent front CVD half-shafts";
+  frontCVDShaftsModel.visible = false;
+  showcase.add(frontCVDShaftsModel);
+
+  function buildFrontCVDShafts() {
+    const body = new THREE.Group();
+    frontCVDShaftsModel.add(body);
+    for (const side of [-1, 1]) {
+      const inner = new THREE.Vector3(side * 0.46, 0.54, -0.60);
+      const outer = new THREE.Vector3(side * 1.18, 0.57, 0.02);
+      const direction = outer.clone().sub(inner).normalize();
+
+      // Hardened steel half-shaft with inner and outer universal/CV cups.
+      addPrototypeRod(body, inner.toArray(), outer.toArray(), 0.043, materials.brightAlloy, 0.072);
+      for (const point of [inner, outer]) {
+        const cup = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.085, 0.085, 0.16, 22),
+          materials.darkAlloy
+        );
+        cup.position.copy(point);
+        cup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+        cup.castShadow = true;
+        body.add(cup);
+      }
+
+      // Short flexible rubber gaiter around the inboard joint.
+      const bootCenter = inner.clone().lerp(outer, 0.22);
+      const bootQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction);
+      for (let i = 0; i < 4; i++) {
+        const ring = new THREE.Mesh(
+          new THREE.TorusGeometry(0.069 - i * 0.003, 0.012, 7, 18),
+          materials.rubber
+        );
+        ring.position.copy(bootCenter).addScaledVector(direction, (i - 1.5) * 0.055);
+        ring.quaternion.copy(bootQuat);
+        ring.castShadow = true;
+        body.add(ring);
+      }
+
+      // Outer stub and small retaining cap at the hub-carrier end.
+      const cap = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.058, 0.058, 0.12, 20),
+        materials.alloy
+      );
+      cap.position.copy(outer).addScaledVector(direction, 0.105);
+      cap.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+      cap.castShadow = true;
+      body.add(cap);
+    }
+    batchStaticMeshes(body);
+    return body;
+  }
+  const frontCVDParts = buildFrontCVDShafts();
+
+  const motorMountModel = new THREE.Group();
+  motorMountModel.name = "Adjustable 42 to 50 size motor mount";
+  motorMountModel.visible = false;
+  showcase.add(motorMountModel);
+
+  function buildMotorMount() {
+    const body = new THREE.Group();
+    motorMountModel.add(body);
+    addBox(body, [0.96, 0.12, 0.92], [0, 0.31, 0], materials.darkAlloy, 0.04);
+    addBox(body, [0.70, 0.08, 0.68], [0, 0.41, 0], materials.black, 0.025);
+    for (const x of [-0.36, 0.36]) {
+      addBox(body, [0.12, 0.42, 0.80], [x, 0.62, 0], materials.alloy, 0.025);
+      addBox(body, [0.04, 0.26, 0.36], [x * 1.12, 0.66, 0], materials.darkAlloy, 0.012);
+      for (const z of [-0.29, 0.29]) {
+        addCylinder(body, 0.032, 0.032, 0.10, materials.brightAlloy,
+          [x, 0.67, z], [0, 0, Math.PI / 2], 16);
+      }
+    }
+    for (const x of [-0.26, 0.26]) {
+      addBox(body, [0.10, 0.035, 0.68], [x, 0.49, 0], materials.shellLight, 0.012);
+      for (const z of [-0.23, 0.23]) addScrew(body, [x, 0.52, z], 0.026, materials.brightAlloy);
+    }
+    batchStaticMeshes(body);
+    return body;
+  }
+  const motorMountParts = buildMotorMount();
+
+  const wheelTireModel = new THREE.Group();
+  wheelTireModel.name = "One scale off-road wheel and tire";
+  wheelTireModel.visible = false;
+  showcase.add(wheelTireModel);
+
+  function buildWheelTire() {
+    const body = new THREE.Group();
+    wheelTireModel.add(body);
+    addCylinder(body, 0.58, 0.58, 0.42, materials.rubber,
+      [0, 0.84, 0], [0, 0, Math.PI / 2], 48);
+    for (const x of [-0.205, 0.205]) {
+      addTorus(body, 0.52, 0.055, materials.rubber, [x, 0.84, 0], [0, Math.PI / 2, 0], 48);
+    }
+    addCylinder(body, 0.39, 0.39, 0.36, materials.darkAlloy,
+      [0, 0.84, 0], [0, 0, Math.PI / 2], 40);
+    addCylinder(body, 0.36, 0.36, 0.025, materials.shellLight,
+      [0.195, 0.84, 0], [0, 0, Math.PI / 2], 40);
+    addTorus(body, 0.375, 0.020, materials.brightAlloy,
+      [0.222, 0.84, 0], [0, Math.PI / 2, 0], 40);
+
+    for (let i = 0; i < 6; i++) {
+      const angle = i / 6 * Math.PI * 2;
+      addBox(body, [0.035, 0.31, 0.085],
+        [0.218, 0.84 + Math.cos(angle) * 0.17, Math.sin(angle) * 0.17],
+        materials.alloy, 0.018, [angle, 0, 0]);
+    }
+    addCylinder(body, 0.105, 0.105, 0.10, materials.black,
+      [0.25, 0.84, 0], [0, 0, Math.PI / 2], 28);
+    addCylinder(body, 0.065, 0.065, 0.13, materials.brightAlloy,
+      [0.31, 0.84, 0], [0, 0, Math.PI / 2], 24);
+
+    for (let i = 0; i < 28; i++) {
+      const angle = i / 28 * Math.PI * 2;
+      const y = 0.84 + Math.cos(angle) * 0.565;
+      const z = Math.sin(angle) * 0.565;
+      addBox(body, [0.32, 0.13, 0.075], [0, y, z], materials.rubber, 0.018,
+        [angle - Math.PI / 2, 0, 0]);
+    }
+    for (let i = 0; i < 16; i++) {
+      const angle = i / 16 * Math.PI * 2;
+      addCylinder(body, 0.018, 0.018, 0.025, materials.brightAlloy,
+        [0.248, 0.84 + Math.cos(angle) * 0.345, Math.sin(angle) * 0.345],
+        [0, 0, Math.PI / 2], 10);
+    }
+    batchStaticMeshes(body);
+    return body;
+  }
+  const wheelTireParts = buildWheelTire();
+
+  const bumpersModel = new THREE.Group();
+  bumpersModel.name = "Front and rear tubular bumpers";
+  bumpersModel.visible = false;
+  showcase.add(bumpersModel);
+
+  function buildBumpers() {
+    const body = new THREE.Group();
+    bumpersModel.add(body);
+    for (const z of [-1.22, 1.22]) {
+      addBox(body, [1.46, 0.22, 0.18], [0, 0.46, z], materials.darkAlloy, 0.065);
+      addBox(body, [0.92, 0.11, 0.22], [0, 0.40, z + (z < 0 ? -0.08 : 0.08)], materials.black, 0.035);
+      for (const x of [-0.55, 0.55]) {
+        addPrototypeRod(body, [x * 0.70, 0.52, z + (z < 0 ? 0.10 : -0.10)],
+          [x, 0.78, z + (z < 0 ? -0.16 : 0.16)], 0.042, materials.shellLight, 0.06);
+      }
+      for (const x of [-0.48, 0.48]) {
+        addCylinder(body, 0.055, 0.055, 0.15, materials.brightAlloy,
+          [x, 0.46, z], [0, 0, Math.PI / 2], 18);
+      }
+    }
+    batchStaticMeshes(body);
+    return body;
+  }
+  const bumperParts = buildBumpers();
+
+  const rollCageModel = new THREE.Group();
+  rollCageModel.name = "Tubular body safety cage";
+  rollCageModel.visible = false;
+  showcase.add(rollCageModel);
+
+  function buildRollCage() {
+    const body = new THREE.Group();
+    rollCageModel.add(body);
+    for (const x of [-0.52, 0.52]) {
+      addPrototypeRod(body, [x, 0.42, -1.06], [x, 1.34, -0.62], 0.045, materials.darkAlloy);
+      addPrototypeRod(body, [x, 1.34, -0.62], [x, 1.34, 0.75], 0.045, materials.darkAlloy);
+      addPrototypeRod(body, [x, 1.34, 0.75], [x, 0.42, 1.08], 0.045, materials.darkAlloy);
+      addPrototypeRod(body, [x, 0.42, -1.06], [x, 0.42, 1.08], 0.035, materials.shellLight);
+    }
+    for (const z of [-0.62, 0.0, 0.75]) {
+      addPrototypeRod(body, [-0.52, 1.34, z], [0.52, 1.34, z], 0.038, materials.shellLight);
+    }
+    for (const side of [-1, 1]) {
+      addPrototypeRod(body, [side * 0.52, 0.42, -0.95], [side * 0.52, 1.34, 0.74], 0.032, materials.darkAlloy);
+      addPrototypeRod(body, [side * 0.52, 1.34, -0.62], [0, 0.42, 0.95], 0.032, materials.shellLight);
+    }
+    batchStaticMeshes(body);
+    return body;
+  }
+  const rollCageParts = buildRollCage();
+
   const componentModels = {
     servo: servoModel,
     motor: motorModel,
@@ -1010,7 +1486,20 @@ export function createPartsLabSystem(game) {
     skidPlate: skidPlateModel,
     frontAArms: frontAArmsModel,
     rearAxle: rearAxleModel,
-    frontSuspension: frontSuspensionModel
+    frontSuspension: frontSuspensionModel,
+    chassisFrame: chassisFrameModel,
+    frontUpperArms: frontUpperArmsModel,
+    frontKnuckles: frontKnucklesModel,
+    steeringLinkage: steeringLinkageModel,
+    frontDifferential: frontDifferentialModel,
+    frontCVDShafts: frontCVDShaftsModel,
+    centerDifferential: centerDifferentialModel,
+    rearLinks: rearLinksModel,
+    driveShafts: driveShaftsModel,
+    motorMount: motorMountModel,
+    wheelTire: wheelTireModel,
+    bumpers: bumpersModel,
+    rollCage: rollCageModel
   };
 
   const partDetails = {
@@ -1068,6 +1557,71 @@ export function createPartsLabSystem(game) {
       name: "FRONT SUSPENSION DEMONSTRATOR",
       description: "A standalone pair of front lower A-arms connected visually to two coil-over shocks. The arms pivot up and down while the shock rods and coil springs compress and extend together.",
       specs: "LAYOUT      ·  Mirrored front lower A-arms\nDAMPERS     ·  Twin coil-over shocks\nMOVEMENT    ·  Arm travel + spring compression\nSTATUS      ·  Standalone animated assembly"
+    },
+    chassisFrame: {
+      name: "ALUMINUM CHASSIS FRAME",
+      description: "Twin longitudinal frame rails, upper equipment deck, battery tray and crossmembers. It is a separate structural prototype, not an assembled chassis.",
+      specs: "LAYOUT      ·  Twin-rail three-layer frame\nDECK        ·  Upper electronics plate\nTRAY        ·  Recessed battery bay\nSTATUS      ·  Standalone structure"
+    },
+    frontUpperArms: {
+      name: "FRONT UPPER A-ARMS",
+      description: "A mirrored pair of compact upper wishbones to complement the lower A-arms in the independent front suspension. They move vertically with the standalone suspension travel demonstration.",
+      specs: "LAYOUT      ·  Left and right upper arms\nPIVOTS      ·  Twin inner hinge points\nOUTER       ·  Upright ball-joint mount\nMOTION      ·  Matching suspension travel"
+    },
+    frontKnuckles: {
+      name: "FRONT STEERING KNUCKLES",
+      description: "Left and right front hub carriers with stub axles, bearing bosses and steering-arm mounts.",
+      specs: "LAYOUT      ·  Independent left/right carriers\nHUB         ·  17 mm style wheel mount\nSTEERING    ·  Outboard steering arms\nSTATUS      ·  Standalone pair"
+    },
+    steeringLinkage: {
+      name: "FRONT STEERING LINKAGE",
+      description: "A central servo-saver/rack bar with drag link and left/right tie rods that connect the steering system conceptually to both front knuckles.",
+      specs: "LAYOUT      ·  Transverse steering rack\nLINKS       ·  Drag link + two tie rods\nJOINTS      ·  Ball-end style pivots\nSTATUS      ·  Standalone assembly"
+    },
+    frontDifferential: {
+      name: "FRONT DIFFERENTIAL",
+      description: "A compact front differential case with left and right output cups and a simple mounting bulkhead for the independent front drive.",
+      specs: "DRIVE       ·  Front axle differential\nOUTPUTS     ·  Left and right half-shafts\nCASE        ·  Enclosed alloy-style housing\nSTATUS      ·  Standalone prototype"
+    },
+    frontCVDShafts: {
+      name: "FRONT CVD HALF-SHAFTS",
+      description: "A mirrored pair of articulated front constant-velocity half-shafts with inner joint cups, rubber gaiters and outer hub-end couplings for the independent front suspension.",
+      specs: "DRIVE       ·  Front independent axle shafts\nJOINTS      ·  Inner + outer CV cups\nBOOT        ·  Flexible rubber gaiters\nSTATUS      ·  Standalone pair"
+    },
+    centerDifferential: {
+      name: "CENTRE DIFFERENTIAL",
+      description: "A centre differential housing with forward and rearward prop-shaft outputs for the four-wheel-drive layout.",
+      specs: "DRIVE       ·  4WD power split\nOUTPUTS     ·  Front and rear shafts\nCASE        ·  Enclosed central housing\nSTATUS      ·  Standalone prototype"
+    },
+    rearLinks: {
+      name: "REAR TRAILING ARMS & LINKS",
+      description: "A pair of long lower trailing arms, triangulated upper locating links and a lateral panhard bar. These pieces locate the rear solid axle while allowing suspension travel.",
+      specs: "LAYOUT      ·  Solid rear axle location\nLOWER       ·  Twin trailing arms\nUPPER       ·  Triangulated locating links\nLATERAL     ·  Panhard / track bar"
+    },
+    driveShafts: {
+      name: "FRONT & REAR PROPELLER SHAFTS",
+      description: "Two telescoping centre drive shafts with universal-joint yokes connecting a centre differential to the front differential and rear axle.",
+      specs: "DRIVE       ·  Shaft-driven 4WD\nFRONT       ·  Centre-to-front prop shaft\nREAR        ·  Centre-to-rear prop shaft\nJOINTS      ·  Universal-style couplings"
+    },
+    motorMount: {
+      name: "ADJUSTABLE MOTOR MOUNT",
+      description: "An alloy cradle and slotted side plates sized as a visual mount for a large 42–50 size brushless motor.",
+      specs: "FORMAT      ·  1/7 desert truck class\nFIT         ·  42–50 size motor envelope\nADJUST      ·  Slotted pinion-mesh rails\nSTATUS      ·  Standalone bracket"
+    },
+    wheelTire: {
+      name: "OFF-ROAD WHEEL & TIRE",
+      description: "A single large-scale desert tire with chunky tread blocks, alloy-style six-spoke rim, beadlock ring and 17 mm style hub centre.",
+      specs: "REFERENCE   ·  1/7 desert truck class\nTIRE        ·  Approx. 135–146 mm diameter\nRIM         ·  Six-spoke beadlock style\nHUB         ·  17 mm style centre"
+    },
+    bumpers: {
+      name: "FRONT & REAR BUMPERS",
+      description: "A pair of simple structural bumper bars with corner braces and mounting points for the front and rear of the rolling chassis.",
+      specs: "LAYOUT      ·  Front + rear crossbars\nMOUNT       ·  Braced chassis tabs\nMATERIAL    ·  Alloy and tubular details\nSTATUS      ·  Standalone pair"
+    },
+    rollCage: {
+      name: "TUBULAR BODY / SAFETY CAGE",
+      description: "A separate perimeter roll cage with side rails, roof crossbars and diagonal braces inspired by desert short-course chassis structures.",
+      specs: "LAYOUT      ·  Open tubular perimeter\nROOF        ·  Three crossbars\nBRACING     ·  Diagonal side supports\nSTATUS      ·  Standalone structure"
     }
   };
 
@@ -1098,13 +1652,18 @@ export function createPartsLabSystem(game) {
   }
 
   function updateSuspensionDemo(time, animate) {
-    const travel = animate ? Math.sin(time * 2.4) * 0.105 : 0;
+    // The inner hinge line runs along Z, so rotating around Z lifts and lowers
+    // each outboard arm tip. Opposite signs keep both sides moving vertically.
+    const travel = animate ? Math.sin(time * 2.1) * 0.35 : 0;
     const compression = animate
-      ? 0.72 + 0.28 * (0.5 + 0.5 * Math.sin(time * 2.4 + 0.35))
+      ? 0.62 + 0.38 * (0.5 + 0.5 * Math.sin(time * 2.1 + 0.30))
       : 1;
 
     for (const item of suspensionArmSet.pivots) {
-      item.pivot.rotation.x = travel;
+      item.pivot.rotation.z = item.side * travel;
+    }
+    for (const item of suspensionUpperArmSet.pivots) {
+      item.pivot.rotation.z = item.side * travel * 0.72;
     }
 
     frontSuspensionModel.updateMatrixWorld(true);
@@ -1141,8 +1700,10 @@ export function createPartsLabSystem(game) {
       shockParts.moving.position.y = 0;
       shockParts.springGroup.scale.y = 1;
       standaloneSpring.springGroup.scale.y = 1;
-      for (const item of frontArmSet.pivots) item.pivot.rotation.x = 0;
-      for (const item of suspensionArmSet.pivots) item.pivot.rotation.x = 0;
+      for (const item of frontArmSet.pivots) item.pivot.rotation.z = 0;
+      for (const item of upperArmSet.pivots) item.pivot.rotation.z = 0;
+      for (const item of suspensionArmSet.pivots) item.pivot.rotation.z = 0;
+      for (const item of suspensionUpperArmSet.pivots) item.pivot.rotation.z = 0;
       updateSuspensionDemo(0, false);
     }
   }
@@ -1180,8 +1741,12 @@ export function createPartsLabSystem(game) {
       shockParts.springGroup.scale.y = activePart === "shock" ? compression : 1;
       standaloneSpring.springGroup.scale.y = activePart === "spring" ? compression : 1;
     } else if (activePart === "frontAArms") {
-      const armTravel = Math.sin(time * 2.4) * 0.105;
-      for (const item of frontArmSet.pivots) item.pivot.rotation.x = armTravel;
+      const armTravel = Math.sin(time * 2.1) * 0.35;
+      for (const item of frontArmSet.pivots) item.pivot.rotation.z = item.side * armTravel;
+      for (const item of upperArmSet.pivots) item.pivot.rotation.z = item.side * armTravel * 0.72;
+    } else if (activePart === "frontUpperArms") {
+      const upperTravel = Math.sin(time * 2.1) * 0.35;
+      for (const item of upperArmSet.pivots) item.pivot.rotation.z = item.side * upperTravel;
     } else if (activePart === "frontSuspension") {
       updateSuspensionDemo(time, true);
     }
@@ -1205,8 +1770,11 @@ export function createPartsLabSystem(game) {
     resetView,
     getFocusPosition() {
       if (activePart === "skidPlate") return new THREE.Vector3(0, 0.70, 0);
-      if (activePart === "frontAArms" || activePart === "rearAxle") return new THREE.Vector3(0, 0.50, 0);
+      if (activePart === "frontAArms" || activePart === "rearAxle" || activePart === "rearLinks") return new THREE.Vector3(0, 0.52, 0);
       if (activePart === "frontSuspension") return new THREE.Vector3(0, 0.85, 0);
+      if (activePart === "chassisFrame" || activePart === "rollCage") return new THREE.Vector3(0, 0.88, 0);
+      if (activePart === "frontKnuckles" || activePart === "steeringLinkage" || activePart === "frontDifferential") return new THREE.Vector3(0, 0.62, 0);
+      if (activePart === "rearLinks" || activePart === "driveShafts" || activePart === "centerDifferential") return new THREE.Vector3(0, 0.58, 0);
       return new THREE.Vector3(0, 0.92, 0);
     },
     get activePart() { return activePart; },
