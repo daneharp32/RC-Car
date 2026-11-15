@@ -2205,8 +2205,8 @@ export function createPartsLabSystem(game) {
     },
     motor: {
       name: "540 BRUSHLESS MOTOR",
-      description: "A 1/10-scale-style brushless motor mock-up with a vented can, machined end bells, bearing seats, cooling details, phase leads, mounting plate and rotating output shaft with pinion.",
-      specs: "FORMAT      ·  540-size visual model\nROTOR       ·  Animated output shaft\nCOOLING     ·  Radial ports and vented end bell\nCONNECTION  ·  Three phase wires"
+      description: "A detailed standalone brushless motor mock-up with a vented can, machined end bells, bearing seats, phase leads and rotating pinion shaft. In the assembled chassis the display cradle is hidden and the motor is fitted to a 42 × 74 mm 4274-size envelope.",
+      specs: "STANDALONE  ·  Detailed brushless motor model\nASSEMBLED   ·  4274 / approx. 42 × 74 mm\nROTOR       ·  Animated output shaft\nCONNECTION  ·  Three phase wires"
     },
     esc: {
       name: "BRUSHLESS ESC",
@@ -2215,8 +2215,8 @@ export function createPartsLabSystem(game) {
     },
     battery: {
       name: "2S HARDCASE LIPO BATTERY",
-      description: "A simple full-length hardcase pack with molded case seams, cell markings, balance lead, and main power connector.",
-      specs: "FORMAT      ·  2S hardcase pack\nVOLTAGE     ·  7.4 V nominal\nCASE        ·  Molded protective shell\nLEADS       ·  Main power and balance"
+      description: "A full-length hardcase pack with molded case seams, cell markings, balance lead and main power connector. In the assembled chassis it is fitted lengthwise in a retaining tray based on the 1/7 reference battery compartment.",
+      specs: "FORMAT      ·  2S hardcase pack\nVOLTAGE     ·  7.4 V nominal\nASSEMBLED   ·  181 × 47.5 × 54 mm envelope\nLEADS       ·  Main power and balance"
     },
     gearbox: {
       name: "SHORT-COURSE GEARBOX",
@@ -2235,8 +2235,8 @@ export function createPartsLabSystem(game) {
     },
     skidPlate: {
       name: "MAIN METAL SKID PLATE",
-      description: "A shortened, wider central aluminum pan inspired by the DF7, Desert King and FMS 1/7 chassis underside photographs. It has tapered ends, a broad central footprint and mounting rows that stay clear of the front and rear suspension zones.",
-      specs: "REFERENCE   ·  425 mm wheelbase class\nPAN         ·  Approx. 225 × 170 × 5 mm (estimated)\nSHAPE       ·  Broad centre, tapered ends\nFASTENERS   ·  Recessed perimeter + inner rows"
+      description: "A tapered aluminum belly pan inspired by the DF7, Desert King and FMS 1/7 underside photographs. The assembled version is moved forward and scaled to a broader 270 × 221 mm footprint, leaving a clearly open section before the rear solid axle.",
+      specs: "REFERENCE   ·  425 mm wheelbase class\nASSEMBLED   ·  Approx. 270 × 221 × 5 mm\nPOSITION    ·  Forward of centre, behind front axle\nFASTENERS   ·  Recessed perimeter + inner rows"
     },
     frontAArms: {
       name: "FRONT LOWER A-ARMS",
@@ -2310,8 +2310,8 @@ export function createPartsLabSystem(game) {
     },
     rollingChassis: {
       name: "COMPLETE 1/7 ROLLING CHASSIS",
-      description: "A complete mechanical and electrical 1/7 desert-truck chassis using the reference 425 mm wheelbase layout. It includes independent front double wishbones, servo-operated steering, front/centre differentials, a 4274-style motor, spinning-fan ESC, hardcase battery, shaft-driven 4WD and a live solid rear axle with long-travel suspension. Use A/D or the left/right arrow keys to steer the front wheels and servo together.",
-      specs: "REFERENCE   ·  1/7 class · 425 mm wheelbase\nFRONT       ·  Servo-linked 2WS / double-wishbone\nREAR        ·  Solid axle + extended travel links\nELECTRICS   ·  Servo, motor, ESC fan and battery\nINPUT       ·  A/D or left/right arrow keys"
+      description: "A complete 1/7 desert-truck chassis arranged around a 425 mm wheelbase and 290 mm track. The battery sits lengthwise on the left tray, the 150A ESC is beside it, the 4274 motor is seated in its rear mount and the steering servo is positioned behind the front bulkhead. The shortened belly pan sits forward, leaving open space before the solid rear axle. Use A/D or the left/right arrow keys to steer the servo, tie rods and front hubs together.",
+      specs: "ENVELOPE    ·  Approx. 693 × 346 mm\nWHEELBASE   ·  426 mm / 425 mm class\nTRACK       ·  Approx. 292 mm\nPAN         ·  Approx. 270 × 221 mm, forward mounted\nELECTRICS   ·  Servo, 4274 motor, 150A ESC, LiPo\nINPUT       ·  A/D or left/right arrow keys"
     },
     suspensionWorking: {
       name: "WORKING FRONT + REAR SUSPENSION",
