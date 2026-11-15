@@ -774,7 +774,8 @@ export function createPartsLabSystem(game) {
     profile.lineTo(-0.82, 0.98);
     profile.lineTo(-1.04, 0.65);
     profile.lineTo(-1.27, 0.56);
-    profile.closePath();
+    // Close the polygon explicitly with the supported path line operation.
+    profile.lineTo(-1.27, 0.30);
 
     const plateGeometry = new THREE.ExtrudeGeometry(profile, {
       depth: 0.045, bevelEnabled: true, bevelSegments: 2, steps: 1,
