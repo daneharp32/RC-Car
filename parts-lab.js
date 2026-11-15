@@ -1205,8 +1205,6 @@ export function createPartsLabSystem(game) {
   }
   const frontKnuckleParts = buildFrontKnuckles();
 
-  const frontKnuckleParts = buildFrontKnuckles();
-
   const steeringLinkageModel = new THREE.Group();
   steeringLinkageModel.name = "Front steering tie rods and servo saver linkage";
   steeringLinkageModel.visible = false;
