@@ -1549,7 +1549,8 @@ export function createPartsLabSystem(game) {
       const wheel = wheelTireModel.clone(true);
       wheel.name = side < 0 ? "Front left wheel and tire" : "Front right wheel and tire";
       wheel.visible = true;
-      wheel.position.set(side * 1.01, -0.42, 0);
+      wheel.scale.set(1.20, 1.08, 1.08);
+      wheel.position.set(side * 1.01, -0.4872, 0);
       // The detailed wheel face points outward on each side.
       wheel.rotation.y = side < 0 ? Math.PI : 0;
       pivot.add(wheel);
@@ -1637,7 +1638,8 @@ export function createPartsLabSystem(game) {
       const wheel = wheelTireModel.clone(true);
       wheel.name = side < 0 ? "Rear left wheel and tire" : "Rear right wheel and tire";
       wheel.visible = true;
-      wheel.position.set(side * 1.35, -0.34, 0);
+      wheel.scale.set(1.20, 1.08, 1.08);
+      wheel.position.set(side * 1.35, -0.4072, 0);
       wheel.rotation.y = side < 0 ? Math.PI : 0;
       rearCarrier.add(wheel);
     }
