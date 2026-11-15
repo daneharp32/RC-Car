@@ -1543,9 +1543,10 @@ export function createPartsLabSystem(game) {
     const root = new THREE.Group();
     root.name = "Assembled 1/7 mechanical rolling chassis";
 
-    // Forward central belly pan, shortened to about 230 x 220 mm in the
-    // assembled scale model. The longer open rear section matches the
-    // underside layout visible on the DF7, Desert King and FMS 1/7 trucks.
+    // Forward central belly pan, about 270 x 220 mm at assembled scale.
+    // Its front edge sits close behind the front axle and its rear edge stops
+    // well before the live axle, matching the long open rear section on the
+    // DF7, Desert King and FMS 1/7 underside references.
     const panGroup = new THREE.Group();
     panGroup.name = "Assembled skid plate";
     root.add(panGroup);
@@ -1912,7 +1913,7 @@ export function createPartsLabSystem(game) {
     }
 
     // Front and rear bumpers are retained; no roll cage or longitudinal side rails.
-    cloneAssemblyPart(bumpersModel, "Front and rear bumper pair", root, [0, 0.62, 0], [2.2, 0.90, 2.15]);
+    cloneAssemblyPart(bumpersModel, "Front and rear bumper pair", root, [0, 0.62, 0], [2.2, 0.90, 2.45]);
 
     return root;
   }
