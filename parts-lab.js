@@ -763,11 +763,6 @@ export function createPartsLabSystem(game) {
     // Approx. 310 x 100 x 3.5 mm in the 425 mm wheelbase scale reference.
     addBox(body, [0.80, 0.028, 2.48], [0, 0.285, 0], materials.alloy, 0.012);
 
-    // Two subtle reinforcing rails underneath the centre section.
-    for (const x of [-0.245, 0.245]) {
-      addBox(body, [0.035, 0.035, 1.72], [x, 0.254, 0], materials.darkAlloy, 0.009);
-    }
-
     // Practical edge mounting points and central drivetrain crossmember holes.
     for (const z of [-1.02, -0.62, 0.62, 1.02]) {
       for (const x of [-0.29, 0.29]) {
@@ -824,9 +819,9 @@ export function createPartsLabSystem(game) {
       // Inner hinge barrels run across the pivot axis.
       for (const z of [-0.34, 0.34]) {
         addCylinder(body, 0.066, 0.066, 0.17, materials.black,
-          [side * 0.36, 0.32, z], [0, 0, Math.PI / 2], 24);
+          [side * 0.36, 0.35, z], [0, 0, Math.PI / 2], 24);
         addCylinder(body, 0.045, 0.045, 0.19, materials.brightAlloy,
-          [side * 0.36, 0.32, z], [0, 0, Math.PI / 2], 20);
+          [side * 0.36, 0.35, z], [0, 0, Math.PI / 2], 20);
       }
 
       // Outboard ball-joint cup is centred over the tapered arm tip.
@@ -841,7 +836,7 @@ export function createPartsLabSystem(game) {
     }
 
     // Simple crossmember represents the front inner-pivot mounting area.
-    addBox(body, [0.90, 0.10, 0.16], [0, 0.29, -0.42], materials.shellLight, 0.025);
+    addBox(body, [0.90, 0.10, 0.16], [0, 0.32, -0.42], materials.shellLight, 0.025);
     return { body };
   }
   const frontAArmsParts = buildFrontAArms();
@@ -869,17 +864,17 @@ export function createPartsLabSystem(game) {
     // Straight tubes extend symmetrically from the centre differential.
     for (const side of [-1, 1]) {
       addCylinder(body, 0.115, 0.115, 0.88, materials.darkAlloy,
-        [side * 0.70, 0.50, 0], [0, 0, Math.PI / 2], 32);
+        [side * 0.68, 0.50, 0], [0, 0, Math.PI / 2], 32);
       addCylinder(body, 0.085, 0.085, 0.18, materials.shellLight,
-        [side * 1.13, 0.50, 0], [0, 0, Math.PI / 2], 28);
+        [side * 1.04, 0.50, 0], [0, 0, Math.PI / 2], 28);
 
       // Wheel-end backing plate, bearing ring and short hub stub.
       addCylinder(body, 0.205, 0.205, 0.10, materials.black,
-        [side * 1.22, 0.50, 0], [0, 0, Math.PI / 2], 32);
+        [side * 1.12, 0.50, 0], [0, 0, Math.PI / 2], 32);
       addTorus(body, 0.16, 0.014, materials.brightAlloy,
-        [side * 1.28, 0.50, 0], [0, Math.PI / 2, 0], 28);
-      addCylinder(body, 0.075, 0.075, 0.22, materials.alloy,
-        [side * 1.35, 0.50, 0], [0, 0, Math.PI / 2], 24);
+        [side * 1.17, 0.50, 0], [0, Math.PI / 2, 0], 28);
+      addCylinder(body, 0.075, 0.075, 0.16, materials.alloy,
+        [side * 1.21, 0.50, 0], [0, 0, Math.PI / 2], 24);
     }
 
     // Top saddles mark future suspension-link and shock attachment zones.
@@ -1053,7 +1048,8 @@ export function createPartsLabSystem(game) {
     update,
     resetView,
     getFocusPosition() {
-      return new THREE.Vector3(0, 0.92, 0);
+      const chassisPart = activePart === "skidPlate" || activePart === "frontAArms" || activePart === "rearAxle";
+      return new THREE.Vector3(0, chassisPart ? 0.52 : 0.92, 0);
     },
     get activePart() { return activePart; },
     get motionEnabled() { return motionEnabled; },
