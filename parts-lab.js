@@ -871,10 +871,10 @@ export function createPartsLabSystem(game) {
       // Wheel-end backing plate, bearing ring and short hub stub.
       addCylinder(body, 0.205, 0.205, 0.10, materials.black,
         [side * 1.12, 0.50, 0], [0, 0, Math.PI / 2], 32);
-      addTorus(body, 0.16, 0.014, materials.brightAlloy,
-        [side * 1.17, 0.50, 0], [0, Math.PI / 2, 0], 28);
+      addTorus(body, 0.145, 0.014, materials.brightAlloy,
+        [side * 1.16, 0.50, 0], [0, Math.PI / 2, 0], 28);
       addCylinder(body, 0.075, 0.075, 0.16, materials.alloy,
-        [side * 1.21, 0.50, 0], [0, 0, Math.PI / 2], 24);
+        [side * 1.20, 0.50, 0], [0, 0, Math.PI / 2], 24);
     }
 
     // Top saddles mark future suspension-link and shock attachment zones.
@@ -939,7 +939,7 @@ export function createPartsLabSystem(game) {
     },
     skidPlate: {
       name: "MAIN METAL SKID PLATE",
-      description: "A flat central aluminum chassis plate with rounded edges, subtle underside reinforcing rails and practical mounting points. Sized as the centre section of a truck using a 425 mm target wheelbase.",
+      description: "A flat central aluminum chassis plate with rounded edges and practical mounting points. Sized as the centre section of a truck using a 425 mm target wheelbase.",
       specs: "REFERENCE   ·  425 mm target wheelbase\nPLATE       ·  Approx. 310 × 100 × 3.5 mm\nMATERIAL    ·  Brushed aluminum appearance\nSTATUS      ·  Standalone prototype"
     },
     frontAArms: {
