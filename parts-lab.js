@@ -1549,7 +1549,7 @@ export function createPartsLabSystem(game) {
       const wheel = wheelTireModel.clone(true);
       wheel.name = side < 0 ? "Front left wheel and tire" : "Front right wheel and tire";
       wheel.visible = true;
-      wheel.position.set(side * 0.99, -0.42, 0);
+      wheel.position.set(side * 1.01, -0.42, 0);
       // The detailed wheel face points outward on each side.
       wheel.rotation.y = side < 0 ? Math.PI : 0;
       pivot.add(wheel);
@@ -1586,8 +1586,8 @@ export function createPartsLabSystem(game) {
     // The centre differential, gearbox case and empty motor cradle form the
     // central mechanical powertrain. No motor or electrical equipment is fitted.
     cloneAssemblyPart(centerDifferentialModel, "Centre differential unit", root, [0, 0.32, -0.45]);
-    cloneAssemblyPart(gearboxModel, "Central gearbox housing", root, [0, 0.38, 0.35], [0.75, 0.75, 0.75]);
-    cloneAssemblyPart(motorMountModel, "Empty adjustable motor mount", root, [0, 0.855, 0.42], [0.75, 0.75, 0.75]);
+    cloneAssemblyPart(gearboxModel, "Central gearbox housing", root, [0, 0.425, 0.35], [0.75, 0.75, 0.75]);
+    cloneAssemblyPart(motorMountModel, "Empty adjustable motor mount", root, [0, 0.90, 0.42], [0.75, 0.75, 0.75]);
 
     // Centre-to-front and centre-to-rear prop shafts, with yokes at each end.
     const propShaftGroup = new THREE.Group();
@@ -1689,7 +1689,7 @@ export function createPartsLabSystem(game) {
     }
 
     // Front and rear bumpers are retained; no roll cage or longitudinal side rails.
-    cloneAssemblyPart(bumpersModel, "Front and rear bumper pair", root, [0, 0.62, 0], [2.2, 0.90, 2.63]);
+    cloneAssemblyPart(bumpersModel, "Front and rear bumper pair", root, [0, 0.62, 0], [2.2, 0.90, 2.45]);
 
     return root;
   }
@@ -1710,7 +1710,10 @@ export function createPartsLabSystem(game) {
     const front = root.getObjectByName("Front suspension unit");
     const rearCarrier = root.getObjectByName("Animated rear solid axle carrier");
     const rearLinks = root.getObjectByName("Rear axle locating links");
-    if (!front || !rearCarrier || !rearLinks) {
+    const frontKnuckles = root.getObjectByName("Front steering knuckles");
+    const frontCvd = root.getObjectByName("Front CVD half-shafts");
+    const steering = root.getObjectByName("Front steering linkage");
+    if (!front || !rearCarrier || !rearLinks || !frontKnuckles || !frontCvd || !steering) {
       throw new Error("Rolling chassis is missing a suspension or axle assembly.");
     }
 
@@ -1745,7 +1748,7 @@ export function createPartsLabSystem(game) {
       }
     });
 
-    return { root, front, lowerPivots, upperPivots, frontShocks, rearCarrier, rearLinks, rearShocks };
+    return { root, front, lowerPivots, upperPivots, frontShocks, frontKnuckles, frontCvd, steering, rearCarrier, rearLinks, rearShocks };
   }
 
   function updateRollingChassisSuspension(motion, time, animate) {
@@ -1760,6 +1763,13 @@ export function createPartsLabSystem(game) {
     for (const item of motion.upperPivots) {
       item.pivot.rotation.z = item.side * travel * 0.72;
     }
+
+    // Hub carriers, steering arms and front CVD outers follow the lower
+    // wishbones' vertical arc so they do not hover above the moving wheels.
+    const frontHubTravel = 0.99 * Math.sin(travel) + 0.42 * (Math.cos(travel) - 1);
+    motion.frontKnuckles.position.y = 0.06 + frontHubTravel;
+    motion.frontCvd.position.y = frontHubTravel;
+    motion.steering.position.y = -0.06 + frontHubTravel;
 
     motion.front.updateMatrixWorld(true);
     for (const shock of motion.frontShocks) {
