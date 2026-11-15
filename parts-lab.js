@@ -2021,7 +2021,7 @@ export function createPartsLabSystem(game) {
   }
 
   const rollingChassisModel = buildRollingChassisAssembly();
-  rollingChassisModel.name = "Complete non-electrical 1/7 rolling chassis";
+  rollingChassisModel.name = "Complete 1/7 assembled rolling chassis";
   rollingChassisModel.visible = false;
   showcase.add(rollingChassisModel);
 
@@ -2034,7 +2034,6 @@ export function createPartsLabSystem(game) {
   // heavier central drivetrain obscuring the arms, axle links and dampers.
   for (const name of [
     "Assembled skid plate",
-    "Front steering linkage",
     "Front differential unit",
     "Front CVD half-shafts",
     "Centre differential unit",
@@ -2049,8 +2048,9 @@ export function createPartsLabSystem(game) {
 
   const rollingChassisMotion = captureRollingChassisMotion(rollingChassisModel);
   const suspensionWorkingMotion = captureRollingChassisMotion(suspensionWorkingModel);
-  updateRollingChassisSuspension(rollingChassisMotion, 0, false);
-  updateRollingChassisSuspension(suspensionWorkingMotion, 0, false);
+  let assembledSteeringInput = 0;
+  updateRollingChassisSuspension(rollingChassisMotion, 0, false, 0);
+  updateRollingChassisSuspension(suspensionWorkingMotion, 0, false, 0);
 
   const componentModels = {
     servo: servoModel,
@@ -2191,14 +2191,14 @@ export function createPartsLabSystem(game) {
       specs: "LAYOUT      ·  Front + rear crossbars\nMOUNT       ·  Braced chassis tabs\nMATERIAL    ·  Alloy and tubular details\nSTATUS      ·  Standalone pair"
     },
     rollingChassis: {
-      name: "COMPLETE MECHANICAL ROLLING CHASSIS",
-      description: "An assembled 1/7-scale mechanical chassis using a 425 mm wheelbase layout: independent front double wishbones, steering hubs and links, front/centre differentials, a central gearbox, front half-shafts, prop shafts, a straight live rear axle with trailing links, wheels, dampers and bumpers. Electrical equipment is intentionally omitted.",
-      specs: "REFERENCE   ·  1/7 class · 425 mm wheelbase\nFRONT       ·  Independent double-wishbone\nREAR        ·  Solid axle + trailing / locating links\nDRIVE       ·  Front, centre and rear mechanical drive\nOMISSIONS   ·  Servo, motor, ESC and battery"
+      name: "COMPLETE 1/7 ROLLING CHASSIS",
+      description: "A complete mechanical and electrical 1/7 desert-truck chassis using the reference 425 mm wheelbase layout. It includes independent front double wishbones, servo-operated steering, front/centre differentials, a 4274-style motor, spinning-fan ESC, hardcase battery, shaft-driven 4WD and a live solid rear axle with long-travel suspension. Use A/D or the left/right arrow keys to steer the front wheels and servo together.",
+      specs: "REFERENCE   ·  1/7 class · 425 mm wheelbase\nFRONT       ·  Servo-linked 2WS / double-wishbone\nREAR        ·  Solid axle + extended travel links\nELECTRICS   ·  Servo, motor, ESC fan and battery\nINPUT       ·  A/D or left/right arrow keys"
     },
     suspensionWorking: {
       name: "WORKING FRONT + REAR SUSPENSION",
-      description: "A focused view of the assembled suspension. Front upper and lower A-arms move through vertical travel with steering hubs and wheels following the lower arms; the rear axle, wheels and locating links move together while four rear dampers and the front coil-overs compress.",
-      specs: "FRONT       ·  Moving upper / lower A-arms\nDAMPERS     ·  Front coil-overs + four rear shocks\nREAR        ·  Live axle with trailing links\nMOTION      ·  Pause / resume using the motion control"
+      description: "A focused view of the assembled suspension with the steering servo and ESC fan still visible. Front upper and lower A-arms move through vertical travel, the front wheels steer with the servo and the CVD shafts articulate; the rear axle rises and falls through extended travel with its wheels, locating links and four dampers following. Use A/D or the left/right arrow keys to steer.",
+      specs: "FRONT       ·  Moving A-arms + servo-linked steering\nDAMPERS     ·  Front coil-overs + four rear shocks\nREAR        ·  Solid axle / extended travel\nELECTRICS   ·  Servo horn + spinning ESC fan\nINPUT       ·  A/D or left/right arrow keys"
     },
   };
 
@@ -2289,8 +2289,9 @@ export function createPartsLabSystem(game) {
       for (const item of suspensionArmSet.pivots) item.pivot.rotation.z = 0;
       for (const item of suspensionUpperArmSet.pivots) item.pivot.rotation.z = 0;
       updateSuspensionDemo(0, false);
-      updateRollingChassisSuspension(rollingChassisMotion, 0, false);
-      updateRollingChassisSuspension(suspensionWorkingMotion, 0, false);
+      assembledSteeringInput = 0;
+      updateRollingChassisSuspension(rollingChassisMotion, 0, false, 0);
+      updateRollingChassisSuspension(suspensionWorkingMotion, 0, false, 0);
     }
   }
 
@@ -2313,8 +2314,24 @@ export function createPartsLabSystem(game) {
   }
 
   function update(delta, now, isActive) {
-    if (!visible || !isActive || !motionEnabled) return;
+    if (!visible || !isActive) return;
     const time = now * 0.001;
+    if (activePart === "rollingChassis" || activePart === "suspensionWorking") {
+      if (!motionEnabled) return;
+      const keys = game.controls?.keys || {};
+      const steerLeft = Boolean(keys.a || keys.arrowleft);
+      const steerRight = Boolean(keys.d || keys.arrowright);
+      const targetSteering = (steerRight ? 1 : 0) - (steerLeft ? 1 : 0);
+      assembledSteeringInput +=
+        (targetSteering - assembledSteeringInput) *
+        (1 - Math.exp(-12 * Math.max(0, delta)));
+      const motion = activePart === "rollingChassis"
+        ? rollingChassisMotion
+        : suspensionWorkingMotion;
+      updateRollingChassisSuspension(motion, time, true, assembledSteeringInput);
+      return;
+    }
+    if (!motionEnabled) return;
     if (activePart === "servo") {
       servoParts.hornPivot.rotation.y = Math.sin(time * 1.75) * 0.62;
     } else if (activePart === "motor") {
