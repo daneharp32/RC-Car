@@ -1448,9 +1448,15 @@ function animate(now) {
     if (!isPaused && drivingActive) {
       controls.updateDrivingControls(delta);
     } else {
-      // The showroom and builder are display-only: clear stale input and wheel
-      // forces instead of letting controls keep acting on the parked truck.
-      for (const key of Object.keys(controls.keys)) controls.keys[key] = false;
+      // The showroom and builder are display-only: keep physics input
+      // cleared. In the Parts Lab only, preserve the four steering keys so
+      // the assembled WIP servo, linkage and front hubs can be demonstrated.
+      const partsLabSteeringKeys = garage.viewMode === "parts-lab"
+        ? new Set(["a", "d", "arrowleft", "arrowright"])
+        : null;
+      for (const key of Object.keys(controls.keys)) {
+        if (!partsLabSteeringKeys?.has(key)) controls.keys[key] = false;
+      }
       for (let i = 0; i < 4; i++) {
         vehicle.applyEngineForce(0, i);
         vehicle.setBrake(0, i);
