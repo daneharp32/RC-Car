@@ -1532,6 +1532,25 @@ export function createPartsLabSystem(game) {
         addScrew(mountStructure, [side * 0.74, 0.69, z], 0.026, materials.brightAlloy);
       }
     }
+
+    // Front suspension support crossmember and short diagonal stays tie the
+    // front bulkhead feet back to the central skid pan.
+    addBox(mountStructure, [1.55, 0.12, 0.16], [0, 0.62, -1.15], materials.darkAlloy, 0.03);
+    for (const side of [-1, 1]) {
+      addPrototypeRod(mountStructure,
+        [side * 0.62, 0.68, -1.15],
+        [side * 0.49, 0.86, -2.19],
+        0.045, materials.shellLight, 0.065);
+    }
+
+    // Rear shock tower diagonals connect the upper damper crossbar to the
+    // rear skid crossmember without adding full-length side frame rails.
+    for (const side of [-1, 1]) {
+      addPrototypeRod(mountStructure,
+        [side * 0.54, 0.68, 0.94],
+        [side * 0.54, 1.28, 1.48],
+        0.048, materials.shellLight, 0.068);
+    }
     batchStaticMeshes(mountStructure);
 
     // Front independent suspension: lower/upper A-arms and shock towers are
