@@ -1559,29 +1559,52 @@ export function createPartsLabSystem(game) {
     cloneAssemblyPart(steeringLinkageModel, "Front steering linkage", root, [0, -0.06, -1.97]);
     cloneAssemblyPart(frontDifferentialModel, "Front differential unit", root, [0, 0.32, -1.50]);
 
-    // Front CVDs connect the differential outputs to the moving front hubs.
+    // Front CVDs articulate between the fixed differential outputs and
+    // the moving hub carriers. Each shaft and CV boot is updated from its
+    // actual endpoint pair during the suspension demonstration.
     const frontCvdGroup = new THREE.Group();
     frontCvdGroup.name = "Front CVD half-shafts";
     root.add(frontCvdGroup);
     for (const side of [-1, 1]) {
-      addPrototypeRod(frontCvdGroup,
-        [side * 0.58, 0.84, -1.52],
-        [side * 1.18, 0.63, -1.97],
-        0.045, materials.brightAlloy, 0.073);
-      const boot = new THREE.Group();
-      boot.name = side < 0 ? "Left front CVD rubber boot" : "Right front CVD rubber boot";
-      frontCvdGroup.add(boot);
+      const sideAssembly = new THREE.Group();
+      sideAssembly.name = side < 0 ? "Left front CVD moving assembly" : "Right front CVD moving assembly";
+      frontCvdGroup.add(sideAssembly);
+
+      const shaft = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.043, 0.043, 1, 18, 1),
+        materials.brightAlloy
+      );
+      shaft.name = side < 0 ? "Left front CVD shaft" : "Right front CVD shaft";
+      shaft.castShadow = true;
+      shaft.receiveShadow = true;
+      sideAssembly.add(shaft);
+
+      const makeCup = name => {
+        const cup = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.082, 0.082, 0.14, 20),
+          materials.darkAlloy
+        );
+        cup.name = name;
+        cup.castShadow = true;
+        cup.receiveShadow = true;
+        sideAssembly.add(cup);
+        return cup;
+      };
+      makeCup(side < 0 ? "Left inner CV cup" : "Right inner CV cup");
+      makeCup(side < 0 ? "Left outer CV cup" : "Right outer CV cup");
+
+      const bootRings = [];
       for (let i = 0; i < 4; i++) {
         const ring = new THREE.Mesh(
           new THREE.TorusGeometry(0.068 - i * 0.004, 0.012, 7, 18),
           materials.rubber
         );
-        ring.position.set(side * (0.62 + i * 0.018), 0.826 - i * 0.007, -1.56 - i * 0.035);
-        ring.rotation.y = Math.PI / 2;
-        boot.add(ring);
+        ring.name = "CVD rubber gaiter rib " + (i + 1);
+        ring.castShadow = true;
+        sideAssembly.add(ring);
+        bootRings.push(ring);
       }
     }
-    batchStaticMeshes(frontCvdGroup);
 
     // The centre differential, gearbox case and empty motor cradle form the
     // central mechanical powertrain. No motor or electrical equipment is fitted.
@@ -1731,6 +1754,17 @@ export function createPartsLabSystem(game) {
       springGroup: front.getObjectByName(side < 0 ? "Front shock spring left" : "Front shock spring right"),
       rodGroup: front.getObjectByName(side < 0 ? "Front shock piston left" : "Front shock piston right")
     }));
+    const frontCvdAssemblies = [-1, 1].map(side => {
+      const group = frontCvd.getObjectByName(side < 0 ? "Left front CVD moving assembly" : "Right front CVD moving assembly");
+      return {
+        side,
+        group,
+        shaft: group?.getObjectByName(side < 0 ? "Left front CVD shaft" : "Right front CVD shaft"),
+        innerCup: group?.getObjectByName(side < 0 ? "Left inner CV cup" : "Right inner CV cup"),
+        outerCup: group?.getObjectByName(side < 0 ? "Left outer CV cup" : "Right outer CV cup"),
+        rings: group ? group.children.filter(child => child.name.startsWith("CVD rubber gaiter rib")) : []
+      };
+    });
     const rearShocks = [];
     root.traverse(object => {
       if (object.name.startsWith("Rear damper ") &&
@@ -1748,7 +1782,7 @@ export function createPartsLabSystem(game) {
       }
     });
 
-    return { root, front, lowerPivots, upperPivots, frontShocks, frontKnuckles, frontCvd, steering, rearCarrier, rearLinks, rearShocks };
+    return { root, front, lowerPivots, upperPivots, frontShocks, frontKnuckles, frontCvd, frontCvdAssemblies, steering, rearCarrier, rearLinks, rearShocks };
   }
 
   function updateRollingChassisSuspension(motion, time, animate) {
@@ -1768,8 +1802,30 @@ export function createPartsLabSystem(game) {
     // wishbones' vertical arc so they do not hover above the moving wheels.
     const frontHubTravel = 1.01 * Math.sin(travel) + 0.42 * (Math.cos(travel) - 1);
     motion.frontKnuckles.position.y = 0.06 + frontHubTravel;
-    motion.frontCvd.position.y = frontHubTravel;
     motion.steering.position.y = -0.06 + frontHubTravel;
+
+    // Keep each half-shaft between the fixed differential and the moving hub.
+    const shaftUp = new THREE.Vector3(0, 1, 0);
+    const shaftNormal = new THREE.Vector3(0, 0, 1);
+    for (const cvd of motion.frontCvdAssemblies) {
+      const inner = new THREE.Vector3(cvd.side * 0.58, 0.84, -1.52);
+      const outer = new THREE.Vector3(cvd.side * 1.18, 0.63 + frontHubTravel, -1.97);
+      const direction = outer.clone().sub(inner);
+      const length = Math.max(0.1, direction.length());
+      const axis = direction.normalize();
+      cvd.shaft.position.copy(inner).add(outer).multiplyScalar(0.5);
+      cvd.shaft.quaternion.setFromUnitVectors(shaftUp, axis);
+      cvd.shaft.scale.set(1, length, 1);
+      cvd.innerCup.position.copy(inner).addScaledVector(axis, 0.06);
+      cvd.innerCup.quaternion.setFromUnitVectors(shaftUp, axis);
+      cvd.outerCup.position.copy(outer).addScaledVector(axis, -0.06);
+      cvd.outerCup.quaternion.setFromUnitVectors(shaftUp, axis);
+      cvd.rings.forEach((ring, index) => {
+        const amount = 0.16 + index * 0.055;
+        ring.position.copy(inner).lerp(outer, amount);
+        ring.quaternion.setFromUnitVectors(shaftNormal, axis);
+      });
+    }
 
     motion.front.updateMatrixWorld(true);
     for (const shock of motion.frontShocks) {
