@@ -1093,40 +1093,6 @@ export function createPartsLabSystem(game) {
     return rod;
   }
 
-  const chassisFrameModel = new THREE.Group();
-  chassisFrameModel.name = "Three-layer aluminum chassis frame and upper deck";
-  chassisFrameModel.visible = false;
-  showcase.add(chassisFrameModel);
-
-  function buildChassisFrame() {
-    const body = new THREE.Group();
-    chassisFrameModel.add(body);
-
-    // Twin longitudinal aluminum rails form the rolling chassis spine.
-    for (const x of [-0.52, 0.52]) {
-      addBox(body, [0.15, 0.22, 2.58], [x, 0.48, 0], materials.darkAlloy, 0.035);
-      addBox(body, [0.095, 0.035, 2.44], [x, 0.61, 0], materials.alloy, 0.012);
-    }
-
-    // Upper equipment deck, centre battery tray and the four main crossmembers.
-    addBox(body, [0.88, 0.075, 1.72], [0, 0.72, -0.03], materials.alloy, 0.025);
-    addBox(body, [0.72, 0.035, 1.25], [0, 0.78, -0.05], materials.black, 0.018);
-    addBox(body, [0.64, 0.055, 0.76], [0, 0.83, -0.04], materials.shellLight, 0.02);
-    for (const z of [-1.10, -0.52, 0.50, 1.10]) {
-      addBox(body, [1.16, 0.13, 0.14], [0, 0.47, z], materials.shellLight, 0.025);
-      for (const x of [-0.48, 0.48]) addScrew(body, [x, 0.55, z], 0.025, materials.brightAlloy);
-    }
-
-    // Diagonal upper braces support the deck and open body cage.
-    for (const side of [-1, 1]) {
-      addPrototypeRod(body, [side * 0.52, 0.55, -0.90], [side * 0.38, 0.92, -0.46], 0.035, materials.darkAlloy);
-      addPrototypeRod(body, [side * 0.52, 0.55, 0.90], [side * 0.38, 0.92, 0.46], 0.035, materials.darkAlloy);
-    }
-    batchStaticMeshes(body);
-    return body;
-  }
-  const chassisFrameParts = buildChassisFrame();
-
   const frontUpperArmsModel = new THREE.Group();
   frontUpperArmsModel.name = "Pair of independent front upper A arms";
   frontUpperArmsModel.visible = false;
@@ -1510,32 +1476,6 @@ export function createPartsLabSystem(game) {
   }
   const bumperParts = buildBumpers();
 
-  const rollCageModel = new THREE.Group();
-  rollCageModel.name = "Tubular body safety cage";
-  rollCageModel.visible = false;
-  showcase.add(rollCageModel);
-
-  function buildRollCage() {
-    const body = new THREE.Group();
-    rollCageModel.add(body);
-    for (const x of [-0.52, 0.52]) {
-      addPrototypeRod(body, [x, 0.42, -1.06], [x, 1.34, -0.62], 0.045, materials.darkAlloy);
-      addPrototypeRod(body, [x, 1.34, -0.62], [x, 1.34, 0.75], 0.045, materials.darkAlloy);
-      addPrototypeRod(body, [x, 1.34, 0.75], [x, 0.42, 1.08], 0.045, materials.darkAlloy);
-      addPrototypeRod(body, [x, 0.42, -1.06], [x, 0.42, 1.08], 0.035, materials.shellLight);
-    }
-    for (const z of [-0.62, 0.0, 0.75]) {
-      addPrototypeRod(body, [-0.52, 1.34, z], [0.52, 1.34, z], 0.038, materials.shellLight);
-    }
-    for (const side of [-1, 1]) {
-      addPrototypeRod(body, [side * 0.52, 0.42, -0.95], [side * 0.52, 1.34, 0.74], 0.032, materials.darkAlloy);
-      addPrototypeRod(body, [side * 0.52, 1.34, -0.62], [0, 0.42, 0.95], 0.032, materials.shellLight);
-    }
-    batchStaticMeshes(body);
-    return body;
-  }
-  const rollCageParts = buildRollCage();
-
   const componentModels = {
     servo: servoModel,
     motor: motorModel,
@@ -1548,7 +1488,6 @@ export function createPartsLabSystem(game) {
     frontAArms: frontAArmsModel,
     rearAxle: rearAxleModel,
     frontSuspension: frontSuspensionModel,
-    chassisFrame: chassisFrameModel,
     frontUpperArms: frontUpperArmsModel,
     frontKnuckles: frontKnucklesModel,
     steeringLinkage: steeringLinkageModel,
@@ -1560,7 +1499,6 @@ export function createPartsLabSystem(game) {
     motorMount: motorMountModel,
     wheelTire: wheelTireModel,
     bumpers: bumpersModel,
-    rollCage: rollCageModel
   };
 
   const partDetails = {
@@ -1619,11 +1557,6 @@ export function createPartsLabSystem(game) {
       description: "A standalone pair of front lower A-arms connected visually to two coil-over shocks. The arms pivot up and down while the shock rods and coil springs compress and extend together.",
       specs: "LAYOUT      ·  Mirrored front lower A-arms\nDAMPERS     ·  Twin coil-over shocks\nMOVEMENT    ·  Arm travel + spring compression\nSTATUS      ·  Standalone animated assembly"
     },
-    chassisFrame: {
-      name: "ALUMINUM CHASSIS FRAME",
-      description: "Twin longitudinal frame rails, upper equipment deck, battery tray and crossmembers. It is a separate structural prototype, not an assembled chassis.",
-      specs: "LAYOUT      ·  Twin-rail three-layer frame\nDECK        ·  Upper electronics plate\nTRAY        ·  Recessed battery bay\nSTATUS      ·  Standalone structure"
-    },
     frontUpperArms: {
       name: "FRONT UPPER A-ARMS",
       description: "A mirrored pair of compact upper wishbones to complement the lower A-arms in the independent front suspension. They move vertically with the standalone suspension travel demonstration.",
@@ -1679,11 +1612,6 @@ export function createPartsLabSystem(game) {
       description: "A pair of simple structural bumper bars with corner braces and mounting points for the front and rear of the rolling chassis.",
       specs: "LAYOUT      ·  Front + rear crossbars\nMOUNT       ·  Braced chassis tabs\nMATERIAL    ·  Alloy and tubular details\nSTATUS      ·  Standalone pair"
     },
-    rollCage: {
-      name: "TUBULAR BODY / SAFETY CAGE",
-      description: "A separate perimeter roll cage with side rails, roof crossbars and diagonal braces inspired by desert short-course chassis structures.",
-      specs: "LAYOUT      ·  Open tubular perimeter\nROOF        ·  Three crossbars\nBRACING     ·  Diagonal side supports\nSTATUS      ·  Standalone structure"
-    }
   };
 
   let activePart = "servo";
@@ -1830,10 +1758,9 @@ export function createPartsLabSystem(game) {
     update,
     resetView,
     getFocusPosition() {
-      if (activePart === "skidPlate") return new THREE.Vector3(0, 0.70, 0);
+      if (activePart === "skidPlate") return new THREE.Vector3(0, 0.30, 0);
       if (activePart === "frontAArms" || activePart === "rearAxle" || activePart === "rearLinks") return new THREE.Vector3(0, 0.52, 0);
       if (activePart === "frontSuspension") return new THREE.Vector3(0, 0.85, 0);
-      if (activePart === "chassisFrame" || activePart === "rollCage") return new THREE.Vector3(0, 0.88, 0);
       if (activePart === "frontKnuckles" || activePart === "steeringLinkage" || activePart === "frontDifferential") return new THREE.Vector3(0, 0.62, 0);
       if (activePart === "rearLinks" || activePart === "driveShafts" || activePart === "centerDifferential") return new THREE.Vector3(0, 0.58, 0);
       return new THREE.Vector3(0, 0.92, 0);
