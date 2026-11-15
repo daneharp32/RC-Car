@@ -1701,7 +1701,7 @@ export function createPartsLabSystem(game) {
     if (!escRotor) throw new Error("ESC cooling fan rotor was not found in the assembled model.");
 
     const motorInstall = cloneAssemblyPart(
-      motorModel, "4274 brushless motor installation", root, [0.55, 0.97, 1.02], [0.60, 0.60, 0.60]
+      motorModel, "4274 brushless motor installation", root, [0.55, 0.58, 1.02], [0.60, 0.60, 0.60]
     );
     motorInstall.rotation.y = Math.PI;
     const installedMotorShaft = motorInstall.getObjectByName("Aligned rotating motor shaft and pinion");
