@@ -539,9 +539,26 @@ function parkCarForShowroom() {
   }
   updateLocalVisual();
 }
-function showMainMenu() {
-  if (game.wipTestDrive?.active) game.wipTestDrive.stop();
+function leaveWipTestDriveForNavigation() {
+  const shouldStop = viewMode === "parts-lab-drive" || game.wipTestDrive?.active;
+  if (shouldStop) {
+    let stopped = false;
+    try {
+      stopped = game.wipTestDrive?.stop?.() === true;
+    } catch (error) {
+      console.error("Could not exit the WIP chassis test drive:", error);
+    }
+    if (!stopped) {
+      game.showToast?.("WIP chassis is still attached to physics; finish exiting the test drive first");
+      return false;
+    }
+  }
   game.partsLab?.setTestDriveMode?.(false);
+  return true;
+}
+
+function showMainMenu() {
+  if (!leaveWipTestDriveForNavigation()) return;
   game.partsLab?.setVisible(false);
   clearGaragePartHover();
   resetGarageShellState(true);
@@ -557,8 +574,7 @@ function showMainMenu() {
   parkCarForShowroom();
 }
 function showModeSelect() {
-  if (game.wipTestDrive?.active) game.wipTestDrive.stop();
-  game.partsLab?.setTestDriveMode?.(false);
+  if (!leaveWipTestDriveForNavigation()) return;
   game.partsLab?.setVisible(false);
   clearGaragePartHover();
   resetGarageShellState(true);
@@ -575,8 +591,7 @@ function showModeSelect() {
   game.multiplayer?.openLobbyBrowser?.();
 }
 function showCreateLobby() {
-  if (game.wipTestDrive?.active) game.wipTestDrive.stop();
-  game.partsLab?.setTestDriveMode?.(false);
+  if (!leaveWipTestDriveForNavigation()) return;
   game.partsLab?.setVisible(false);
   clearGaragePartHover();
   resetGarageShellState(true);
@@ -594,8 +609,7 @@ function showCreateLobby() {
   $("lobbyName").focus();
 }
 function showGarage() {
-  if (game.wipTestDrive?.active) game.wipTestDrive.stop();
-  game.partsLab?.setTestDriveMode?.(false);
+  if (!leaveWipTestDriveForNavigation()) return;
   game.partsLab?.setVisible(false);
   clearGaragePartHover();
   resetGarageShellState(true);
@@ -613,8 +627,7 @@ function showGarage() {
   updateGarageChassisChoiceButtons();
 }
 function showPartsLab() {
-  if (game.wipTestDrive?.active) game.wipTestDrive.stop();
-  game.partsLab?.setTestDriveMode?.(false);
+  if (!leaveWipTestDriveForNavigation()) return;
   clearGaragePartHover();
   resetGarageShellState(true);
   viewMode = "parts-lab";
@@ -633,6 +646,8 @@ function showPartsLab() {
 function showPartsLabDrive() {
   clearGaragePartHover();
   resetGarageShellState(true);
+  game.setCameraMode?.("chase");
+  if (game.controls) game.controls.cameraOrbitYaw = 0;
   viewMode = "parts-lab-drive";
   mainMenuPanel.style.display = "none";
   modeSelectPanel.style.display = "none";
@@ -673,8 +688,7 @@ $("shellToggleButton").addEventListener("click", () => {
 });
 
 function showDriveScreen() {
-  if (game.wipTestDrive?.active) game.wipTestDrive.stop();
-  game.partsLab?.setTestDriveMode?.(false);
+  if (!leaveWipTestDriveForNavigation()) return;
   game.partsLab?.setVisible(false);
   viewMode = "drive";
   mainMenuPanel.style.display = "none";
