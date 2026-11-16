@@ -1479,17 +1479,30 @@ function animate(now) {
       vehicle.setSteeringValue(0, 1);
     }
   } catch (error) {
-    // A control bug must not stop the render loop or turn the track screen
-    // into a blank background. Remove drive force and report the error once.
+    // A control bug must not stop rendering. In the isolated WIP mode, stop
+    // the prototype vehicle first so a stale throttle command cannot persist.
     for (let i = 0; i < 4; i++) {
       vehicle.applyEngineForce(0, i);
       vehicle.setBrake(0, i);
     }
     vehicle.setSteeringValue(0, 0);
     vehicle.setSteeringValue(0, 1);
+    if (wipTestDriveActive) {
+      for (let i = 0; i < 4; i++) {
+        wipTestDrive.vehicle.applyEngineForce(0, i);
+        wipTestDrive.vehicle.setBrake(20, i);
+      }
+      try {
+        if (wipTestDrive.stop()) garage.showPartsLab();
+      } catch (restoreError) {
+        console.error("WIP test drive could not exit safely after an input error:", restoreError);
+      }
+    }
     if (!drivingControlErrorReported) {
       console.error("Driving controls failed; keeping the game running:", error);
-      showToast("Driving input error — please reload the game");
+      showToast(wipTestDriveActive
+        ? "WIP test drive stopped after an input error"
+        : "Driving input error — please reload the game");
       drivingControlErrorReported = true;
     }
   }
