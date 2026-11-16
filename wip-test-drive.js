@@ -50,7 +50,7 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
     new CANNON.Vec3(0, 0, 0)
   );
 
-  world.addContactMaterial(new CANNON.ContactMaterial(chassisMaterial, world.defaultContactMaterial, {
+  world.addContactMaterial(new CANNON.ContactMaterial(chassisMaterial, physicsSystem.groundBody.material, {
     friction: 0.32,
     restitution: 0.015,
     contactEquationStiffness: 1e7
