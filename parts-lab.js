@@ -2300,6 +2300,14 @@ export function createPartsLabSystem(game) {
     }
     const driveButton = $("partsLabTestDriveButton");
     if (driveButton) driveButton.textContent = driving ? "RETURN TO PARTS LAB" : "TEST DRIVE CHASSIS";
+    if (!driving) {
+      const state = $("partsLabTestDriveState");
+      const speed = $("partsLabTestDriveSpeed");
+      const contact = $("partsLabTestDriveContact");
+      if (state) state.textContent = "READY TO TEST";
+      if (speed) speed.textContent = "0 MPH";
+      if (contact) contact.textContent = "0 / 4 TIRES";
+    }
   }
 
   const componentModels = {
