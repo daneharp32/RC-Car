@@ -4,10 +4,10 @@
 
 const VISUAL_SCALE = 0.11;
 const VISUAL_COM_HEIGHT = 0.075;
-const WHEEL_CENTRE_MODEL_Y = 0.6228;
+const WHEEL_CENTRE_MODEL_Y = 0.69;
 const WHEEL_CENTRE_MODEL_X = 1.35;
 const AXLE_HALF_WHEELBASE_MODEL = 1.97;
-const WHEEL_RADIUS_MODEL = 0.58 * 1.08;
+const WHEEL_RADIUS_MODEL = 0.63 * 1.08;
 const WHEEL_RADIUS = WHEEL_RADIUS_MODEL * VISUAL_SCALE;
 const SUSPENSION_REST = 0.045;
 const MAX_SUSPENSION_TRAVEL = 0.055;
@@ -84,7 +84,7 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
       directionLocal: new CANNON.Vec3(0, -1, 0),
       axleLocal: new CANNON.Vec3(-1, 0, 0),
       suspensionRestLength: SUSPENSION_REST,
-      suspensionStiffness: 52,
+      suspensionStiffness: 74,
       dampingCompression: 5.0,
       dampingRelaxation: 3.8,
       maxSuspensionTravel: MAX_SUSPENSION_TRAVEL,
