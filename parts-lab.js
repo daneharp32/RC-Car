@@ -2266,7 +2266,7 @@ export function createPartsLabSystem(game) {
     const pivot = new THREE.Group();
     pivot.name = "Physics driven WIP wheel pivot " + (index + 1);
     pivot.add(wheel);
-    wheel.position.set(0, -0.84, 0);
+    wheel.position.set(0, -0.9072, 0);
     testDriveModel.add(pivot);
     testDriveWheelPivots.push(pivot);
   }
