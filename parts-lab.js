@@ -2048,26 +2048,56 @@ export function createPartsLabSystem(game) {
     updateDynamicLink(motion.root, motion.servoDragRod, motion.servoDragBalls, hornWorld, bellcrankWorld);
   }
 
-  function updateRollingChassisSuspension(motion, time, animate, steeringInput = 0) {
-    const travel = animate ? Math.sin(time * 2.05) * 0.35 : 0;
+  function updateRollingChassisSuspension(motion, time, animate, steeringInput = 0, physicsState = null) {
+    const visualScale = 0.11;
+    const wheels = physicsState?.wheels || null;
+    const frontState = side => wheels ? wheels[side < 0 ? 0 : 1] : null;
+    const rearState = side => wheels ? wheels[side < 0 ? 2 : 3] : null;
+    const frontTravelForSide = side => {
+      if (!wheels) return animate ? Math.sin(time * 2.05) * 0.35 : 0;
+      const wheel = frontState(side);
+      const compression = wheel ? wheel.restLength - wheel.length : 0;
+      const armRadius = 0.72 * visualScale;
+      return THREE.MathUtils.clamp(
+        Math.asin(THREE.MathUtils.clamp(compression / armRadius, -0.55, 0.55)),
+        -0.35,
+        0.35
+      );
+    };
+    const rearCompressionForSide = side => {
+      if (!wheels) return animate ? Math.sin(time * 2.05 + 1.05) * 0.34 : 0;
+      const wheel = rearState(side);
+      return wheel ? wheel.restLength - wheel.length : 0;
+    };
+
+    const frontTravelLeft = frontTravelForSide(-1);
+    const frontTravelRight = frontTravelForSide(1);
+    const averageFrontTravel = (frontTravelLeft + frontTravelRight) * 0.5;
     const steering = THREE.MathUtils.clamp(steeringInput, -1, 1);
     const wheelSteerAngle = -steering * 0.45;
-    const compression = animate
-      ? 0.64 + 0.36 * (0.5 + 0.5 * Math.sin(time * 2.05 + 0.28))
-      : 1;
+    const frontCompression = wheels
+      ? THREE.MathUtils.clamp(
+          1 - ((frontState(-1).restLength - frontState(-1).length +
+                frontState(1).restLength - frontState(1).length) * 0.5 / 0.055) * 0.18,
+          0.76,
+          1.12
+        )
+      : animate
+        ? 0.64 + 0.36 * (0.5 + 0.5 * Math.sin(time * 2.05 + 0.28))
+        : 1;
 
     for (const item of motion.lowerPivots) {
-      item.pivot.rotation.z = item.side * travel;
+      item.pivot.rotation.z = item.side * (item.side < 0 ? frontTravelLeft : frontTravelRight);
     }
     for (const item of motion.upperPivots) {
+      const travel = item.side < 0 ? frontTravelLeft : frontTravelRight;
       item.pivot.rotation.z = item.side * travel * 0.72;
     }
 
-    // Hub carriers, steering arms and front CVD outers follow the lower
-    // wishbones' vertical arc so they do not hover above the moving wheels.
-    const frontHubTravel = 1.01 * Math.sin(travel) + 0.42 * (Math.cos(travel) - 1);
+    const frontHubTravel = 1.01 * Math.sin(averageFrontTravel) +
+      0.42 * (Math.cos(averageFrontTravel) - 1);
     motion.frontKnuckles.position.y = 0.12 + frontHubTravel;
-    motion.steering.position.y = -0.06; // steering rack is chassis-mounted, not on the moving upright
+    motion.steering.position.y = -0.06;
     motion.steering.rotation.y = wheelSteerAngle * 0.34;
     motion.servoHorn.rotation.y = wheelSteerAngle * 1.18;
     for (const item of motion.steeringPivots) {
@@ -2075,8 +2105,6 @@ export function createPartsLabSystem(game) {
       item.pivot.rotation.y = wheelSteerAngle * ackermann;
     }
 
-    // Keep each half-shaft between the fixed differential outputs and the
-    // moving/steering hub carriers.
     motion.root.updateMatrixWorld(true);
     motion.frontKnuckles.updateMatrixWorld(true);
     for (const tieRod of motion.steeringTieRods) {
@@ -2085,6 +2113,7 @@ export function createPartsLabSystem(game) {
       const uprightEnd = knucklePivot.localToWorld(new THREE.Vector3(-tieRod.side * 0.11, 0.31, 0.38));
       updateDynamicLink(motion.root, tieRod.rod, tieRod.balls, rackEnd, uprightEnd);
     }
+
     const shaftUp = new THREE.Vector3(0, 1, 0);
     const shaftNormal = new THREE.Vector3(0, 0, 1);
     for (const cvd of motion.frontCvdAssemblies) {
@@ -2115,28 +2144,69 @@ export function createPartsLabSystem(game) {
       const upperWorld = motion.front.localToWorld(new THREE.Vector3(shock.side * 0.61, 1.49, 0.10));
       const lower = motion.front.worldToLocal(lowerWorld.clone());
       const upper = motion.front.worldToLocal(upperWorld);
-      alignAssemblyDamper(shock, lower, upper, compression);
+      const sideTravel = shock.side < 0 ? frontTravelLeft : frontTravelRight;
+      const shockCompression = wheels
+        ? THREE.MathUtils.clamp(1 - sideTravel / 0.35 * 0.18, 0.76, 1.12)
+        : frontCompression;
+      alignAssemblyDamper(shock, lower, upper, shockCompression);
     }
 
-    const rearTravel = animate ? Math.sin(time * 2.05 + 1.05) * 0.34 : 0;
-    const rearCompression = animate
-      ? THREE.MathUtils.clamp(1 - ((rearTravel + 0.34) / 0.68) * 0.18, 0.82, 1)
-      : 1;
-    const rearPitch = animate ? Math.sin(time * 2.05 + 1.05) * 0.045 : 0;
+    const rearTravelLeft = rearCompressionForSide(-1) / visualScale;
+    const rearTravelRight = rearCompressionForSide(1) / visualScale;
+    const rearTravel = wheels
+      ? THREE.MathUtils.clamp((rearTravelLeft + rearTravelRight) * 0.5, -0.42, 0.42)
+      : animate ? Math.sin(time * 2.05 + 1.05) * 0.34 : 0;
+    const rearCompression = wheels
+      ? THREE.MathUtils.clamp(
+          1 - ((rearTravelLeft + rearTravelRight) * 0.5 / 0.50) * 0.18,
+          0.76,
+          1.12
+        )
+      : animate
+        ? THREE.MathUtils.clamp(1 - ((rearTravel + 0.34) / 0.68) * 0.18, 0.82, 1)
+        : 1;
+    const rearPitch = wheels ? 0 : animate ? Math.sin(time * 2.05 + 1.05) * 0.045 : 0;
+    const rearTrack = 2 * 1.35 * visualScale;
+    const rearRoll = wheels
+      ? THREE.MathUtils.clamp(
+          Math.atan2(rearCompressionForSide(1) - rearCompressionForSide(-1), rearTrack),
+          -0.22,
+          0.22
+        )
+      : 0;
+
     motion.rearCarrier.position.y = 0.19 + rearTravel;
     motion.rearCarrier.rotation.x = rearPitch;
+    motion.rearCarrier.rotation.z = rearRoll;
     motion.rearLinks.position.y = 0.19 + rearTravel * 0.70;
     motion.rearLinks.rotation.x = rearPitch * 0.72;
+    motion.rearLinks.rotation.z = rearRoll * 0.72;
 
     for (const shock of motion.rearShocks) {
-      const lower = new THREE.Vector3(shock.side * 0.46, 0.96 + rearTravel, 1.97 + shock.offset);
+      let lower;
+      if (wheels) {
+        motion.rearCarrier.updateMatrixWorld(true);
+        const lowerWorld = motion.rearCarrier.localToWorld(
+          new THREE.Vector3(shock.side * 0.46, 0.77, shock.offset)
+        );
+        lower = motion.root.worldToLocal(lowerWorld.clone());
+      } else {
+        lower = new THREE.Vector3(shock.side * 0.46, 0.96 + rearTravel, 1.97 + shock.offset);
+      }
       const upper = new THREE.Vector3(shock.side * 0.54, 1.65, 1.48 + shock.offset);
-      alignAssemblyDamper(shock, lower, upper, rearCompression);
+      const sideCompression = wheels
+        ? THREE.MathUtils.clamp(
+            1 - (rearCompressionForSide(shock.side) / visualScale / 0.50) * 0.18,
+            0.76,
+            1.12
+          )
+        : rearCompression;
+      alignAssemblyDamper(shock, lower, upper, sideCompression);
     }
 
     updateDynamicServoPushrod(motion);
-    motion.escRotor.rotation.y = animate ? time * 31 : 0;
-    motion.motorShaft.rotation.z = animate ? time * 22 : 0;
+    motion.escRotor.rotation.y = time * 31;
+    motion.motorShaft.rotation.z = time * 22;
   }
 
   const rollingChassisModel = buildRollingChassisAssembly();
@@ -2170,6 +2240,62 @@ export function createPartsLabSystem(game) {
   let assembledSteeringInput = 0;
   updateRollingChassisSuspension(rollingChassisMotion, 0, false, 0);
   updateRollingChassisSuspension(suspensionWorkingMotion, 0, false, 0);
+
+  // A separate 1/7-scale copy is reserved for physics test drives.
+  // Its four tyre meshes are detached from the display suspension and placed
+  // on independent pivots so actual Cannon wheel transforms drive their motion.
+  const testDriveModel = rollingChassisModel.clone(true);
+  testDriveModel.name = "WIP 1/7 rolling chassis - physics test vehicle";
+  testDriveModel.scale.setScalar(0.11);
+  testDriveModel.visible = false;
+  scene.add(testDriveModel);
+
+  const testDriveWheelPivots = [];
+  const testWheelNames = [
+    "Front left steerable wheel and tire",
+    "Front right steerable wheel and tire",
+    "Rear left wheel and tire",
+    "Rear right wheel and tire"
+  ];
+  for (let index = 0; index < testWheelNames.length; index++) {
+    const wheel = testDriveModel.getObjectByName(testWheelNames[index]);
+    if (!wheel || !wheel.parent) {
+      throw new Error("WIP test chassis is missing a wheel model: " + testWheelNames[index]);
+    }
+    wheel.parent.remove(wheel);
+    const pivot = new THREE.Group();
+    pivot.name = "Physics driven WIP wheel pivot " + (index + 1);
+    pivot.add(wheel);
+    wheel.position.set(0, -0.84, 0);
+    testDriveModel.add(pivot);
+    testDriveWheelPivots.push(pivot);
+  }
+  const testDriveMotion = captureRollingChassisMotion(testDriveModel);
+  let testDriveMode = false;
+
+  function updateTestDriveSuspension(state) {
+    if (!testDriveModel.visible || !state?.wheels) return;
+    updateRollingChassisSuspension(
+      testDriveMotion,
+      (state.now || performance.now()) * 0.001,
+      false,
+      state.steering || 0,
+      state
+    );
+    testDriveModel.updateMatrixWorld(true);
+  }
+
+  function setTestDriveMode(enabled) {
+    const driving = !!enabled;
+    testDriveMode = driving;
+    labRoot.visible = visible && !driving;
+    testDriveModel.visible = driving;
+    for (const button of document.querySelectorAll("[data-wip-part]")) {
+      button.disabled = driving;
+    }
+    const driveButton = $("partsLabTestDriveButton");
+    if (driveButton) driveButton.textContent = driving ? "RETURN TO PARTS LAB" : "TEST DRIVE CHASSIS";
+  }
 
   const componentModels = {
     servo: servoModel,
@@ -2333,6 +2459,9 @@ export function createPartsLabSystem(game) {
     // Full chassis views should sit directly in the showroom, not on the
     // circular component display plinth used for individual parts.
     plinthGroup.visible = id !== "rollingChassis" && id !== "suspensionWorking";
+    const testDrivePanel = $("partsLabTestDrivePanel");
+    if (testDrivePanel) testDrivePanel.style.display =
+      id === "rollingChassis" || id === "suspensionWorking" ? "block" : "none";
     for (const [key, model] of Object.entries(componentModels)) {
       model.visible = key === id;
     }
@@ -2418,7 +2547,7 @@ export function createPartsLabSystem(game) {
     const next = !!nextVisible;
     if (visible === next) return;
     visible = next;
-    labRoot.visible = visible;
+    labRoot.visible = visible && !testDriveMode;
     if (visible) {
       renderer.shadowMap.needsUpdate = true;
       previousCarVisibility = localCar.root.visible;
@@ -2484,6 +2613,18 @@ export function createPartsLabSystem(game) {
 
   $("partsLabMotionToggle")?.addEventListener("click", () => setMotionEnabled(!motionEnabled));
   $("partsLabResetView")?.addEventListener("click", resetView);
+  $("partsLabTestDriveButton")?.addEventListener("click", () => {
+    if (game.wipTestDrive?.active) {
+      game.wipTestDrive.stop();
+      game.garage?.showPartsLab();
+      return;
+    }
+    game.garage?.showPartsLabDrive?.();
+    if (!game.wipTestDrive?.start?.()) {
+      game.garage?.showPartsLab();
+      game.showToast?.("WIP test drive could not start — see console for details");
+    }
+  });
   $("partsLabBackButton")?.addEventListener("click", () => game.garage?.showMainMenu());
 
   selectPart(activePart);
@@ -2491,8 +2632,12 @@ export function createPartsLabSystem(game) {
 
   return {
     setVisible,
+    setTestDriveMode,
     selectPart,
     update,
+    updateTestDriveSuspension,
+    getTestDriveModel() { return testDriveModel; },
+    getTestDriveWheelPivots() { return testDriveWheelPivots; },
     resetView,
     getFocusPosition() {
       if (activePart === "skidPlate") return new THREE.Vector3(0, 0.30, 0);
