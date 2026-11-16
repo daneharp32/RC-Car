@@ -673,6 +673,8 @@ $("shellToggleButton").addEventListener("click", () => {
 });
 
 function showDriveScreen() {
+  if (game.wipTestDrive?.active) game.wipTestDrive.stop();
+  game.partsLab?.setTestDriveMode?.(false);
   game.partsLab?.setVisible(false);
   viewMode = "drive";
   mainMenuPanel.style.display = "none";
