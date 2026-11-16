@@ -1129,6 +1129,7 @@ function setCameraMode(mode) {
     button.setAttribute("aria-pressed", active ? "true" : "false");
   }
 }
+game.setCameraMode = setCameraMode;
 
 function cycleCameraMode() {
   const currentIndex = CAMERA_MODES.indexOf(cameraMode);
