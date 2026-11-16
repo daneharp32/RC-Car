@@ -1539,6 +1539,7 @@ function animate(now) {
 
     const stressNow = typeof performance !== "undefined" ? performance.now() : Date.now();
     if (
+      !wipTestDriveActive &&
       stressNow - lastLaunchStressAt >= 500 &&
       (linearChange >= 6.0 || angularChange >= 10.0)
     ) {
@@ -1559,15 +1560,21 @@ function animate(now) {
       }
     }
 
-    for (const impact of impactDamageSystem.drain()) {
-      localCar.setDamageMultiplier?.(cheatModifiers.damageMultiplier);
-      const damageResult = (!cheatModifiers.invincible && cheatModifiers.damageEnabled) ? localCar.applyImpact?.(impact) : null;
-      if (damageResult) {
-        const detachedText = damageResult.detached.length
-          ? " · " + damageResult.detached.join(", ").toUpperCase() + " DISCONNECTED"
-          : "";
-        showToast(damageResult.primary.toUpperCase() + " DAMAGED" + detachedText);
+    if (!wipTestDriveActive) {
+      for (const impact of impactDamageSystem.drain()) {
+        localCar.setDamageMultiplier?.(cheatModifiers.damageMultiplier);
+        const damageResult = (!cheatModifiers.invincible && cheatModifiers.damageEnabled) ? localCar.applyImpact?.(impact) : null;
+        if (damageResult) {
+          const detachedText = damageResult.detached.length
+            ? " · " + damageResult.detached.join(", ").toUpperCase() + " DISCONNECTED"
+            : "";
+          showToast(damageResult.primary.toUpperCase() + " DAMAGED" + detachedText);
+        }
       }
+    } else {
+      // Impacts from the independent WIP vehicle must not be applied to the
+      // parked production truck's damage model.
+      impactDamageSystem.drain();
     }
   } else {
     previousLaunchVelocity.copy(chassisBody.velocity);
