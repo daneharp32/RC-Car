@@ -2074,7 +2074,7 @@ export function createPartsLabSystem(game) {
     const frontTravelRight = frontTravelForSide(1);
     const averageFrontTravel = (frontTravelLeft + frontTravelRight) * 0.5;
     const steering = THREE.MathUtils.clamp(steeringInput, -1, 1);
-    const wheelSteerAngle = -steering * 0.45;
+    const wheelSteerAngle = steering * 0.45;
     const frontCompression = wheels
       ? THREE.MathUtils.clamp(
           1 - ((frontState(-1).restLength - frontState(-1).length +
@@ -2271,10 +2271,10 @@ export function createPartsLabSystem(game) {
     const pivot = new THREE.Group();
     pivot.name = "Physics driven WIP wheel pivot " + (index + 1);
     pivot.add(wheel);
-    // The wheel mesh's rubber geometry is centred at local Y = 0.84.
-    // Offset the detached group by -0.84 so its actual tire centre sits exactly
-    // on the independent Cannon wheel pivot, without the old suspension-parent offset.
-    wheel.position.set(0, -0.84, 0);
+    // The rubber geometry is centred at local Y = 0.84 and the wheel group
+    // is scaled to 1.08 vertically. Compensate for that scale so the tire's
+    // true centre sits on the Cannon spin axis instead of orbiting it.
+    wheel.position.set(0, -0.84 * wheel.scale.y, 0);
     testDriveModel.add(pivot);
     testDriveWheelPivots.push(pivot);
   }
