@@ -2271,10 +2271,10 @@ export function createPartsLabSystem(game) {
     const pivot = new THREE.Group();
     pivot.name = "Physics driven WIP wheel pivot " + (index + 1);
     pivot.add(wheel);
-    // The wheel model's origin is the tire centre. The old offsets belonged
-    // to the knuckle and rear-axle parent groups, so they must not be carried
-    // over after detaching each wheel onto its own physics pivot.
-    wheel.position.set(0, 0, 0);
+    // The wheel mesh's rubber geometry is centred at local Y = 0.84.
+    // Offset the detached group by -0.84 so its actual tire centre sits exactly
+    // on the independent Cannon wheel pivot, without the old suspension-parent offset.
+    wheel.position.set(0, -0.84, 0);
     testDriveModel.add(pivot);
     testDriveWheelPivots.push(pivot);
   }
