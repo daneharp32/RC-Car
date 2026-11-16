@@ -50,7 +50,8 @@ window.addEventListener("keydown", (event) => {
     keys[key] = true;
   }
   if (game.sandbox?.handleKeyDown?.(key, event)) return;
-  if (key === "r" && !event.repeat && game.multiplayer?.joined) {
+  if (key === "r" && !event.repeat && game.multiplayer?.joined &&
+      game.garage?.viewMode === "drive") {
     resetCar();
     game.race?.onCarReset();
   }
