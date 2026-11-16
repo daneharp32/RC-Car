@@ -202,8 +202,10 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
       rightWorld.y - body.position.y,
       rightWorld.z - body.position.z
     );
-    leftForce.set(-worldUp.x * force, -worldUp.y * force, -worldUp.z * force);
-    rightForce.set(worldUp.x * force, worldUp.y * force, worldUp.z * force);
+    // Oppose the compression difference: lift the more-compressed side and
+    // push the opposite side down, rather than amplifying chassis roll.
+    leftForce.set(worldUp.x * force, worldUp.y * force, worldUp.z * force);
+    rightForce.set(-worldUp.x * force, -worldUp.y * force, -worldUp.z * force);
     body.applyForce(leftForce, leftOffset);
     body.applyForce(rightForce, rightOffset);
   }
@@ -327,11 +329,16 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
 
     let listenerAddedThisAttempt = false;
     try {
-      const spawn = getGroundSpawn();
       const activeMap = game.activeMapId || "closed-course";
       if (physicsSystem?.setActiveMap && !physicsSystem.setActiveMap(activeMap)) {
         throw new Error("The selected driving area could not be enabled for the WIP test.");
       }
+      // Use the selected physics map's spawn after its collision geometry is enabled.
+      const physicsSpawn = physicsSystem?.getSpawn?.();
+      const spawn = physicsSpawn && Number.isFinite(physicsSpawn.x) &&
+        Number.isFinite(physicsSpawn.y) && Number.isFinite(physicsSpawn.z)
+        ? physicsSpawn
+        : getGroundSpawn();
 
       // Validate the reversible switch before changing either vehicle.
       if (typeof productionVehicle.removeFromWorld !== "function" ||
