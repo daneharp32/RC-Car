@@ -4,6 +4,8 @@
 
 const VISUAL_SCALE = 0.11;
 const VISUAL_COM_HEIGHT = 0.075;
+// Raise the chassis relative to the tire centres without changing wheel size.
+const RIDE_HEIGHT_OFFSET = 0.020;
 // Measured from the assembled wheel geometry: local tire centre Y is
 // 0.6228 and the tire cylinder's outer radius is 0.58 before wheel scaling.
 const WHEEL_CENTRE_MODEL_Y = 0.6228;
@@ -39,8 +41,8 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
   const body = new CANNON.Body({
     mass: CHASSIS_MASS,
     material: chassisMaterial,
-    linearDamping: 0.075,
-    angularDamping: 0.32,
+    linearDamping: 0.09,
+    angularDamping: 0.40,
     allowSleep: false,
     collisionFilterGroup: WIP_COLLISION_GROUP,
     // Keep the chassis tub clear of the jump-face collision group. The
@@ -58,7 +60,7 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
 
   world.addContactMaterial(new CANNON.ContactMaterial(chassisMaterial, physicsSystem.groundBody.material, {
     friction: 0.32,
-    restitution: 0.015,
+    restitution: 0.005,
     contactEquationStiffness: 1e7
   }));
 
@@ -70,7 +72,7 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
   });
 
   const visualTyreBottomTrim = WHEEL_RADIUS - WHEEL_CENTRE_MODEL_Y * VISUAL_SCALE;
-  const connectionY = WHEEL_RADIUS - VISUAL_COM_HEIGHT + SUSPENSION_REST + 0.002;
+  const connectionY = WHEEL_RADIUS - VISUAL_COM_HEIGHT + SUSPENSION_REST + 0.002 - RIDE_HEIGHT_OFFSET;
   const axleHalfTrack = WHEEL_CENTRE_MODEL_X * VISUAL_SCALE;
   const axleHalfWheelbase = AXLE_HALF_WHEELBASE_MODEL * VISUAL_SCALE;
 
@@ -91,8 +93,8 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
       axleLocal: new CANNON.Vec3(-1, 0, 0),
       suspensionRestLength: SUSPENSION_REST,
       suspensionStiffness: 240,
-      dampingCompression: 9.0,
-      dampingRelaxation: 6.8,
+      dampingCompression: 11.0,
+      dampingRelaxation: 10.0,
       maxSuspensionTravel: MAX_SUSPENSION_TRAVEL,
       maxSuspensionForce: 260,
       radius: WHEEL_RADIUS,
@@ -146,7 +148,7 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
 
   function reset() {
     const spawn = getGroundSpawn();
-    body.position.set(spawn.x, spawn.y + VISUAL_COM_HEIGHT, spawn.z);
+    body.position.set(spawn.x, spawn.y + VISUAL_COM_HEIGHT + RIDE_HEIGHT_OFFSET, spawn.z);
     body.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), spawn.yaw);
     body.velocity.set(0, 0, 0);
     body.angularVelocity.set(0, 0, 0);
@@ -230,16 +232,19 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
     body.quaternion.vmult(localForward, worldForward);
     const forwardSpeed = body.velocity.dot(worldForward);
     const absoluteSpeed = body.velocity.length();
-    const speedSteeringScale = clamp(1 - Math.abs(forwardSpeed) / 19, 0.58, 1);
-    const steeringAngle = steering * 0.43 * speedSteeringScale;
+    const speedSteeringScale = clamp(1 - Math.abs(forwardSpeed) / 25, 0.42, 1);
+    const steeringAngle = steering * 0.29 * speedSteeringScale;
 
     vehicle.setSteeringValue(steeringAngle, 0);
     vehicle.setSteeringValue(steeringAngle, 1);
 
     // Four-wheel drive. A gentle speed taper prevents runaway acceleration,
     // while reverse uses a lower force for predictable low-speed manoeuvring.
-    const speedLimit = targetThrottle >= 0 ? 15.5 : 6.2;
-    const speedScale = clamp(1 - absoluteSpeed / speedLimit, 0.12, 1);
+    const speedLimit = targetThrottle >= 0 ? 22.35 : 6.2; // 50 mph forward target.
+    const speedAlongDrive = targetThrottle >= 0
+      ? Math.max(0, forwardSpeed)
+      : Math.max(0, -forwardSpeed);
+    const speedScale = clamp(1 - speedAlongDrive / speedLimit, 0.12, 1);
     const driveForce = throttle >= 0
       ? throttle * 25 * speedScale
       : throttle * 17 * speedScale;
@@ -362,7 +367,7 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
       productionBody.collisionFilterMask = 0;
       productionBody.updateMassProperties?.();
 
-      body.position.set(spawn.x, spawn.y + VISUAL_COM_HEIGHT, spawn.z);
+      body.position.set(spawn.x, spawn.y + VISUAL_COM_HEIGHT + RIDE_HEIGHT_OFFSET, spawn.z);
       body.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), spawn.yaw);
       body.velocity.set(0, 0, 0);
       body.angularVelocity.set(0, 0, 0);
