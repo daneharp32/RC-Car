@@ -1727,9 +1727,10 @@ function animate(now) {
   if (!wipTestDriveActive) multiplayer.sendSnapshotIfReady(delta);
 
   // Keep the large outdoor-map shadow frusta centered near the truck.
-  if (game.activeMapId === "gravel-basin" && garage.viewMode === "drive") {
-    const focusX = Math.round(chassisBody.position.x / 3) * 3;
-    const focusZ = Math.round(chassisBody.position.z / 3) * 3;
+  if (game.activeMapId === "gravel-basin" && physicsDriveActive) {
+    const shadowFocusBody = wipTestDriveActive ? wipTestDrive.body : chassisBody;
+    const focusX = Math.round(shadowFocusBody.position.x / 3) * 3;
+    const focusZ = Math.round(shadowFocusBody.position.z / 3) * 3;
     sun.target.position.set(focusX, 0, focusZ);
     sun.position.set(
       focusX + activeLighting.sunOffset[0],
@@ -1743,7 +1744,7 @@ function animate(now) {
   // Static map casters do not need a new shadow pass every frame. Refresh at
   // roughly 5-6 Hz while driving so the truck's moving shadow stays responsive
   // without spending the GPU budget rendering the full scenery 60 times/sec.
-  if (drivingActive && !isPaused &&
+  if (physicsDriveActive && !isPaused &&
       now - lastShadowRefreshAt >= SHADOW_REFRESH_INTERVAL_MS) {
     requestShadowRefresh();
     lastShadowRefreshAt = now;
