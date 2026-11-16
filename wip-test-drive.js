@@ -28,7 +28,8 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
     controls
   } = game;
 
-  if (!CANNON || !THREE || !world || !productionVehicle || !visualRoot || !Array.isArray(wheelPivots) || wheelPivots.length !== 4) {
+  if (!CANNON || !THREE || !world || !physicsSystem?.groundBody?.material ||
+      !productionVehicle || !visualRoot || !Array.isArray(wheelPivots) || wheelPivots.length !== 4) {
     throw new Error("WIP test drive could not initialize: missing physics or chassis visual references.");
   }
 
@@ -360,8 +361,10 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
       body.force.set(0, 0, 0);
       body.torque.set(0, 0, 0);
 
-      vehicle.addToWorld(world);
+      // Mark the attempt before registration so the catch path also tries to
+      // undo a partially completed addToWorld call.
       wipVehicleAdded = true;
+      vehicle.addToWorld(world);
       world.addEventListener("preStep", applyRearAxleCoupling);
       rearCouplingListenerAdded = true;
       listenerAddedThisAttempt = true;
@@ -380,18 +383,26 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
         world.removeEventListener("preStep", applyRearAxleCoupling);
         rearCouplingListenerAdded = false;
       }
+      let wipVehicleCleanedUp = !wipVehicleAdded;
       if (wipVehicleAdded) {
         try {
           vehicle.removeFromWorld(world);
           wipVehicleAdded = false;
+          wipVehicleCleanedUp = true;
         } catch (removeError) {
+          // Do not re-enable the production vehicle when the prototype might
+          // still be registered in the same world.
           console.error("Could not remove the partially started WIP vehicle:", removeError);
         }
       }
-      try {
-        restoreProductionVehicle();
-      } catch (restoreError) {
-        console.error("Could not restore the production vehicle after test-drive setup failed:", restoreError);
+      if (wipVehicleCleanedUp) {
+        try {
+          restoreProductionVehicle();
+        } catch (restoreError) {
+          console.error("Could not restore the production vehicle after test-drive setup failed:", restoreError);
+        }
+      } else {
+        console.error("The original truck remains safely disabled because WIP cleanup was incomplete.");
       }
       clearHeldControls();
       world.broadphase.dirty = true;
