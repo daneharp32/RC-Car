@@ -4,10 +4,12 @@
 
 const VISUAL_SCALE = 0.11;
 const VISUAL_COM_HEIGHT = 0.075;
-const WHEEL_CENTRE_MODEL_Y = 0.69;
+// Measured from the assembled wheel geometry: local tire centre Y is
+// 0.6228 and the tire cylinder's outer radius is 0.58 before wheel scaling.
+const WHEEL_CENTRE_MODEL_Y = 0.6228;
 const WHEEL_CENTRE_MODEL_X = 1.35;
 const AXLE_HALF_WHEELBASE_MODEL = 1.97;
-const WHEEL_RADIUS_MODEL = 0.63 * 1.08;
+const WHEEL_RADIUS_MODEL = 0.58 * 1.08;
 const WHEEL_RADIUS = WHEEL_RADIUS_MODEL * VISUAL_SCALE;
 const SUSPENSION_REST = 0.045;
 const MAX_SUSPENSION_TRAVEL = 0.055;
@@ -72,9 +74,9 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
   const axleHalfTrack = WHEEL_CENTRE_MODEL_X * VISUAL_SCALE;
   const axleHalfWheelbase = AXLE_HALF_WHEELBASE_MODEL * VISUAL_SCALE;
 
-  // The model's nose is at local -Z. The test vehicle uses Cannon's standard
-  // +Z forward axis, so front wheels are placed at +Z and the visual model is
-  // yaw-corrected by 180 degrees when it follows the physics body.
+  // The assembled model's nose and the test-drive vehicle both point along -Z.
+  // Front wheels stay at negative Z; the engine-force sign and steering sign
+  // are inverted below to match RaycastVehicle's local tire-force convention.
   const wheelSpecs = [
     { x: -axleHalfTrack, z: -axleHalfWheelbase, front: true },
     { x: axleHalfTrack, z: -axleHalfWheelbase, front: true },
@@ -112,14 +114,13 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
   const wheelQuaternion = new THREE.Quaternion();
   const worldWheelPosition = new THREE.Vector3();
   const worldOriginOffset = new CANNON.Vec3();
-  const localForward = new CANNON.Vec3(0, 0, 1);
+  const localForward = new CANNON.Vec3(0, 0, -1);
   const worldForward = new CANNON.Vec3();
   const leftForce = new CANNON.Vec3();
   const rightForce = new CANNON.Vec3();
   const leftOffset = new CANNON.Vec3();
   const rightOffset = new CANNON.Vec3();
   const worldUp = new CANNON.Vec3();
-  const axisY = new THREE.Vector3(0, 1, 0);
 
   let active = false;
   let steering = 0;
