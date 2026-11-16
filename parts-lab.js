@@ -2094,13 +2094,18 @@ export function createPartsLabSystem(game) {
       item.pivot.rotation.z = item.side * travel * 0.72;
     }
 
-    const frontHubTravel = 1.01 * Math.sin(averageFrontTravel) +
-      0.42 * (Math.cos(averageFrontTravel) - 1);
-    motion.frontKnuckles.position.y = 0.12 + frontHubTravel;
+    // Keep the knuckle carrier aligned to each side's actual wheel compression.
+    // A single shared parent offset would make the lightly loaded side follow
+    // the heavily compressed side when landing with one front wheel first.
+    motion.frontKnuckles.position.y = 0.12;
     motion.steering.position.y = -0.06;
     motion.steering.rotation.y = wheelSteerAngle * 0.34;
     motion.servoHorn.rotation.y = wheelSteerAngle * 1.18;
     for (const item of motion.steeringPivots) {
+      const sideTravel = item.side < 0 ? frontTravelLeft : frontTravelRight;
+      const hubTravel = 1.01 * Math.sin(sideTravel) +
+        0.42 * (Math.cos(sideTravel) - 1);
+      item.pivot.position.y = 0.57 + hubTravel;
       const ackermann = 1 + item.side * steering * 0.065;
       item.pivot.rotation.y = wheelSteerAngle * ackermann;
     }
@@ -2154,7 +2159,7 @@ export function createPartsLabSystem(game) {
     const rearTravelLeft = rearCompressionForSide(-1) / visualScale;
     const rearTravelRight = rearCompressionForSide(1) / visualScale;
     const rearTravel = wheels
-      ? THREE.MathUtils.clamp((rearTravelLeft + rearTravelRight) * 0.5, -0.42, 0.42)
+      ? THREE.MathUtils.clamp((rearTravelLeft + rearTravelRight) * 0.5, -0.50, 0.50)
       : animate ? Math.sin(time * 2.05 + 1.05) * 0.34 : 0;
     const rearCompression = wheels
       ? THREE.MathUtils.clamp(
