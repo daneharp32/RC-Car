@@ -63,8 +63,8 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
     indexUpAxis: 1
   });
 
-  const wheelCentreFromCom = WHEEL_CENTRE_MODEL_Y * VISUAL_SCALE - VISUAL_COM_HEIGHT;
-  const connectionY = wheelCentreFromCom + SUSPENSION_REST;
+  const visualTyreBottomTrim = WHEEL_RADIUS - WHEEL_CENTRE_MODEL_Y * VISUAL_SCALE;
+  const connectionY = WHEEL_RADIUS - VISUAL_COM_HEIGHT + SUSPENSION_REST + 0.002;
   const axleHalfTrack = WHEEL_CENTRE_MODEL_X * VISUAL_SCALE;
   const axleHalfWheelbase = AXLE_HALF_WHEELBASE_MODEL * VISUAL_SCALE;
 
@@ -72,10 +72,10 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
   // +Z forward axis, so front wheels are placed at +Z and the visual model is
   // yaw-corrected by 180 degrees when it follows the physics body.
   const wheelSpecs = [
-    { x: -axleHalfTrack, z: axleHalfWheelbase, front: true },
-    { x: axleHalfTrack, z: axleHalfWheelbase, front: true },
-    { x: -axleHalfTrack, z: -axleHalfWheelbase, front: false },
-    { x: axleHalfTrack, z: -axleHalfWheelbase, front: false }
+    { x: -axleHalfTrack, z: -axleHalfWheelbase, front: true },
+    { x: axleHalfTrack, z: -axleHalfWheelbase, front: true },
+    { x: -axleHalfTrack, z: axleHalfWheelbase, front: false },
+    { x: axleHalfTrack, z: axleHalfWheelbase, front: false }
   ];
 
   for (const spec of wheelSpecs) {
@@ -98,15 +98,15 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
     });
   }
 
-  const visualYawCorrection = new THREE.Quaternion().setFromAxisAngle(
-    new THREE.Vector3(0, 1, 0),
-    Math.PI
+  const visualOriginOffset = new CANNON.Vec3(
+    0,
+    -VISUAL_COM_HEIGHT + visualTyreBottomTrim,
+    0
   );
   const inverseVisualQuaternion = new THREE.Quaternion();
   const bodyQuaternion = new THREE.Quaternion();
   const wheelQuaternion = new THREE.Quaternion();
   const worldWheelPosition = new THREE.Vector3();
-  const visualOriginOffset = new CANNON.Vec3(0, -VISUAL_COM_HEIGHT, 0);
   const worldOriginOffset = new CANNON.Vec3();
   const localForward = new CANNON.Vec3(0, 0, 1);
   const worldForward = new CANNON.Vec3();
@@ -221,7 +221,7 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
     const forwardSpeed = body.velocity.dot(worldForward);
     const absoluteSpeed = body.velocity.length();
     const speedSteeringScale = clamp(1 - Math.abs(forwardSpeed) / 19, 0.58, 1);
-    const steeringAngle = steering * 0.43 * speedSteeringScale;
+    const steeringAngle = -steering * 0.43 * speedSteeringScale;
 
     vehicle.setSteeringValue(steeringAngle, 0);
     vehicle.setSteeringValue(steeringAngle, 1);
@@ -231,8 +231,8 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
     const speedLimit = targetThrottle >= 0 ? 15.5 : 6.2;
     const speedScale = clamp(1 - absoluteSpeed / speedLimit, 0.12, 1);
     const driveForce = throttle >= 0
-      ? throttle * 25 * speedScale
-      : throttle * 17 * speedScale;
+      ? -throttle * 25 * speedScale
+      : -throttle * 17 * speedScale;
     const braking = keys[" "] ? 8.5 : 0;
 
     for (let index = 0; index < 4; index++) {
@@ -256,7 +256,7 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
       body.position.y + worldOriginOffset.y,
       body.position.z + worldOriginOffset.z
     );
-    visualRoot.quaternion.copy(bodyQuaternion).multiply(visualYawCorrection);
+    visualRoot.quaternion.copy(bodyQuaternion);
     visualRoot.visible = true;
     visualRoot.updateMatrixWorld(true);
     inverseVisualQuaternion.copy(visualRoot.quaternion).invert();
