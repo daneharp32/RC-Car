@@ -802,6 +802,17 @@
     }
     .parts-lab-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
     .parts-lab-controls .menu-button { min-height: 40px; padding: 0 7px; font-size: 8px; }
+    .parts-lab-test-drive-panel {
+      display: none; margin-top: 11px; padding: 12px;
+      border: 1px solid rgba(92,183,255,.35); border-radius: 11px;
+      background: linear-gradient(145deg, rgba(16,53,82,.72), rgba(7,17,29,.82));
+    }
+    .parts-lab-test-drive-button { width: 100%; min-height: 42px; font-size: 10px; letter-spacing: .07em; }
+    .parts-lab-test-drive-status {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      margin-top: 9px; color: #8ecbff; font: 800 9px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+    .parts-lab-test-drive-hint { margin: 7px 0 0; color: #aebfce; font-size: 9px; line-height: 1.55; text-align: center; }
     .parts-lab-hint { margin: 12px 0 10px; color: #8296a8; font-size: 8px; line-height: 1.5; letter-spacing: .07em; text-align: center; }
     .parts-lab-back { width: 100%; min-height: 40px; font-size: 9px; }
     @media (max-width: 700px) {
@@ -913,7 +924,7 @@
   <section id="partsLabPanel" aria-labelledby="partsLabTitle" style="display:none">
     <div class="parts-lab-kicker">COMPONENT DEVELOPMENT · NOT INSTALLED</div>
     <h2 id="partsLabTitle" class="parts-lab-title">WIP PARTS LAB</h2>
-    <p class="parts-lab-copy">Inspect the new standalone component models. These are display models only and are not connected to either truck chassis.</p>
+    <p class="parts-lab-copy">Inspect the standalone components and assembled 1/7 chassis. Select ROLLING CHASSIS or SUSPENSION WORKING to test-drive the new chassis without its body shell.</p>
     <div class="parts-lab-section-label">SELECT A COMPONENT</div>
     <div class="parts-lab-part-list" role="group" aria-label="Choose a work-in-progress component">
       <div class="parts-lab-section-label parts-lab-part-divider">EXISTING COMPONENT PROTOTYPES</div>
@@ -1005,7 +1016,16 @@
       <button id="partsLabMotionToggle" class="menu-button" type="button" aria-pressed="true">PAUSE MOTION</button>
       <button id="partsLabResetView" class="menu-button secondary" type="button">RESET VIEW</button>
     </div>
-    <p class="parts-lab-hint">DRAG THE VIEW TO ROTATE · ANIMATIONS RUN IN REAL TIME</p>
+    <div id="partsLabTestDrivePanel" class="parts-lab-test-drive-panel">
+      <button id="partsLabTestDriveButton" class="menu-button parts-lab-test-drive-button" type="button">TEST DRIVE CHASSIS</button>
+      <div class="parts-lab-test-drive-status">
+        <span id="partsLabTestDriveState">READY TO TEST</span>
+        <span id="partsLabTestDriveSpeed">0 MPH</span>
+        <span id="partsLabTestDriveContact">0 / 4 TIRES</span>
+      </div>
+      <p class="parts-lab-test-drive-hint">W / ↑ ACCELERATE · S / ↓ REVERSE · A / D STEER · SPACE BRAKE · R RESET</p>
+    </div>
+    <p class="parts-lab-hint">DRAG THE VIEW TO ROTATE · CHASSIS TEST DRIVE USES LIVE SUSPENSION PHYSICS</p>
     <button id="partsLabBackButton" class="menu-button secondary parts-lab-back" type="button">BACK TO MAIN MENU</button>
   </section>
 
@@ -1339,6 +1359,6 @@
     }, 15000);
   })();
 </script>
-  <script type="module" src="./main.js?v=20261115-proportions12"></script>
+  <script type="module" src="./main.js?v=20261115-wip-drive1"></script>
 </body>
 </html>
