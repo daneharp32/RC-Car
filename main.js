@@ -6,7 +6,8 @@ import { createControlsSystem } from "./controls.js";
 import { createImpactDamageSystem } from "./damage-system.js";
 import { createMultiplayerSystem } from "./multiplayer.js";
 import { createGarageSystem } from "./garage.js";
-import { createPartsLabSystem } from "./parts-lab.js?v=20261115-proportions12";
+import { createPartsLabSystem } from "./parts-lab.js?v=20261115-wip-drive5";
+import { createWipTestDriveSystem } from "./wip-test-drive.js?v=20261115-wip-drive5";
 import { createSandboxSystem } from "./sandbox.js";
 import { createTrackSystem } from "./track.js";
 import { createGravelBasinSystem } from "./gravel-map.js";
@@ -1128,6 +1129,7 @@ function setCameraMode(mode) {
     button.setAttribute("aria-pressed", active ? "true" : "false");
   }
 }
+game.setCameraMode = setCameraMode;
 
 function cycleCameraMode() {
   const currentIndex = CAMERA_MODES.indexOf(cameraMode);
@@ -1233,6 +1235,13 @@ const garage = createGarageSystem(game);
 game.garage = garage;
 const partsLab = createPartsLabSystem(game);
 game.partsLab = partsLab;
+const wipTestDrive = createWipTestDriveSystem(
+  game,
+  partsLab.getTestDriveModel(),
+  partsLab.getTestDriveWheelPivots(),
+  state => partsLab.updateTestDriveSuspension(state)
+);
+game.wipTestDrive = wipTestDrive;
 const sandbox = createSandboxSystem(game);
 game.sandbox = sandbox;
 
@@ -1444,8 +1453,12 @@ function animate(now) {
   lastTime = now;
 
   const drivingActive = garage.viewMode === "drive";
+  const wipTestDriveActive = garage.viewMode === "parts-lab-drive";
+  const physicsDriveActive = drivingActive || wipTestDriveActive;
   try {
-    if (!isPaused && drivingActive) {
+    if (!isPaused && wipTestDriveActive) {
+      wipTestDrive.updateControls(delta);
+    } else if (!isPaused && drivingActive) {
       controls.updateDrivingControls(delta);
     } else {
       // The showroom and builder are display-only: keep physics input
@@ -1453,7 +1466,9 @@ function animate(now) {
       // the assembled WIP servo, linkage and front hubs can be demonstrated.
       const partsLabSteeringKeys = garage.viewMode === "parts-lab"
         ? new Set(["a", "d", "arrowleft", "arrowright"])
-        : null;
+        : garage.viewMode === "parts-lab-drive"
+          ? new Set(["w", "a", "s", "d", " ", "r", "arrowup", "arrowdown", "arrowleft", "arrowright"])
+          : null;
       for (const key of Object.keys(controls.keys)) {
         if (!partsLabSteeringKeys?.has(key)) controls.keys[key] = false;
       }
@@ -1465,17 +1480,30 @@ function animate(now) {
       vehicle.setSteeringValue(0, 1);
     }
   } catch (error) {
-    // A control bug must not stop the render loop or turn the track screen
-    // into a blank background. Remove drive force and report the error once.
+    // A control bug must not stop rendering. In the isolated WIP mode, stop
+    // the prototype vehicle first so a stale throttle command cannot persist.
     for (let i = 0; i < 4; i++) {
       vehicle.applyEngineForce(0, i);
       vehicle.setBrake(0, i);
     }
     vehicle.setSteeringValue(0, 0);
     vehicle.setSteeringValue(0, 1);
+    if (wipTestDriveActive) {
+      for (let i = 0; i < 4; i++) {
+        wipTestDrive.vehicle.applyEngineForce(0, i);
+        wipTestDrive.vehicle.setBrake(20, i);
+      }
+      try {
+        if (wipTestDrive.stop()) garage.showPartsLab();
+      } catch (restoreError) {
+        console.error("WIP test drive could not exit safely after an input error:", restoreError);
+      }
+    }
     if (!drivingControlErrorReported) {
       console.error("Driving controls failed; keeping the game running:", error);
-      showToast("Driving input error — please reload the game");
+      showToast(wipTestDriveActive
+        ? "WIP test drive stopped after an input error"
+        : "Driving input error — please reload the game");
       drivingControlErrorReported = true;
     }
   }
@@ -1484,7 +1512,7 @@ function animate(now) {
   sandbox.update(delta, now);
   // The physics world is only active while the truck is on a driving screen.
   // This keeps showroom, menus, and the Sandbox builder completely stationary.
-  if (drivingActive && !isPaused) {
+  if (physicsDriveActive && !isPaused) {
     world.step(FIXED_STEP, delta, 3);
 
     const deltaVelocity = [
@@ -1511,6 +1539,7 @@ function animate(now) {
 
     const stressNow = typeof performance !== "undefined" ? performance.now() : Date.now();
     if (
+      !wipTestDriveActive &&
       stressNow - lastLaunchStressAt >= 500 &&
       (linearChange >= 6.0 || angularChange >= 10.0)
     ) {
@@ -1531,22 +1560,30 @@ function animate(now) {
       }
     }
 
-    for (const impact of impactDamageSystem.drain()) {
-      localCar.setDamageMultiplier?.(cheatModifiers.damageMultiplier);
-      const damageResult = (!cheatModifiers.invincible && cheatModifiers.damageEnabled) ? localCar.applyImpact?.(impact) : null;
-      if (damageResult) {
-        const detachedText = damageResult.detached.length
-          ? " · " + damageResult.detached.join(", ").toUpperCase() + " DISCONNECTED"
-          : "";
-        showToast(damageResult.primary.toUpperCase() + " DAMAGED" + detachedText);
+    if (!wipTestDriveActive) {
+      for (const impact of impactDamageSystem.drain()) {
+        localCar.setDamageMultiplier?.(cheatModifiers.damageMultiplier);
+        const damageResult = (!cheatModifiers.invincible && cheatModifiers.damageEnabled) ? localCar.applyImpact?.(impact) : null;
+        if (damageResult) {
+          const detachedText = damageResult.detached.length
+            ? " · " + damageResult.detached.join(", ").toUpperCase() + " DISCONNECTED"
+            : "";
+          showToast(damageResult.primary.toUpperCase() + " DAMAGED" + detachedText);
+        }
       }
+    } else {
+      // Impacts from the independent WIP vehicle must not be applied to the
+      // parked production truck's damage model.
+      impactDamageSystem.drain();
     }
   } else {
     previousLaunchVelocity.copy(chassisBody.velocity);
     previousLaunchAngularVelocity.copy(chassisBody.angularVelocity);
   }
   const damageRules = sandbox.getCheatModifiers?.() || { damageEnabled: true };
-  const damageBeforeFailure = damageRules.damageEnabled ? localCar.getDamageSummary?.() : null;
+  const damageBeforeFailure = !wipTestDriveActive && damageRules.damageEnabled
+    ? localCar.getDamageSummary?.()
+    : null;
   if (
     damageBeforeFailure &&
     !damageBeforeFailure.totalled &&
@@ -1555,14 +1592,27 @@ function animate(now) {
     localCar.triggerCatastrophicFailure?.();
     showToast("VEHICLE TOTALLED · ALL COMPONENTS RELEASED · PRESS R TO RESET");
   }
-  localCar.updateDebris?.(delta);
-  // Stabilize the Sandbox chassis after physics so contact forces cannot build into a flip.
-  sandbox.postPhysicsUpdate(delta);
+  if (!wipTestDriveActive) {
+    localCar.updateDebris?.(delta);
+    // Stabilize the Sandbox chassis after physics so contact forces cannot build into a flip.
+    sandbox.postPhysicsUpdate(delta);
+  }
   // Read wheel contact and sliding flags before visual wheel transforms refresh them.
+  if (wipTestDriveActive) {
+    wipTestDrive.updateVisuals();
+    const speedLabel = $("partsLabTestDriveSpeed");
+    const contactLabel = $("partsLabTestDriveContact");
+    const stateLabel = $("partsLabTestDriveState");
+    if (speedLabel) speedLabel.textContent = Math.round(wipTestDrive.getSpeedMph()) + " MPH";
+    if (contactLabel) contactLabel.textContent = wipTestDrive.getContactCount() + " / 4 TIRES";
+    if (stateLabel) stateLabel.textContent = "TEST DRIVE ACTIVE";
+  }
 
-  updateLocalVisual();
-  race.update(delta, now);
-  multiplayer.updateRemoteVisuals(delta);
+  if (!wipTestDriveActive) {
+    updateLocalVisual();
+    race.update(delta, now);
+    multiplayer.updateRemoteVisuals(delta);
+  }
 
   const speedMph = chassisBody.velocity.length() * 2.236936;
   $("speedValue").textContent = String(Math.round(speedMph));
@@ -1607,7 +1657,9 @@ function animate(now) {
   // follows the local truck. Remote car visuals are already interpolated.
   const spectatedPlayer = race.getSpectateTarget();
   const followedCar = spectatedPlayer?.visual || localCar;
-  const followedRoot = followedCar.root;
+  const followedRoot = wipTestDriveActive
+    ? partsLab.getTestDriveModel()
+    : followedCar.root;
   const worldUp = new THREE.Vector3(0, 1, 0);
   const fullCarForward = new THREE.Vector3(0, 0, -1)
     .applyQuaternion(followedRoot.quaternion)
@@ -1673,15 +1725,16 @@ function animate(now) {
     const cameraCarScale = Math.max(1, followedRoot.scale.x || 1);
     // chaseCameraDistance is user-adjustable, with a closer minimum for a
     // more immersive view and enough range to pull back for high-speed driving.
-    const chaseHeight = chaseCameraDistance * 0.52;
+    const activeChaseDistance = wipTestDriveActive ? 1.95 : chaseCameraDistance * cameraCarScale;
+    const chaseHeight = wipTestDriveActive ? 0.95 : chaseCameraDistance * 0.52;
     const desiredCamera = followedRoot.position.clone()
-      .addScaledVector(cameraDirection, -chaseCameraDistance * cameraCarScale)
-      .add(new THREE.Vector3(0, chaseHeight * cameraCarScale, 0));
+      .addScaledVector(cameraDirection, -activeChaseDistance)
+      .add(new THREE.Vector3(0, chaseHeight * (wipTestDriveActive ? 1 : cameraCarScale), 0));
     camera.position.lerp(desiredCamera, 1 - Math.exp(-3.8 * delta));
     easeCameraFov(55, delta, 4.0);
     const lookTarget = followedRoot.position.clone()
-      .add(new THREE.Vector3(0, 0.32 * cameraCarScale, 0))
-      .addScaledVector(carForward, chaseCameraDistance * 0.17 * cameraCarScale);
+      .add(new THREE.Vector3(0, (wipTestDriveActive ? 0.14 : 0.32 * cameraCarScale), 0))
+      .addScaledVector(carForward, (wipTestDriveActive ? 0.55 : chaseCameraDistance * 0.17 * cameraCarScale));
     camera.up.copy(worldUp);
     camera.lookAt(lookTarget);
   }
@@ -1692,12 +1745,13 @@ function animate(now) {
   const orbitalLaserShake = sandbox.getCameraShakeOffset?.(Date.now());
   if (orbitalLaserShake?.lengthSq?.() > 0) camera.position.add(orbitalLaserShake);
 
-  multiplayer.sendSnapshotIfReady(delta);
+  if (!wipTestDriveActive) multiplayer.sendSnapshotIfReady(delta);
 
   // Keep the large outdoor-map shadow frusta centered near the truck.
-  if (game.activeMapId === "gravel-basin" && garage.viewMode === "drive") {
-    const focusX = Math.round(chassisBody.position.x / 3) * 3;
-    const focusZ = Math.round(chassisBody.position.z / 3) * 3;
+  if (game.activeMapId === "gravel-basin" && physicsDriveActive) {
+    const shadowFocusBody = wipTestDriveActive ? wipTestDrive.body : chassisBody;
+    const focusX = Math.round(shadowFocusBody.position.x / 3) * 3;
+    const focusZ = Math.round(shadowFocusBody.position.z / 3) * 3;
     sun.target.position.set(focusX, 0, focusZ);
     sun.position.set(
       focusX + activeLighting.sunOffset[0],
@@ -1711,7 +1765,7 @@ function animate(now) {
   // Static map casters do not need a new shadow pass every frame. Refresh at
   // roughly 5-6 Hz while driving so the truck's moving shadow stays responsive
   // without spending the GPU budget rendering the full scenery 60 times/sec.
-  if (drivingActive && !isPaused &&
+  if (physicsDriveActive && !isPaused &&
       now - lastShadowRefreshAt >= SHADOW_REFRESH_INTERVAL_MS) {
     requestShadowRefresh();
     lastShadowRefreshAt = now;
