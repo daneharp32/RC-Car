@@ -13,6 +13,7 @@ const SUSPENSION_REST = 0.045;
 const MAX_SUSPENSION_TRAVEL = 0.055;
 const CHASSIS_MASS = 6.8;
 const WIP_COLLISION_GROUP = 4;
+const JUMP_COLLISION_GROUP = 2;
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -39,7 +40,9 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
     angularDamping: 0.32,
     allowSleep: false,
     collisionFilterGroup: WIP_COLLISION_GROUP,
-    collisionFilterMask: -1
+    // Keep the chassis tub clear of the jump-face collision group. The
+    // wheel raycasts still see those surfaces, just like the production truck.
+    collisionFilterMask: ~JUMP_COLLISION_GROUP
   });
 
   // The body origin represents the assembled chassis' visual ground datum.
@@ -124,6 +127,9 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
   let previousOriginalBodyType = productionBody.type;
   let previousOriginalBodyMass = productionBody.mass;
   let previousOriginalCollisionMask = productionBody.collisionFilterMask;
+  let productionVehicleRemoved = false;
+  let wipVehicleAdded = false;
+  let rearCouplingListenerAdded = false;
 
   function getGroundSpawn() {
     const layout = game.mapLayouts?.[game.activeMapId] || game.trackLayout;
@@ -292,24 +298,56 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
     });
   }
 
+  function clearHeldControls() {
+    if (!controls?.keys) return;
+    for (const key of Object.keys(controls.keys)) controls.keys[key] = false;
+  }
+
+  function restoreProductionVehicle() {
+    productionBody.type = previousOriginalBodyType;
+    productionBody.mass = previousOriginalBodyMass;
+    productionBody.collisionFilterMask = previousOriginalCollisionMask;
+    productionBody.updateMassProperties?.();
+
+    // Only re-register a vehicle that this system successfully removed. This
+    // avoids adding a second set of raycast callbacks if setup failed early.
+    if (productionVehicleRemoved) {
+      productionVehicle.addToWorld(world);
+      productionVehicleRemoved = false;
+    }
+    world.broadphase.dirty = true;
+  }
+
   function start() {
     if (active) return true;
+    // A failed cleanup must never allow a second WIP vehicle to be registered.
+    if (productionVehicleRemoved || wipVehicleAdded) return false;
+
+    let listenerAddedThisAttempt = false;
     try {
       const spawn = getGroundSpawn();
-      physicsSystem?.setActiveMap?.(game.activeMapId || "closed-course");
+      const activeMap = game.activeMapId || "closed-course";
+      if (physicsSystem?.setActiveMap && !physicsSystem.setActiveMap(activeMap)) {
+        throw new Error("The selected driving area could not be enabled for the WIP test.");
+      }
+
+      // Validate the reversible switch before changing either vehicle.
+      if (typeof productionVehicle.removeFromWorld !== "function" ||
+          typeof productionVehicle.addToWorld !== "function" ||
+          typeof vehicle.removeFromWorld !== "function" ||
+          typeof vehicle.addToWorld !== "function") {
+        throw new Error("The current physics library does not support safe vehicle switching.");
+      }
 
       previousOriginalBodyType = productionBody.type;
       previousOriginalBodyMass = productionBody.mass;
       previousOriginalCollisionMask = productionBody.collisionFilterMask;
 
       // Remove the normal vehicle and its raycast callbacks for the duration
-      // of the prototype drive. This prevents two vehicles from using the same
-      // body or applying forces to one another.
-      if (typeof productionVehicle.removeFromWorld !== "function" ||
-          typeof productionVehicle.addToWorld !== "function") {
-        throw new Error("The current physics library does not support safe vehicle switching.");
-      }
+      // of the prototype drive. The production body is parked and disabled;
+      // the dedicated WIP body is the only vehicle receiving drive forces.
       productionVehicle.removeFromWorld(world);
+      productionVehicleRemoved = true;
       productionBody.type = CANNON.Body.STATIC;
       productionBody.mass = 0;
       productionBody.collisionFilterMask = 0;
@@ -323,11 +361,12 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
       body.torque.set(0, 0, 0);
 
       vehicle.addToWorld(world);
+      wipVehicleAdded = true;
       world.addEventListener("preStep", applyRearAxleCoupling);
+      rearCouplingListenerAdded = true;
+      listenerAddedThisAttempt = true;
       active = true;
-      if (controls?.keys) {
-        for (const key of Object.keys(controls.keys)) controls.keys[key] = false;
-      }
+      clearHeldControls();
       visualRoot.visible = true;
       world.broadphase.dirty = true;
       reset();
@@ -335,53 +374,70 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
       return true;
     } catch (error) {
       console.error("WIP chassis test drive could not start:", error);
-      try {
-        vehicle.removeFromWorld?.(world);
-      } catch (removeError) {
-        console.warn("Could not remove the inactive WIP vehicle:", removeError);
-      }
       active = false;
       visualRoot.visible = false;
-      productionBody.type = previousOriginalBodyType;
-      productionBody.mass = previousOriginalBodyMass;
-      productionBody.collisionFilterMask = previousOriginalCollisionMask;
-      productionBody.updateMassProperties?.();
+      if (listenerAddedThisAttempt && rearCouplingListenerAdded) {
+        world.removeEventListener("preStep", applyRearAxleCoupling);
+        rearCouplingListenerAdded = false;
+      }
+      if (wipVehicleAdded) {
+        try {
+          vehicle.removeFromWorld(world);
+          wipVehicleAdded = false;
+        } catch (removeError) {
+          console.error("Could not remove the partially started WIP vehicle:", removeError);
+        }
+      }
       try {
-        productionVehicle.addToWorld(world);
-        controls?.resetCar?.();
+        restoreProductionVehicle();
       } catch (restoreError) {
         console.error("Could not restore the production vehicle after test-drive setup failed:", restoreError);
       }
+      clearHeldControls();
       world.broadphase.dirty = true;
       return false;
     }
   }
 
   function stop() {
-    if (!active) return;
+    if (!active && !productionVehicleRemoved && !wipVehicleAdded) return true;
     active = false;
-    world.removeEventListener("preStep", applyRearAxleCoupling);
-    try {
-      vehicle.removeFromWorld(world);
-    } catch (error) {
-      console.warn("WIP test vehicle removal reported an error:", error);
+    if (rearCouplingListenerAdded) {
+      world.removeEventListener("preStep", applyRearAxleCoupling);
+      rearCouplingListenerAdded = false;
     }
+
+    if (wipVehicleAdded) {
+      try {
+        vehicle.removeFromWorld(world);
+        wipVehicleAdded = false;
+      } catch (error) {
+        // Do not reactivate the production truck while the WIP vehicle may
+        // still be registered; two active vehicles in one spot would be unsafe.
+        console.error("Could not cleanly remove the WIP test vehicle:", error);
+        visualRoot.visible = true;
+        return false;
+      }
+    }
+
     body.velocity.set(0, 0, 0);
     body.angularVelocity.set(0, 0, 0);
     body.force.set(0, 0, 0);
     body.torque.set(0, 0, 0);
     visualRoot.visible = false;
 
-    productionBody.type = previousOriginalBodyType;
-    productionBody.mass = previousOriginalBodyMass;
-    productionBody.collisionFilterMask = previousOriginalCollisionMask;
-    productionBody.updateMassProperties?.();
-    productionVehicle.addToWorld(world);
-    controls?.resetCar?.();
-    if (controls?.keys) {
-      for (const key of Object.keys(controls.keys)) controls.keys[key] = false;
+    try {
+      restoreProductionVehicle();
+    } catch (error) {
+      console.error("Could not restore the original truck after test drive:", error);
+      return false;
     }
-    world.broadphase.dirty = true;
+
+    // Do not call controls.resetCar() here: that also repairs the original
+    // truck and clears its damage. The garage handles showroom parking when
+    // returning to the Parts Lab, so its pre-test condition remains intact.
+    clearHeldControls();
+    return true;
   }
 
   function getSpeedMph() {
