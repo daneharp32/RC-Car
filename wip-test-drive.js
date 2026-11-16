@@ -12,7 +12,7 @@ const AXLE_HALF_WHEELBASE_MODEL = 1.97;
 const WHEEL_RADIUS_MODEL = 0.58 * 1.08;
 const WHEEL_RADIUS = WHEEL_RADIUS_MODEL * VISUAL_SCALE;
 const SUSPENSION_REST = 0.045;
-const MAX_SUSPENSION_TRAVEL = 0.055;
+const MAX_SUSPENSION_TRAVEL = 0.045;
 const CHASSIS_MASS = 6.8;
 const WIP_COLLISION_GROUP = 4;
 const JUMP_COLLISION_GROUP = 2;
@@ -90,11 +90,11 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
       directionLocal: new CANNON.Vec3(0, -1, 0),
       axleLocal: new CANNON.Vec3(-1, 0, 0),
       suspensionRestLength: SUSPENSION_REST,
-      suspensionStiffness: 74,
-      dampingCompression: 5.0,
-      dampingRelaxation: 3.8,
+      suspensionStiffness: 240,
+      dampingCompression: 9.0,
+      dampingRelaxation: 6.8,
       maxSuspensionTravel: MAX_SUSPENSION_TRAVEL,
-      maxSuspensionForce: 155,
+      maxSuspensionForce: 260,
       radius: WHEEL_RADIUS,
       frictionSlip: spec.front ? 3.55 : 3.15,
       rollInfluence: 0.075,
@@ -186,7 +186,7 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
     const travelDifference = leftCompression - rightCompression;
     if (!Number.isFinite(travelDifference)) return;
 
-    const force = clamp(travelDifference * 360, -34, 34) * contactScale;
+    const force = clamp(travelDifference * 220, -24, 24) * contactScale;
     if (Math.abs(force) < 0.01) return;
 
     body.vectorToWorldFrame(new CANNON.Vec3(0, 1, 0), worldUp);
@@ -231,7 +231,7 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
     const forwardSpeed = body.velocity.dot(worldForward);
     const absoluteSpeed = body.velocity.length();
     const speedSteeringScale = clamp(1 - Math.abs(forwardSpeed) / 19, 0.58, 1);
-    const steeringAngle = -steering * 0.43 * speedSteeringScale;
+    const steeringAngle = steering * 0.43 * speedSteeringScale;
 
     vehicle.setSteeringValue(steeringAngle, 0);
     vehicle.setSteeringValue(steeringAngle, 1);
@@ -241,8 +241,8 @@ export function createWipTestDriveSystem(game, visualRoot, wheelPivots, onSuspen
     const speedLimit = targetThrottle >= 0 ? 15.5 : 6.2;
     const speedScale = clamp(1 - absoluteSpeed / speedLimit, 0.12, 1);
     const driveForce = throttle >= 0
-      ? -throttle * 25 * speedScale
-      : -throttle * 17 * speedScale;
+      ? throttle * 25 * speedScale
+      : throttle * 17 * speedScale;
     const braking = keys[" "] ? 8.5 : 0;
 
     for (let index = 0; index < 4; index++) {
