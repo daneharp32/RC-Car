@@ -2074,7 +2074,7 @@ export function createPartsLabSystem(game) {
     const frontTravelRight = frontTravelForSide(1);
     const averageFrontTravel = (frontTravelLeft + frontTravelRight) * 0.5;
     const steering = THREE.MathUtils.clamp(steeringInput, -1, 1);
-    const wheelSteerAngle = steering * 0.45;
+    const wheelSteerAngle = steering * 0.30;
     const frontCompression = wheels
       ? THREE.MathUtils.clamp(
           1 - ((frontState(-1).restLength - frontState(-1).length +
