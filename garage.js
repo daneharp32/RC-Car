@@ -540,6 +540,8 @@ function parkCarForShowroom() {
   updateLocalVisual();
 }
 function showMainMenu() {
+  if (game.wipTestDrive?.active) game.wipTestDrive.stop();
+  game.partsLab?.setTestDriveMode?.(false);
   game.partsLab?.setVisible(false);
   clearGaragePartHover();
   resetGarageShellState(true);
@@ -555,6 +557,8 @@ function showMainMenu() {
   parkCarForShowroom();
 }
 function showModeSelect() {
+  if (game.wipTestDrive?.active) game.wipTestDrive.stop();
+  game.partsLab?.setTestDriveMode?.(false);
   game.partsLab?.setVisible(false);
   clearGaragePartHover();
   resetGarageShellState(true);
@@ -571,6 +575,8 @@ function showModeSelect() {
   game.multiplayer?.openLobbyBrowser?.();
 }
 function showCreateLobby() {
+  if (game.wipTestDrive?.active) game.wipTestDrive.stop();
+  game.partsLab?.setTestDriveMode?.(false);
   game.partsLab?.setVisible(false);
   clearGaragePartHover();
   resetGarageShellState(true);
@@ -588,6 +594,8 @@ function showCreateLobby() {
   $("lobbyName").focus();
 }
 function showGarage() {
+  if (game.wipTestDrive?.active) game.wipTestDrive.stop();
+  game.partsLab?.setTestDriveMode?.(false);
   game.partsLab?.setVisible(false);
   clearGaragePartHover();
   resetGarageShellState(true);
@@ -605,6 +613,8 @@ function showGarage() {
   updateGarageChassisChoiceButtons();
 }
 function showPartsLab() {
+  if (game.wipTestDrive?.active) game.wipTestDrive.stop();
+  game.partsLab?.setTestDriveMode?.(false);
   clearGaragePartHover();
   resetGarageShellState(true);
   viewMode = "parts-lab";
@@ -619,6 +629,25 @@ function showPartsLab() {
   parkCarForShowroom();
   game.partsLab?.setVisible(true);
 }
+
+function showPartsLabDrive() {
+  clearGaragePartHover();
+  resetGarageShellState(true);
+  viewMode = "parts-lab-drive";
+  mainMenuPanel.style.display = "none";
+  modeSelectPanel.style.display = "none";
+  garagePanel.style.display = "none";
+  $("partsLabPanel").style.display = "block";
+  joinPanel.style.display = "none";
+  hud.style.display = "none";
+  $("topStatus").style.display = "none";
+  parkCarForShowroom();
+  setArenaVisible(true);
+  localCar.root.visible = false;
+  game.partsLab?.setTestDriveMode?.(true);
+  return true;
+}
+
 function setGarageShellVisible(visible) {
   if (game.getShellStyle?.() === "none" || garageShellAnimation || visible === garageShellInstalled) return;
 
@@ -672,6 +701,7 @@ function showDriveScreen() {
     showCreateLobby,
     showGarage,
     showPartsLab,
+    showPartsLabDrive,
     showDriveScreen,
     setGarageShellVisible,
     chooseGarageShell,
